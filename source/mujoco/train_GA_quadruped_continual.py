@@ -289,7 +289,7 @@ def parse_args():
     parser.add_argument('--mutation_std', type=float, default=0.1)
     parser.add_argument('--crossover_rate', type=float, default=0.0)
     parser.add_argument('--elite_ratio', type=float, default=0.1)
-    parser.add_argument('--num_evals', type=int, default=3)
+    parser.add_argument('--num_evals', type=int, default=1)
     parser.add_argument('--init_range', type=float, default=0.1)
     parser.add_argument('--hidden_dims', type=str, default='512,256,128')
     parser.add_argument('--wandb_project', type=str, default='mujoco_evosax')

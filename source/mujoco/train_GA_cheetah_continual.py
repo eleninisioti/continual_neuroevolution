@@ -372,8 +372,8 @@ def parse_args():
                         help='Crossover rate (default 0.0, no crossover)')
     parser.add_argument('--elite_ratio', type=float, default=0.5,
                         help='Elite ratio - fraction of population used as parents (default 0.5)')
-    parser.add_argument('--num_evals', type=int, default=5,
-                        help='Number of evaluations per agent (averaged, default 5)')
+    parser.add_argument('--num_evals', type=int, default=1,
+                        help='Number of evaluations per agent (averaged, default 1)')
     parser.add_argument('--init_range', type=float, default=1.0,
                         help='Initial population range: values drawn from N(0, init_range) (default 1.0)')
     parser.add_argument('--gpus', type=str, default=None,

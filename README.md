@@ -11,6 +11,8 @@ This repository compares evolutionary strategies (SimpleGA, OpenES) against rein
 - **ReDo-PPO**: PPO with Reactivating Dormant Neurons - periodically reinitializes inactive neurons to combat plasticity loss
 - **TRAC-PPO**: PPO with Trust Region-Aware Continual learning optimizer - adaptive learning rates for continual learning
 
+We have implemented RL algorithms by modifying the PPO implementation of brax to support TRAC-PPO and ReDO-PPO (our implementation is under folder my_brax).
+gi
 ### Evolutionary Algorithms
 - **SimpleGA**: Simple Genetic Algorithm with elitism
 - **OpenES**: OpenAI Evolution Strategy with adaptive noise
@@ -119,7 +121,6 @@ tail -f projects/mujoco/ppo_CheetahRun_continual_friction/trial_1/train.log
 - Population size: 512
 - Generations per task: 500 (CheetahRun), 50 (Quadruped)
 - Mutation std: 1.0
-- Num evaluations: 3
 
 ### OpenES
 - Population size: 512

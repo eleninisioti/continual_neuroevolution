@@ -378,8 +378,8 @@ def parse_args():
                         help='OpenES noise standard deviation (default 0.04)')
     parser.add_argument('--learning_rate', type=float, default=0.01,
                         help='OpenES Adam optimizer learning rate (default 0.01)')
-    parser.add_argument('--num_evals', type=int, default=5,
-                        help='Number of evaluations per agent (averaged, default 5)')
+    parser.add_argument('--num_evals', type=int, default=1,
+                        help='Number of evaluations per agent (averaged, default 1)')
     parser.add_argument('--init_range', type=float, default=1.0,
                         help='Initial population range: values drawn from N(0, init_range) (default 1.0)')
     parser.add_argument('--gpus', type=str, default=None,

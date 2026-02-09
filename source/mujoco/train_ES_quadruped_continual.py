@@ -234,7 +234,7 @@ def parse_args():
     parser.add_argument('--pop_size', type=int, default=512)
     parser.add_argument('--sigma', type=float, default=0.04)
     parser.add_argument('--learning_rate', type=float, default=0.01)
-    parser.add_argument('--num_evals', type=int, default=3)
+    parser.add_argument('--num_evals', type=int, default=1)
     parser.add_argument('--init_range', type=float, default=0.1)
     parser.add_argument('--max_episode_steps', type=int, default=1000)
     parser.add_argument('--hidden_dims', type=int, nargs='+', default=[512, 256, 128])
