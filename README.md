@@ -1,4 +1,4 @@
-# Continual Neuroevolution vs Reinforcement Learning
+# Continual Reinforcement Learning through Neuroevolution
 
 Benchmarking continual learning algorithms on MuJoCo Playground environments using JAX.
 
@@ -11,7 +11,7 @@ This repository compares evolutionary strategies (SimpleGA, OpenES) against rein
 - **ReDo-PPO**: PPO with Reactivating Dormant Neurons - periodically reinitializes inactive neurons to combat plasticity loss
 - **TRAC-PPO**: PPO with Trust Region-Aware Continual learning optimizer - adaptive learning rates for continual learning
 
-### Evolutionary Strategies
+### Evolutionary Algorithms
 - **SimpleGA**: Simple Genetic Algorithm with elitism
 - **OpenES**: OpenAI Evolution Strategy with adaptive noise
 

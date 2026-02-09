@@ -17,7 +17,7 @@
 from typing import Callable, Sequence, Tuple
 
 from brax.training import distribution
-from brax_trac import networks  # Use our local networks module
+from my_brax import networks  # Use our local networks module
 from brax.training import types
 from brax.training.types import PRNGKey
 from flax import linen

@@ -56,7 +56,7 @@ import matplotlib.pyplot as plt
 import imageio
 
 # Import our custom continual training function
-from ppo_continual_train import train_continual
+from my_brax.ppo_continual_train import train_continual
 
 
 def create_modified_env(env_name, task_mod='gravity', multiplier=1.0):

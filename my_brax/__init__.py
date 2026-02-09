@@ -7,4 +7,4 @@ Local copy of Brax PPO training adapted for:
 Based on inspiration/brax_wrapper with fixed imports.
 """
 
-from brax_trac.ppo_train import train
+from my_brax.ppo_train import train

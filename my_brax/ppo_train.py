@@ -43,8 +43,8 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 
-# Import ReDo support from brax_trac
-from brax_trac import networks as brax_trac_networks
+# Import ReDo support from my_brax
+from my_brax import networks as my_brax_networks
 
 InferenceParams = Tuple[running_statistics.NestedMeanStd, Params]
 Metrics = types.Metrics
@@ -121,7 +121,7 @@ def _apply_redo(
             )
             
             # Apply ReDo to policy params
-            new_policy_params = brax_trac_networks.apply_redo_to_params(
+            new_policy_params = my_brax_networks.apply_redo_to_params(
                 params.policy,
                 policy_hidden_sizes,
                 policy_dormant_indices,
@@ -149,7 +149,7 @@ def _apply_redo(
             )
             
             # Apply ReDo to value params
-            new_value_params = brax_trac_networks.apply_redo_to_params(
+            new_value_params = my_brax_networks.apply_redo_to_params(
                 params.value,
                 value_hidden_sizes,
                 value_dormant_indices,

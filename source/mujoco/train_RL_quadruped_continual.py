@@ -52,7 +52,7 @@ from mujoco_playground import registry
 from mujoco_playground._src import wrapper
 
 # Import continual training function
-from ppo_continual_train import train_continual
+from my_brax.ppo_continual_train import train_continual
 
 
 # Leg action indices (None = healthy/no damage)

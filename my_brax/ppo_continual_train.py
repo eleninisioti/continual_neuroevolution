@@ -32,8 +32,8 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 
-# Import ReDo support from brax_trac
-from brax_trac import networks as brax_trac_networks
+# Import ReDo support from my_brax
+from my_brax import networks as my_brax_networks
 
 InferenceParams = Tuple[running_statistics.NestedMeanStd, Params]
 Metrics = types.Metrics
@@ -316,7 +316,7 @@ def _apply_redo(
             )
             
             # Apply ReDo to policy params
-            new_policy_params = brax_trac_networks.apply_redo_to_params(
+            new_policy_params = my_brax_networks.apply_redo_to_params(
                 params.policy,
                 policy_hidden_sizes,
                 policy_dormant_indices,
@@ -344,7 +344,7 @@ def _apply_redo(
             )
             
             # Apply ReDo to value params
-            new_value_params = brax_trac_networks.apply_redo_to_params(
+            new_value_params = my_brax_networks.apply_redo_to_params(
                 params.value,
                 value_hidden_sizes,
                 value_dormant_indices,
@@ -539,9 +539,9 @@ def train_continual(
     # Use custom network factory with dormant detection when tracking is enabled
     if track_dormant or use_redo:
         # Use our custom networks with dormant neuron detection
-        print(f'[NETWORK DEBUG] Using brax_trac_networks.make_ppo_networks for dormant tracking', flush=True)
+        print(f'[NETWORK DEBUG] Using my_brax_networks.make_ppo_networks for dormant tracking', flush=True)
         print(f'[NETWORK DEBUG] policy_hidden_sizes: {policy_hidden_sizes}, value_hidden_sizes: {value_hidden_sizes}', flush=True)
-        ppo_network = brax_trac_networks.make_ppo_networks(
+        ppo_network = my_brax_networks.make_ppo_networks(
             obs_shape, wrapped_env.action_size, 
             preprocess_observations_fn=normalize,
             policy_hidden_layer_sizes=policy_hidden_sizes,
