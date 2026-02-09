@@ -1,0 +1,133 @@
+# Continual Neuroevolution vs Reinforcement Learning
+
+Benchmarking continual learning algorithms on MuJoCo Playground environments using JAX.
+
+This repository compares evolutionary strategies (SimpleGA, OpenES) against reinforcement learning methods (PPO and variants) on continual learning tasks where the environment changes over time.
+
+## Methods
+
+### Reinforcement Learning
+- **PPO**: Proximal Policy Optimization baseline
+- **ReDo-PPO**: PPO with Reactivating Dormant Neurons - periodically reinitializes inactive neurons to combat plasticity loss
+- **TRAC-PPO**: PPO with Trust Region-Aware Continual learning optimizer - adaptive learning rates for continual learning
+
+### Evolutionary Strategies
+- **SimpleGA**: Simple Genetic Algorithm with elitism
+- **OpenES**: OpenAI Evolution Strategy with adaptive noise
+
+## Tasks
+
+### CheetahRun - Friction Continual Learning
+- **Environment**: DeepMind Control Suite CheetahRun
+- **Task variation**: Friction coefficient cycles through 3 values (low=0.2x, default=1.0x, high=5.0x)
+- **30 tasks** per trial, each with different friction
+- **Continual setting**: Network weights preserved across tasks
+
+### Go1 Quadruped - Leg Damage Continual Learning
+- **Environment**: Unitree Go1 robot locomotion (MuJoCo Playground)
+- **Task variation**: Different leg is damaged (locked in bent position) each task
+- **20 tasks** per trial (first task = healthy baseline)
+- **Continual setting**: Network weights preserved, random leg selection avoiding consecutive same leg
+
+## Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/eleninisioti/continual_neuroevolution.git
+cd continual_neuroevolution
+
+# Create virtual environment with uv
+uv venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+uv pip install -r requirements.txt
+
+# For GPU support (CUDA 12)
+uv pip install -U "jax[cuda12]"
+```
+
+
+## Running Experiments
+
+All experiment scripts are located in `scripts/mujoco/`. Each script runs 10 trials sequentially on a specified GPU.
+
+### CheetahRun Continual Friction
+
+```bash
+# PPO, ReDo-PPO, TRAC-PPO (30 trials total)
+./scripts/mujoco/run_RL_cheetah_continual.sh [GPU_ID]
+
+# SimpleGA (10 trials)
+./scripts/mujoco/run_GA_cheetah_continual.sh [GPU_ID]
+
+# OpenES (10 trials)
+./scripts/mujoco/run_ES_cheetah_continual.sh [GPU_ID]
+```
+
+### Go1 Quadruped Continual Leg Damage
+
+```bash
+# PPO, ReDo-PPO, TRAC-PPO (30 trials total)
+./scripts/mujoco/run_RL_quadruped_continual.sh [GPU_ID]
+
+# SimpleGA (10 trials)
+./scripts/mujoco/run_GA_quadruped_continual.sh [GPU_ID]
+
+# OpenES (10 trials)
+./scripts/mujoco/run_ES_quadruped_continual.sh [GPU_ID]
+```
+
+
+## Output Structure
+
+Results are saved under `projects/mujoco/`:
+
+```
+projects/mujoco/
+├── ppo_CheetahRun_continual_friction/
+│   ├── trial_1/
+│   │   ├── train.log
+│   │   ├── config.json
+│   │   └── checkpoints/
+│   ├── trial_2/
+│   └── ...
+```
+
+## Monitoring
+
+All experiments log to Weights & Biases (wandb). Monitor progress:
+
+```bash
+# Check log files
+tail -f projects/mujoco/ppo_CheetahRun_continual_friction/trial_1/train.log
+
+# View wandb dashboard
+# Project: continual_neuroevolution_ICML_2026_ppo (or _redo, _trac, _ga, _es)
+```
+
+## Hyperparameters
+
+### PPO / ReDo-PPO / TRAC-PPO
+- Timesteps per task: 51.2M (CheetahRun), 25.6M (Quadruped)
+- Network: (512, 256, 128) hidden layers
+- Learning rate: 3e-4
+- Batch size: 2048
+- ReDo frequency: every epoch
+
+### SimpleGA
+- Population size: 512
+- Generations per task: 500 (CheetahRun), 50 (Quadruped)
+- Mutation std: 1.0
+- Num evaluations: 3
+
+### OpenES
+- Population size: 512
+- Generations per task: 100 (CheetahRun), 50 (Quadruped)
+- Sigma: 0.04
+- Learning rate: 0.01
+
+
+## License
+
+MIT License
