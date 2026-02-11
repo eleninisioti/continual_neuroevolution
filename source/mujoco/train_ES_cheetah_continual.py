@@ -691,8 +691,11 @@ def main():
         
         print(f"\nTask {task_idx + 1} complete! Best fitness: {best_fitness_task:.2f}")
         
+        # Create task label from multiplier (same format as GA)
+        task_label = f"{task_mod}_{current_multiplier:.2f}".replace(".", "p")
+        
         # Save checkpoint at end of task
-        ckpt_path = os.path.join(checkpoint_dir, f'task_{task_idx+1:02d}_{task_mod}_{current_multiplier:.2f}.pkl')
+        ckpt_path = os.path.join(checkpoint_dir, f'task_{task_idx:02d}_{task_label}.pkl')
         with open(ckpt_path, 'wb') as f:
             pickle.dump({
                 'flat_params': best_params_task,
@@ -707,6 +710,42 @@ def main():
                 'env_name': env_name,
             }, f)
         print(f"  Saved checkpoint: {ckpt_path}")
+        
+        # Save GIFs at end of each task (same format as GA)
+        try:
+            task_gifs_dir = os.path.join(output_dir, "gifs", f"task_{task_idx:02d}_{task_label}")
+            os.makedirs(task_gifs_dir, exist_ok=True)
+            
+            params = unflatten_params(best_params_task, param_template)
+            jit_policy = jax.jit(policy.apply)
+            
+            num_gifs = 3
+            for gif_idx in range(num_gifs):
+                key, gif_key = jax.random.split(key)
+                jit_reset = jax.jit(env.reset)
+                jit_step = jax.jit(env.step)
+                
+                state = jit_reset(gif_key)
+                trajectory = [state]
+                total_reward = 0.0
+                
+                for _ in range(max_episode_steps):
+                    obs = jnp.expand_dims(state.obs, axis=0)
+                    action = jit_policy(params, obs)[0]
+                    state = jit_step(state, action)
+                    trajectory.append(state)
+                    total_reward += float(state.reward)
+                    if state.done:
+                        break
+                
+                # Render every 2nd frame
+                images = env.render(trajectory[::2], height=240, width=320, camera="side")
+                gif_path = os.path.join(task_gifs_dir, f"trial{gif_idx}_reward{total_reward:.0f}.gif")
+                imageio.mimsave(gif_path, images, fps=30, loop=0)
+            
+            print(f"  Saved {num_gifs} GIFs to: {task_gifs_dir}")
+        except Exception as e:
+            print(f"  Warning: Failed to save GIFs for task {task_idx}: {e}")
     
     total_time = time.time() - start_time
     

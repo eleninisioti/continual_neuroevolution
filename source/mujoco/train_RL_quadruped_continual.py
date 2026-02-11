@@ -41,12 +41,14 @@ os.environ["MUJOCO_GL"] = "egl"
 import argparse
 import json
 import pickle
+import jax
 import jax.numpy as jnp
 from jax import random
 from datetime import datetime
 import numpy as np
 import functools
 import wandb
+import imageio
 
 from mujoco_playground import registry
 from mujoco_playground._src import wrapper
@@ -425,6 +427,53 @@ def main():
             }, f)
         print(f"  Saved checkpoint: {ckpt_path}")
     
+    # GIF callback function - saves evaluation GIFs at end of each task
+    gifs_dir = os.path.join(output_path, "gifs")
+    os.makedirs(gifs_dir, exist_ok=True)
+    
+    def gif_callback_fn(task_idx, multiplier, inference_fn, env, params):
+        """Save evaluation GIFs at end of task before switching."""
+        try:
+            num_gifs = 10  # Save 10 random trajectory GIFs per task
+            max_steps = 1000
+            
+            jit_reset = jax.jit(env.reset)
+            jit_step = jax.jit(env.step)
+            jit_inference_fn = jax.jit(inference_fn)
+            
+            leg_idx = leg_sequence[task_idx]
+            leg_name = LEG_NAMES[leg_idx]
+            
+            # Create task-specific subdirectory
+            task_gifs_dir = os.path.join(gifs_dir, f"task_{task_idx:02d}_{leg_name}")
+            os.makedirs(task_gifs_dir, exist_ok=True)
+            
+            for gif_idx in range(num_gifs):
+                # Use random seeds for diverse trajectories
+                gif_key = jax.random.key(task_idx * 1000 + gif_idx * 37 + args.seed)
+                state = jit_reset(gif_key)
+                rollout = [state]
+                total_reward = 0.0
+                
+                for _ in range(max_steps):
+                    gif_key, act_key = jax.random.split(gif_key)
+                    action, _ = jit_inference_fn(state.obs, act_key)
+                    state = jit_step(state, action)
+                    rollout.append(state)
+                    total_reward += float(state.reward)
+                    if state.done:
+                        break
+                
+                # Render every 2nd frame for smaller GIFs
+                images = env.render(rollout[::2], height=240, width=320, camera="tracking")
+                gif_path = os.path.join(task_gifs_dir, f"trajectory_{gif_idx:02d}_reward{total_reward:.0f}.gif")
+                imageio.mimsave(gif_path, images, fps=30, loop=0)
+            
+            print(f"  Saved {num_gifs} GIFs for task {task_idx} in {task_gifs_dir}")
+            
+        except Exception as e:
+            print(f"  Warning: Failed to save GIFs for task {task_idx}: {e}")
+    
     # Run continual training
     make_policy, final_params, final_metrics = train_continual(
         env_factory=env_factory,
@@ -454,6 +503,7 @@ def main():
         dormant_tau=args.dormant_tau,
         progress_fn=progress_fn,
         checkpoint_fn=checkpoint_fn,
+        gif_callback_fn=gif_callback_fn,
     )
     
     # Final summary

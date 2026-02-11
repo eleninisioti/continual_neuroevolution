@@ -1,13 +1,16 @@
 #!/bin/bash
-# Script to run all CheetahRun continual friction experiments sequentially
-# Methods: PPO, ReDo-PPO, TRAC-PPO (in that order)
+# Script to run all CheetahRun continual friction experiments in parallel
+# Methods: PPO, ReDo-PPO, TRAC-PPO (running in parallel on different GPUs)
 # Total runs: 3 methods × 10 trials = 30 runs
 #
-# Usage: ./run_cheetah_continual_friction_all.sh [GPU_ID]
+# Usage: ./run_cheetah_continual_friction_all.sh
 
 set -e
 
-GPU_ID=${1:-0}
+# GPU assignments for parallel execution
+GPU_PPO=0
+GPU_TRAC=2
+GPU_REDO=4
 
 # ============================================
 # ACTIVATE VIRTUAL ENVIRONMENT
@@ -52,144 +55,170 @@ FRICTION_HIGH=5.0
 mkdir -p "$BASE_DIR"
 
 echo "=============================================="
-echo "CheetahRun Continual Friction - ALL METHODS"
+echo "CheetahRun Continual Friction - ALL METHODS (PARALLEL)"
 echo "=============================================="
-echo "GPU: $GPU_ID"
+echo "GPUs: PPO=$GPU_PPO, TRAC=$GPU_TRAC, ReDo=$GPU_REDO"
 echo "Methods: PPO, ReDo-PPO, TRAC-PPO"
 echo "Trials per method: $NUM_TRIALS"
 echo "Total runs: $((NUM_TRIALS * 3))"
 echo ""
 
 # ============================================
-# 1. PPO (baseline)
+# Function to run PPO trials
 # ============================================
-echo ""
-echo "=============================================="
-echo "PHASE 1: PPO (baseline)"
-echo "=============================================="
+run_ppo() {
+    local GPU_ID=$GPU_PPO
+    echo ""
+    echo "=============================================="
+    echo "PPO (baseline) on GPU $GPU_ID"
+    echo "=============================================="
 
-for TRIAL in $(seq 1 $NUM_TRIALS); do
-    SEED=$((42 + TRIAL - 1))
-    
-    RUN_NAME="ppo_${ENV}_continual_friction_trial${TRIAL}"
-    PROJECT_DIR="${BASE_DIR}/ppo_${ENV}_continual_friction"
-    OUTPUT_DIR="${PROJECT_DIR}/trial_${TRIAL}"
-    mkdir -p "$OUTPUT_DIR"
-    
-    echo "[GPU $GPU_ID] Starting: $RUN_NAME (trial $TRIAL/$NUM_TRIALS, seed=$SEED)..."
-    
-    LOG_FILE="${OUTPUT_DIR}/train.log"
-    python source/mujoco/train_RL_cheetah_continual.py \
-        --env $ENV \
-        --task_mod friction \
-        --friction_default_mult $FRICTION_DEFAULT \
-        --friction_low_mult $FRICTION_LOW \
-        --friction_high_mult $FRICTION_HIGH \
-        --num_tasks $NUM_TASKS \
-        --timesteps_per_task $PPO_STEPS_PER_TASK \
-        --seed $SEED \
-        --gpus $GPU_ID \
-        --run_name $RUN_NAME \
-        --output_dir $OUTPUT_DIR \
-        --wandb_project ${WANDB_PROJECT}_ppo \
-        > "$LOG_FILE" 2>&1
-    
-    echo "[GPU $GPU_ID] Completed: $RUN_NAME"
-done
+    for TRIAL in $(seq 1 $NUM_TRIALS); do
+        SEED=$((42 + TRIAL ))
+        
+        RUN_NAME="ppo_${ENV}_continual_friction_trial${TRIAL}"
+        PROJECT_DIR="${BASE_DIR}/ppo_${ENV}_continual_friction"
+        OUTPUT_DIR="${PROJECT_DIR}/trial_${TRIAL}"
+        mkdir -p "$OUTPUT_DIR"
+        
+        echo "[GPU $GPU_ID] Starting: $RUN_NAME (trial $TRIAL/$NUM_TRIALS, seed=$SEED)..."
+        
+        LOG_FILE="${OUTPUT_DIR}/train.log"
+        python source/mujoco/train_RL_cheetah_continual.py \
+            --env $ENV \
+            --task_mod friction \
+            --friction_default_mult $FRICTION_DEFAULT \
+            --friction_low_mult $FRICTION_LOW \
+            --friction_high_mult $FRICTION_HIGH \
+            --num_tasks $NUM_TASKS \
+            --timesteps_per_task $PPO_STEPS_PER_TASK \
+            --seed $SEED \
+            --gpus $GPU_ID \
+            --run_name $RUN_NAME \
+            --output_dir $OUTPUT_DIR \
+            --wandb_project ${WANDB_PROJECT}_ppo \
+            > "$LOG_FILE" 2>&1
+        
+        echo "[GPU $GPU_ID] Completed: $RUN_NAME"
+    done
 
-echo ""
-echo "PPO experiments complete!"
-
-# ============================================
-# 2. ReDo-PPO
-# ============================================
-echo ""
-echo "=============================================="
-echo "PHASE 2: ReDo-PPO"
-echo "=============================================="
-
-for TRIAL in $(seq 1 $NUM_TRIALS); do
-    SEED=$((42 + TRIAL - 1))
-    
-    RUN_NAME="redo_ppo_${ENV}_continual_friction_trial${TRIAL}"
-    PROJECT_DIR="${BASE_DIR}/redo_ppo_${ENV}_continual_friction"
-    OUTPUT_DIR="${PROJECT_DIR}/trial_${TRIAL}"
-    mkdir -p "$OUTPUT_DIR"
-    
-    echo "[GPU $GPU_ID] Starting: $RUN_NAME (trial $TRIAL/$NUM_TRIALS, seed=$SEED)..."
-    
-    LOG_FILE="${OUTPUT_DIR}/train.log"
-    python source/mujoco/train_RL_cheetah_continual.py \
-        --env $ENV \
-        --task_mod friction \
-        --friction_default_mult $FRICTION_DEFAULT \
-        --friction_low_mult $FRICTION_LOW \
-        --friction_high_mult $FRICTION_HIGH \
-        --num_tasks $NUM_TASKS \
-        --timesteps_per_task $PPO_STEPS_PER_TASK \
-        --seed $SEED \
-        --gpus $GPU_ID \
-        --run_name $RUN_NAME \
-        --output_dir $OUTPUT_DIR \
-        --redo \
-        --redo_frequency 1 \
-        --wandb_project ${WANDB_PROJECT}_redo \
-        > "$LOG_FILE" 2>&1
-    
-    echo "[GPU $GPU_ID] Completed: $RUN_NAME"
-done
-
-echo ""
-echo "ReDo-PPO experiments complete!"
+    echo ""
+    echo "PPO experiments complete!"
+}
 
 # ============================================
-# 3. TRAC-PPO
+# Function to run ReDo-PPO trials
 # ============================================
-echo ""
-echo "=============================================="
-echo "PHASE 3: TRAC-PPO"
-echo "=============================================="
+run_redo() {
+    local GPU_ID=$GPU_REDO
+    echo ""
+    echo "=============================================="
+    echo "ReDo-PPO on GPU $GPU_ID"
+    echo "=============================================="
 
-for TRIAL in $(seq 1 $NUM_TRIALS); do
-    SEED=$((42 + TRIAL - 1))
-    
-    RUN_NAME="trac_ppo_${ENV}_continual_friction_trial${TRIAL}"
-    PROJECT_DIR="${BASE_DIR}/trac_ppo_${ENV}_continual_friction"
-    OUTPUT_DIR="${PROJECT_DIR}/trial_${TRIAL}"
-    mkdir -p "$OUTPUT_DIR"
-    
-    echo "[GPU $GPU_ID] Starting: $RUN_NAME (trial $TRIAL/$NUM_TRIALS, seed=$SEED)..."
-    
-    LOG_FILE="${OUTPUT_DIR}/train.log"
-    python source/mujoco/train_RL_cheetah_continual.py \
-        --env $ENV \
-        --task_mod friction \
-        --friction_default_mult $FRICTION_DEFAULT \
-        --friction_low_mult $FRICTION_LOW \
-        --friction_high_mult $FRICTION_HIGH \
-        --num_tasks $NUM_TASKS \
-        --timesteps_per_task $PPO_STEPS_PER_TASK \
-        --seed $SEED \
-        --gpus $GPU_ID \
-        --run_name $RUN_NAME \
-        --output_dir $OUTPUT_DIR \
-        --trac \
-        --wandb_project ${WANDB_PROJECT}_trac \
-        > "$LOG_FILE" 2>&1
-    
-    echo "[GPU $GPU_ID] Completed: $RUN_NAME"
-done
+    for TRIAL in $(seq 1 $NUM_TRIALS); do
+        SEED=$((42 + TRIAL - 1))
+        
+        RUN_NAME="redo_ppo_${ENV}_continual_friction_trial${TRIAL}"
+        PROJECT_DIR="${BASE_DIR}/redo_ppo_${ENV}_continual_friction"
+        OUTPUT_DIR="${PROJECT_DIR}/trial_${TRIAL}"
+        mkdir -p "$OUTPUT_DIR"
+        
+        echo "[GPU $GPU_ID] Starting: $RUN_NAME (trial $TRIAL/$NUM_TRIALS, seed=$SEED)..."
+        
+        LOG_FILE="${OUTPUT_DIR}/train.log"
+        python source/mujoco/train_RL_cheetah_continual.py \
+            --env $ENV \
+            --task_mod friction \
+            --friction_default_mult $FRICTION_DEFAULT \
+            --friction_low_mult $FRICTION_LOW \
+            --friction_high_mult $FRICTION_HIGH \
+            --num_tasks $NUM_TASKS \
+            --timesteps_per_task $PPO_STEPS_PER_TASK \
+            --seed $SEED \
+            --gpus $GPU_ID \
+            --run_name $RUN_NAME \
+            --output_dir $OUTPUT_DIR \
+            --redo \
+            --redo_frequency 1 \
+            --wandb_project ${WANDB_PROJECT}_redo \
+            > "$LOG_FILE" 2>&1
+        
+        echo "[GPU $GPU_ID] Completed: $RUN_NAME"
+    done
 
-echo ""
-echo "TRAC-PPO experiments complete!"
+    echo ""
+    echo "ReDo-PPO experiments complete!"
+}
+
+# ============================================
+# Function to run TRAC-PPO trials
+# ============================================
+run_trac() {
+    local GPU_ID=$GPU_TRAC
+    echo ""
+    echo "=============================================="
+    echo "TRAC-PPO on GPU $GPU_ID"
+    echo "=============================================="
+
+    for TRIAL in $(seq 1 $NUM_TRIALS); do
+        SEED=$((42 + TRIAL - 1))
+        
+        RUN_NAME="trac_ppo_${ENV}_continual_friction_trial${TRIAL}"
+        PROJECT_DIR="${BASE_DIR}/trac_ppo_${ENV}_continual_friction"
+        OUTPUT_DIR="${PROJECT_DIR}/trial_${TRIAL}"
+        mkdir -p "$OUTPUT_DIR"
+        
+        echo "[GPU $GPU_ID] Starting: $RUN_NAME (trial $TRIAL/$NUM_TRIALS, seed=$SEED)..."
+        
+        LOG_FILE="${OUTPUT_DIR}/train.log"
+        python source/mujoco/train_RL_cheetah_continual.py \
+            --env $ENV \
+            --task_mod friction \
+            --friction_default_mult $FRICTION_DEFAULT \
+            --friction_low_mult $FRICTION_LOW \
+            --friction_high_mult $FRICTION_HIGH \
+            --num_tasks $NUM_TASKS \
+            --timesteps_per_task $PPO_STEPS_PER_TASK \
+            --seed $SEED \
+            --gpus $GPU_ID \
+            --run_name $RUN_NAME \
+            --output_dir $OUTPUT_DIR \
+            --trac \
+            --wandb_project ${WANDB_PROJECT}_trac \
+            > "$LOG_FILE" 2>&1
+        
+        echo "[GPU $GPU_ID] Completed: $RUN_NAME"
+    done
+
+    echo ""
+    echo "TRAC-PPO experiments complete!"
+}
+
+# ============================================
+# Run all methods in parallel
+# ============================================
+echo "Starting all methods in parallel..."
+run_ppo &
+PID_PPO=$!
+run_trac &
+PID_TRAC=$!
+run_redo &
+PID_REDO=$!
+
+# Wait for all background processes to complete
+echo "Waiting for all experiments to complete..."
+wait $PID_PPO
+wait $PID_TRAC
+wait $PID_REDO
 
 echo ""
 echo "=============================================="
 echo "ALL EXPERIMENTS COMPLETE!"
 echo "=============================================="
-echo "  PPO: $NUM_TRIALS trials"
-echo "  ReDo-PPO: $NUM_TRIALS trials"
-echo "  TRAC-PPO: $NUM_TRIALS trials"
+echo "  PPO: $NUM_TRIALS trials (GPU $GPU_PPO)"
+echo "  TRAC-PPO: $NUM_TRIALS trials (GPU $GPU_TRAC)"
+echo "  ReDo-PPO: $NUM_TRIALS trials (GPU $GPU_REDO)"
 echo "  Total: $((NUM_TRIALS * 3)) runs"
 echo "  Output: $BASE_DIR"
 echo "=============================================="

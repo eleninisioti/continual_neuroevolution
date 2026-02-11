@@ -46,6 +46,7 @@ import pickle
 import wandb
 import json
 import numpy as np
+import imageio
 
 
 # Leg action indices
@@ -516,6 +517,46 @@ def main():
                 'global_gen': global_gen - 1,  # Last generation of this task
             }, f)
         print(f"  Saved checkpoint: {ckpt_path}")
+        
+        # Save GIFs at end of each task
+        try:
+            task_gifs_dir = os.path.join(output_dir, "gifs", f"task_{task_num:02d}_{leg_name}")
+            os.makedirs(task_gifs_dir, exist_ok=True)
+            
+            params = unflatten_params(task_best_params, param_template)
+            jit_policy = jax.jit(policy.apply)
+            
+            num_gifs = 3
+            for gif_idx in range(num_gifs):
+                key, gif_key = jax.random.split(key)
+                jit_reset = jax.jit(env.reset)
+                jit_step = jax.jit(env.step)
+                
+                state = jit_reset(gif_key)
+                trajectory = [state]
+                total_reward = 0.0
+                
+                for _ in range(max_episode_steps):
+                    obs = jnp.expand_dims(state.obs, axis=0)
+                    action = jit_policy(params, obs)[0]
+                    # Apply leg damage mask
+                    if damaged_leg is not None:
+                        damaged_indices = jnp.array(LEG_ACTION_INDICES[damaged_leg])
+                        action = action.at[damaged_indices].set(0.0)
+                    state = jit_step(state, action)
+                    trajectory.append(state)
+                    total_reward += float(state.reward)
+                    if state.done:
+                        break
+                
+                # Render every 2nd frame
+                images = env.render(trajectory[::2], height=240, width=320, camera="tracking")
+                gif_path = os.path.join(task_gifs_dir, f"trial{gif_idx}_reward{total_reward:.0f}.gif")
+                imageio.mimsave(gif_path, images, fps=30, loop=0)
+            
+            print(f"  Saved {num_gifs} GIFs to: {task_gifs_dir}")
+        except Exception as e:
+            print(f"  Warning: Failed to save GIFs for task {task_num}: {e}")
     
     total_time = time.time() - start_time
     
