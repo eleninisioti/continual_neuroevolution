@@ -574,8 +574,8 @@ def main():
             num_gifs = 3
             for gif_idx in range(num_gifs):
                 key, gif_key = jax.random.split(key)
-                jit_reset = jax.jit(env.reset)
-                jit_step = jax.jit(env.step)
+                jit_reset = jax.jit(wrapped_env.reset)
+                jit_step = jax.jit(wrapped_env.step)
                 
                 state = jit_reset(gif_key)
                 trajectory = [state]
@@ -595,7 +595,7 @@ def main():
                         break
                 
                 # Render every 2nd frame
-                images = env.render(trajectory[::2], height=240, width=320, camera="track")
+                images = wrapped_env.render(trajectory[::2], height=240, width=320, camera="track")
                 gif_path = os.path.join(task_gifs_dir, f"trial{gif_idx}_reward{total_reward:.0f}.gif")
                 imageio.mimsave(gif_path, images, fps=30, loop=0)
             

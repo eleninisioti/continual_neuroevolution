@@ -4,7 +4,7 @@
 
 set -e
 
-GPU_ID=${1:-6}
+GPU_ID=${1:-5}
 
 # ============================================
 # ACTIVATE VIRTUAL ENVIRONMENT
