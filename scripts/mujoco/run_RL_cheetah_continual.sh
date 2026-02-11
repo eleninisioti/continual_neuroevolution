@@ -139,7 +139,7 @@ run_redo() {
             --gpus $GPU_ID \
             --run_name $RUN_NAME \
             --output_dir $OUTPUT_DIR \
-            --redo \
+            --use_redo \
             --redo_frequency 1 \
             --wandb_project ${WANDB_PROJECT}_redo \
             > "$LOG_FILE" 2>&1

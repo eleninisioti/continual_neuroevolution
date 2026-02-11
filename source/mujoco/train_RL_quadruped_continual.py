@@ -301,7 +301,12 @@ def main():
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         args.experiment_name = f"ppo_go1_legdamage_trial{args.trial}_{timestamp}"
     
-    output_path = os.path.join(args.output_dir, args.experiment_name)
+    # Output path - use output_dir directly if explicitly provided (non-default value)
+    # This avoids double-nesting when shell script already sets the full path
+    if args.output_dir != 'projects':
+        output_path = args.output_dir
+    else:
+        output_path = os.path.join(args.output_dir, args.experiment_name)
     os.makedirs(output_path, exist_ok=True)
     
     # Save experiment config
@@ -465,7 +470,7 @@ def main():
                         break
                 
                 # Render every 2nd frame for smaller GIFs
-                images = env.render(rollout[::2], height=240, width=320, camera="tracking")
+                images = env.render(rollout[::2], height=240, width=320, camera="track")
                 gif_path = os.path.join(task_gifs_dir, f"trajectory_{gif_idx:02d}_reward{total_reward:.0f}.gif")
                 imageio.mimsave(gif_path, images, fps=30, loop=0)
             

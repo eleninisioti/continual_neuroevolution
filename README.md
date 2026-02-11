@@ -16,6 +16,7 @@ gi
 ### Evolutionary Algorithms
 - **SimpleGA**: Simple Genetic Algorithm with elitism
 - **OpenES**: OpenAI Evolution Strategy with adaptive noise
+- **DNS**: Dominated Novelty Search - combines fitness optimization with novelty search using Pareto-based selection
 
 ## Tasks
 
@@ -65,6 +66,9 @@ All experiment scripts are located in `scripts/mujoco/`. Each script runs 10 tri
 
 # OpenES (10 trials)
 ./scripts/mujoco/run_ES_cheetah_continual.sh [GPU_ID]
+
+# DNS (10 trials)
+./scripts/mujoco/run_DNS_cheetah_continual.sh [GPU_ID]
 ```
 
 ### Go1 Quadruped Continual Leg Damage

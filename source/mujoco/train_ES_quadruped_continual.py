@@ -550,7 +550,7 @@ def main():
                         break
                 
                 # Render every 2nd frame
-                images = env.render(trajectory[::2], height=240, width=320, camera="tracking")
+                images = env.render(trajectory[::2], height=240, width=320, camera="track")
                 gif_path = os.path.join(task_gifs_dir, f"trial{gif_idx}_reward{total_reward:.0f}.gif")
                 imageio.mimsave(gif_path, images, fps=30, loop=0)
             
