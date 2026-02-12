@@ -1,16 +1,16 @@
 #!/bin/bash
-# Run non-continual ES on CheetahRun for multiple friction values
-# Usage: ./run_ES_cheetah.sh [GPU_ID] [NUM_TRIALS]
+# Run non-continual TRAC-PPO on CheetahRun for all 3 friction values
+# Usage: ./run_TRAC_PPO_cheetah.sh [GPU_ID] [NUM_TRIALS]
 
 GPU_ID=${1:-5}
-NUM_TRIALS=${2:-5}
-FRICTIONS="1.0 5.0"
+NUM_TRIALS=${2:-3}
+FRICTIONS="0.2 1.0 5.0"
 
 ENV="CheetahRun"
-OUTPUT_BASE="projects/mujoco/es_${ENV}"
+OUTPUT_BASE="projects/mujoco/trac_ppo_${ENV}"
 
 echo "=========================================="
-echo "ES Non-Continual - CheetahRun Friction"
+echo "TRAC-PPO Non-Continual - CheetahRun Friction"
 echo "=========================================="
 echo "GPU: $GPU_ID"
 echo "Trials: $NUM_TRIALS"
@@ -18,13 +18,12 @@ echo "Friction values: $FRICTIONS"
 echo "=========================================="
 
 for friction in $FRICTIONS; do
+    friction_label=$(echo "friction${friction}" | sed 's/\./_/g')
+    
     echo ""
     echo "=========================================="
     echo "Training for friction=${friction}"
     echo "=========================================="
-    
-    # Convert friction to label (e.g., 0.5 -> friction0p5)
-    friction_label=$(echo $friction | sed 's/\./_/')
     
     for trial in $(seq 1 $NUM_TRIALS); do
         echo ""
@@ -32,16 +31,17 @@ for friction in $FRICTIONS; do
         echo "----------------------------------------"
         
         SEED=$((42 + trial * 1000))
-        TRIAL_OUTPUT="${OUTPUT_BASE}_friction${friction_label}/trial_${trial}"
+        TRIAL_OUTPUT="${OUTPUT_BASE}_friction${friction}/trial_${trial}"
         
-        python source/mujoco/train_ES_cheetah.py \
+        python source/mujoco/train_RL_cheetah.py \
             --env "$ENV" \
             --gpus "$GPU_ID" \
             --friction $friction \
             --seed $SEED \
             --trial $trial \
             --output_dir "$TRIAL_OUTPUT" \
-            --wandb_project "continual_neuroevolution_es"
+            --wandb_project "continual_neuroevolution_ppo" \
+            --use_trac
         
         echo "Trial $trial (friction=${friction}) complete!"
     done
@@ -49,5 +49,5 @@ done
 
 echo ""
 echo "=========================================="
-echo "All trials complete!"
+echo "All TRAC-PPO training complete!"
 echo "=========================================="

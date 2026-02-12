@@ -462,6 +462,7 @@ def main():
                 
                 for _ in range(max_steps):
                     gif_key, act_key = jax.random.split(gif_key)
+                    # Pass full dict observation - normalizer expects dict format
                     action, _ = jit_inference_fn(state.obs, act_key)
                     state = jit_step(state, action)
                     rollout.append(state)

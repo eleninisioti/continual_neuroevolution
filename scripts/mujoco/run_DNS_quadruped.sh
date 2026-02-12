@@ -1,16 +1,16 @@
 #!/bin/bash
-# Run non-continual ES on Go1 quadruped for all 5 tasks (healthy + 4 leg damages)
-# Usage: ./run_ES_quadruped.sh [GPU_ID] [NUM_TRIALS]
+# Run non-continual DNS on Go1 quadruped for all 5 tasks (healthy + 4 leg damages)
+# Usage: ./run_DNS_quadruped.sh [GPU_ID] [NUM_TRIALS]
 
-GPU_ID=${1:-2}
-NUM_TRIALS=${2:-5}
+GPU_ID=${1:-4}
+NUM_TRIALS=${2:-4}
 LEGS="NONE FR FL RR RL"
 
 ENV="Go1JoystickFlatTerrain"
-OUTPUT_BASE="projects/mujoco/es_${ENV}"
+OUTPUT_BASE="projects/mujoco/dns_${ENV}"
 
 echo "=========================================="
-echo "ES Non-Continual - Go1 Leg Damage"
+echo "DNS Non-Continual - Go1 Leg Damage"
 echo "=========================================="
 echo "GPU: $GPU_ID"
 echo "Trials: $NUM_TRIALS"
@@ -35,14 +35,14 @@ for leg in $LEGS; do
         SEED=$((42 + trial * 1000))
         TRIAL_OUTPUT="${OUTPUT_BASE}_leg${leg}/trial_${trial}"
         
-        python source/mujoco/train_ES_quadruped.py \
+        python source/mujoco/train_DNS_quadruped.py \
             --env "$ENV" \
             --gpus "$GPU_ID" \
             --leg $leg \
             --seed $SEED \
             --trial $trial \
             --output_dir "$TRIAL_OUTPUT" \
-            --wandb_project "continual_neuroevolution_es"
+            --wandb_project "continual_neuroevolution_dns"
         
         echo "Trial $trial (leg=${leg}) complete!"
     done

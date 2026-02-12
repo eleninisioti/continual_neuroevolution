@@ -180,7 +180,8 @@ def rollout_episode(env, policy, params, key, max_steps=1000, obs_key='state'):
         state, total_reward, done_flag, key = carry
         key, _ = jax.random.split(key)
         
-        obs = state.obs[obs_key] if isinstance(state.obs, dict) else state.obs
+        # Go1 returns dict observations with 'state' key
+        obs = state.obs[obs_key]
         action = policy.apply(params, obs)
         next_state = env.step(state, action)
         reward = next_state.reward
@@ -234,8 +235,8 @@ def parse_args():
     parser.add_argument('--gens_per_task', type=int, default=50)
     parser.add_argument('--pop_size', type=int, default=512)
     parser.add_argument('--sigma', type=float, default=0.04)
-    parser.add_argument('--learning_rate', type=float, default=0.01)
-    parser.add_argument('--num_evals', type=int, default=1)
+    parser.add_argument('--learning_rate', type=float, default=0.001)
+    parser.add_argument('--num_evals', type=int, default=3)
     parser.add_argument('--init_range', type=float, default=0.1)
     parser.add_argument('--max_episode_steps', type=int, default=1000)
     parser.add_argument('--hidden_dims', type=int, nargs='+', default=[512, 256, 128])
@@ -450,21 +451,21 @@ def main():
             fitness = jit_evaluate(population, key_eval)
             es_state, _ = jit_tell(key_tell, population, -fitness, es_state, es_params)
             
-            # Track best
+            # Track best (ES mean is the actual solution, population is noise samples)
             fitness_gathered = jax.device_get(fitness)
-            population_gathered = jax.device_get(population)
+            current_mean = jax.device_get(es_state.mean)
             
-            gen_best_idx = jnp.argmax(fitness_gathered)
-            gen_best_fitness = float(fitness_gathered[gen_best_idx])
+            gen_best_fitness = float(jnp.max(fitness_gathered))
             
+            # Always use ES mean as the solution (it's what ES actually optimizes)
+            task_best_params = current_mean.copy()
             if gen_best_fitness > task_best_fitness:
                 task_best_fitness = gen_best_fitness
                 best_fitness_per_task[task_num] = task_best_fitness
-                task_best_params = population_gathered[gen_best_idx]
             
             if gen_best_fitness > best_fitness_overall:
                 best_fitness_overall = gen_best_fitness
-                best_params = population_gathered[gen_best_idx]
+                best_params = current_mean.copy()
             
             mean_fitness = float(jnp.mean(fitness_gathered))
             std_fitness = float(jnp.std(fitness_gathered))
@@ -537,7 +538,9 @@ def main():
                 total_reward = 0.0
                 
                 for _ in range(max_episode_steps):
-                    obs = jnp.expand_dims(state.obs, axis=0)
+                    # Go1 returns dict observations with 'state' key
+                    obs_array = state.obs['state']
+                    obs = jnp.expand_dims(obs_array, axis=0)
                     action = jit_policy(params, obs)[0]
                     # Apply leg damage mask
                     if damaged_leg is not None:

@@ -66,7 +66,7 @@ for TRIAL in $(seq 1 $NUM_TRIALS); do
     echo "[GPU $GPU_ID] Starting: $RUN_NAME (trial $TRIAL/$NUM_TRIALS, seed=$SEED)..."
     
     LOG_FILE="${OUTPUT_DIR}/train.log"
-    python source/mujoco/train_GA_quadruped_continual.py \
+    PYTHONUNBUFFERED=1 python -u source/mujoco/train_GA_quadruped_continual.py \
         --env $ENV \
         --num_tasks $NUM_TASKS \
         --gens_per_task $GENS_PER_TASK \

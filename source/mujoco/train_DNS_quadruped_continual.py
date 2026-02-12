@@ -1,20 +1,27 @@
 """
-Train Dominated Novelty Search (DNS) on MuJoCo Playground with Continual Learning (physics changes).
+Train Dominated Novelty Search (DNS) on Go1 with Continual Learning (leg damage).
 
-This script trains a DNS population across multiple tasks where physics (friction) is modified between tasks.
+This script trains a DNS population across multiple tasks where different legs are damaged.
 The population is preserved across tasks (no reset), enabling continual learning.
 
 DNS combines novelty search with fitness selection using Pareto dominance.
 
+Go1 action structure (12 actions total):
+  FR (Front Right): indices 0-2 (hip, thigh, calf)
+  FL (Front Left): indices 3-5 (hip, thigh, calf)
+  RR (Rear Right): indices 6-8 (hip, thigh, calf)
+  RL (Rear Left): indices 9-11 (hip, thigh, calf)
+
 Usage:
-    python train_DNS_cheetah_continual.py --env CheetahRun --num_tasks 30
-    python train_DNS_cheetah_continual.py --env WalkerRun --task_mod friction
+    python train_DNS_quadruped_continual.py --gpus 4
+    python train_DNS_quadruped_continual.py --num_tasks 20 --episodes_per_task 50
 """
 
 import argparse
 import functools
 import os
 import sys
+import json
 from typing import Any, Tuple
 
 # Add repo root to path for imports
@@ -43,7 +50,6 @@ import jax
 import jax.numpy as jnp
 from jax import random, flatten_util
 import flax.linen as nn
-from mujoco import mjx
 from mujoco_playground import registry
 import time
 import pickle
@@ -56,7 +62,101 @@ import imageio
 # Configuration
 # ============================================================================
 
-POLICY_HIDDEN_LAYER_SIZES = (64, 64)
+POLICY_HIDDEN_LAYER_SIZES = (512, 256, 128)
+
+# Leg action indices
+LEG_ACTION_INDICES = {
+    None: [],        # Healthy (no damage)
+    0: [0, 1, 2],    # Front Right (FR)
+    1: [3, 4, 5],    # Front Left (FL)
+    2: [6, 7, 8],    # Rear Right (RR)
+    3: [9, 10, 11],  # Rear Left (RL)
+}
+
+# Leg qpos indices (joint positions in state.data.qpos)
+LEG_QPOS_INDICES = {
+    None: [],        # Healthy (no damage)
+    0: [7, 8, 9],    # Front Right (FR)
+    1: [10, 11, 12], # Front Left (FL)
+    2: [13, 14, 15], # Rear Right (RR)
+    3: [16, 17, 18], # Rear Left (RL)
+}
+
+# Leg qvel indices (joint velocities in state.data.qvel)
+LEG_QVEL_INDICES = {
+    None: [],        # Healthy (no damage)
+    0: [6, 7, 8],    # Front Right (FR)
+    1: [9, 10, 11],  # Front Left (FL)
+    2: [12, 13, 14], # Rear Right (RR)
+    3: [15, 16, 17], # Rear Left (RL)
+}
+
+# Locked joint positions (bent/tucked position)
+LOCKED_JOINT_POSITIONS = jnp.array([0.0, 1.2, -2.4])
+
+LEG_NAMES = {None: 'HEALTHY', 0: 'FR', 1: 'FL', 2: 'RR', 3: 'RL'}
+
+
+# ============================================================================
+# Leg Damage Wrapper
+# ============================================================================
+
+class LegDamageWrapper:
+    """Wrapper that locks a damaged leg in a fixed bent position."""
+    
+    def __init__(self, env, damaged_leg_idx):
+        self._env = env
+        self._damaged_leg = damaged_leg_idx
+        
+        self._action_mask = jnp.ones(env.action_size)
+        if damaged_leg_idx is not None:
+            action_indices = jnp.array(LEG_ACTION_INDICES[damaged_leg_idx])
+            self._action_mask = self._action_mask.at[action_indices].set(0.0)
+            self._qpos_indices = jnp.array(LEG_QPOS_INDICES[damaged_leg_idx])
+            self._qvel_indices = jnp.array(LEG_QVEL_INDICES[damaged_leg_idx])
+        else:
+            self._qpos_indices = None
+            self._qvel_indices = None
+    
+    def __getattr__(self, name):
+        return getattr(self._env, name)
+    
+    def _lock_leg_joints(self, state):
+        if self._damaged_leg is None:
+            return state
+        new_qpos = state.data.qpos.at[self._qpos_indices].set(LOCKED_JOINT_POSITIONS)
+        new_qvel = state.data.qvel.at[self._qvel_indices].set(0.0)
+        new_data = state.data.replace(qpos=new_qpos, qvel=new_qvel)
+        return state.replace(data=new_data)
+    
+    def step(self, state, action):
+        masked_action = action * self._action_mask
+        next_state = self._env.step(state, masked_action)
+        return self._lock_leg_joints(next_state)
+    
+    def reset(self, rng):
+        state = self._env.reset(rng)
+        return self._lock_leg_joints(state)
+
+
+def generate_random_leg_sequence(rng_key, num_tasks: int, avoid_consecutive: bool = True):
+    """Generate a random sequence of legs to damage."""
+    sequence = []
+    
+    for i in range(num_tasks):
+        rng_key, subkey = random.split(rng_key)
+        
+        if avoid_consecutive and len(sequence) > 0:
+            last_leg = sequence[-1]
+            available_legs = [leg for leg in range(4) if leg != last_leg]
+            idx = int(random.randint(subkey, (), 0, len(available_legs)))
+            leg = available_legs[idx]
+        else:
+            leg = int(random.randint(subkey, (), 0, 4))
+        
+        sequence.append(leg)
+    
+    return sequence
 
 
 # ============================================================================
@@ -64,17 +164,17 @@ POLICY_HIDDEN_LAYER_SIZES = (64, 64)
 # ============================================================================
 
 class MLPPolicy(nn.Module):
-    """Simple MLP policy network."""
-    hidden_dims: tuple = (64, 64)
-    action_dim: int = 6
+    """MLP policy network for locomotion environments."""
+    hidden_dims: tuple = (512, 256, 128)
+    action_dim: int = 12
     
     @nn.compact
     def __call__(self, x):
         for dim in self.hidden_dims:
             x = nn.Dense(dim)(x)
-            x = nn.tanh(x)
+            x = nn.silu(x)
         x = nn.Dense(self.action_dim)(x)
-        x = nn.tanh(x)  # Actions bounded to [-1, 1]
+        x = nn.tanh(x)
         return x
 
 
@@ -199,44 +299,22 @@ def isoline_variation(
 
 
 # ============================================================================
-# Environment utilities
-# ============================================================================
-
-def create_modified_env(env_name, task_mod='friction', multiplier=1.0):
-    """Create environment with modified physics (gravity or friction)."""
-    env = registry.load(env_name)
-    
-    if task_mod == 'gravity':
-        gravity_z = -9.81 * multiplier
-        env.mj_model.opt.gravity[2] = gravity_z
-        print(f"  Gravity set: multiplier={multiplier}, gravity_z={gravity_z:.2f}")
-    elif task_mod == 'friction':
-        env.mj_model.geom_friction[:] *= multiplier
-        print(f"  Friction set: multiplier={multiplier}")
-    
-    env._mjx_model = mjx.put_model(env.mj_model)
-    return env
-
-
-def sample_task_multipliers(num_tasks, default_mult=1.0, low_mult=0.2, high_mult=5.0):
-    """Generate multiplier values for each task, cycling through three values."""
-    multiplier_cycle = [default_mult, low_mult, high_mult]
-    return [multiplier_cycle[i % 3] for i in range(num_tasks)]
-
-
-# ============================================================================
 # Evaluation function (JIT-compiled)
 # ============================================================================
+
+def get_obs(state):
+    """Extract observation from state - Go1 returns dict with 'state' key."""
+    return state.obs['state']
+
 
 def make_scoring_fn(env, policy, param_template, episode_length, num_evals=1):
     """Create a JIT-compiled scoring function for a specific environment.
     
-    This follows the same pattern as the example file to ensure GPU acceleration.
     If num_evals > 1, each individual is evaluated multiple times and fitness is averaged.
     """
-    # Get JIT-compiled env functions
     jit_reset = jax.jit(env.reset)
     jit_step = jax.jit(env.step)
+    obs_key = 'state'  # Go1 uses dict observations
     
     def evaluate_single(flat_params, eval_key):
         """Evaluate a single individual."""
@@ -246,23 +324,28 @@ def make_scoring_fn(env, policy, param_template, episode_length, num_evals=1):
         state = jit_reset(reset_key)
         
         def step_fn(carry, _):
-            state, total_reward = carry
-            obs = state.obs
+            state, total_reward, done_flag = carry
+            # Go1 returns dict observations with 'state' key
+            obs = state.obs[obs_key]
             action = policy.apply(params, obs)
             next_state = jit_step(state, action)
             reward = next_state.reward
-            total_reward = total_reward + reward
-            return (next_state, total_reward), None
+            # Don't accumulate reward after done
+            total_reward = total_reward + reward * (1.0 - done_flag)
+            done_flag = jnp.maximum(done_flag, next_state.done)
+            return (next_state, total_reward, done_flag), None
         
-        (final_state, total_reward), _ = jax.lax.scan(
+        (final_state, total_reward, _), _ = jax.lax.scan(
             step_fn,
-            (state, 0.0),
+            (state, 0.0, 0.0),
             None,
             length=episode_length,
         )
         
         # Use final position as descriptor (first 2 dims of obs)
-        descriptor = final_state.obs[:2]
+        # Go1 returns dict observations with 'state' key
+        final_obs = final_state.obs[obs_key]
+        descriptor = final_obs[:2]
         
         return total_reward, descriptor
     
@@ -312,7 +395,7 @@ def save_task_gifs(env, policy, best_params, task_idx, task_label,
             total_reward = 0.0
             
             for _ in range(episode_length):
-                obs = state.obs
+                obs = get_obs(state)
                 action = jit_policy(best_params, obs)
                 state = jit_step(state, action)
                 trajectory.append(state)
@@ -320,8 +403,8 @@ def save_task_gifs(env, policy, best_params, task_idx, task_label,
                 if state.done:
                     break
             
-            # Render every 2nd frame
-            images = env.render(trajectory[::2], height=240, width=320, camera="side")
+            # Render every 2nd frame - use "track" camera for Go1
+            images = env.render(trajectory[::2], height=240, width=320, camera="track")
             gif_path = os.path.join(task_gifs_dir, f"trial{gif_idx}_reward{total_reward:.0f}.gif")
             imageio.mimsave(gif_path, images, fps=30, loop=0)
         
@@ -339,66 +422,28 @@ def compute_fitness_diversity(fitnesses):
     return float(jnp.std(fitnesses))
 
 
-def compute_genomic_diversity(genotypes, sample_size=32):
-    """Compute genomic diversity using sampling to avoid OOM.
-    
-    Full pairwise computation is O(pop_size^2 * num_params) which causes OOM
-    with large networks. Instead sample a subset of individuals.
-    """
-    pop_size = genotypes.shape[0]
-    if pop_size < 2:
-        return 0.0
-    
-    # Sample a subset to avoid OOM
-    actual_sample = min(sample_size, pop_size)
-    indices = np.random.choice(pop_size, size=actual_sample, replace=False)
-    sampled = genotypes[indices]
-    
-    # Normalize on CPU to save GPU memory
-    sampled_np = np.array(sampled)
-    g_min = np.min(sampled_np, axis=0, keepdims=True)
-    g_max = np.max(sampled_np, axis=0, keepdims=True)
-    g_range = np.maximum(g_max - g_min, 1e-8)
-    norm_genotypes = (sampled_np - g_min) / g_range
-    
-    # Compute pairwise distances on sampled subset (on CPU)
-    diffs = norm_genotypes[:, None, :] - norm_genotypes[None, :, :]
-    distances = np.linalg.norm(diffs, axis=-1)
-    
-    # Average of upper triangle
-    mask = np.triu(np.ones((actual_sample, actual_sample)), k=1)
-    mean_dist = np.sum(distances * mask) / np.sum(mask)
-    
-    return float(mean_dist)
-
-
 # ============================================================================
 # Argument parsing
 # ============================================================================
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='DNS Continual Learning on MuJoCo Playground')
-    parser.add_argument('--env', type=str, default='CheetahRun')
-    parser.add_argument('--num_tasks', type=int, default=30)
-    parser.add_argument('--episodes_per_task', type=int, default=200)
+    parser = argparse.ArgumentParser(description='DNS Continual Learning on Go1 with Leg Damage')
+    parser.add_argument('--env', type=str, default='Go1JoystickFlatTerrain')
+    parser.add_argument('--num_tasks', type=int, default=20)
+    parser.add_argument('--episodes_per_task', type=int, default=50)
     parser.add_argument('--pop_size', type=int, default=512)
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--trial', type=int, default=1)
     parser.add_argument('--episode_length', type=int, default=1000)
     parser.add_argument('--num_evals', type=int, default=3,
                         help='Number of evaluations per individual to average fitness')
     parser.add_argument('--k', type=int, default=3)
     parser.add_argument('--iso_sigma', type=float, default=0.05)
     parser.add_argument('--line_sigma', type=float, default=0.5)
-    parser.add_argument('--task_mod', type=str, default='friction', choices=['gravity', 'friction'])
-    parser.add_argument('--gravity_default_mult', type=float, default=1.0)
-    parser.add_argument('--gravity_low_mult', type=float, default=0.2)
-    parser.add_argument('--gravity_high_mult', type=float, default=5.0)
-    parser.add_argument('--friction_default_mult', type=float, default=1.0)
-    parser.add_argument('--friction_low_mult', type=float, default=0.2)
-    parser.add_argument('--friction_high_mult', type=float, default=5.0)
+    parser.add_argument('--avoid_consecutive', action='store_true', default=True)
     parser.add_argument('--gpus', type=str, default=None)
-    parser.add_argument('--run_name', type=str, default=None)
+    parser.add_argument('--experiment_name', type=str, default=None)
     parser.add_argument('--output_dir', type=str, default=None)
     parser.add_argument('--wandb_project', type=str, default='continual_neuroevolution_dns')
     parser.add_argument('--log_interval', type=int, default=10)
@@ -420,73 +465,71 @@ def main():
     episode_length = args.episode_length
     num_evals = args.num_evals
     seed = args.seed
+    trial = args.trial
     k = args.k
     iso_sigma = args.iso_sigma
     line_sigma = args.line_sigma
-    task_mod = args.task_mod
     log_interval = args.log_interval
     
-    # Get multipliers
-    if task_mod == 'gravity':
-        default_mult = args.gravity_default_mult
-        low_mult = args.gravity_low_mult
-        high_mult = args.gravity_high_mult
-    else:
-        default_mult = args.friction_default_mult
-        low_mult = args.friction_low_mult
-        high_mult = args.friction_high_mult
-    
-    multiplier_list = sample_task_multipliers(num_tasks, default_mult, low_mult, high_mult)
     num_iterations = num_tasks * episodes_per_task
     
+    # Generate leg damage sequence
+    key = jax.random.key(seed)
+    key, seq_key = jax.random.split(key)
+    leg_sequence = generate_random_leg_sequence(seq_key, num_tasks, args.avoid_consecutive)
+    
     print("=" * 80)
-    print(f"DNS Continual Learning on MuJoCo Playground: {env_name}")
+    print(f"DNS Continual Learning on Go1 with Leg Damage")
     print("=" * 80)
     print(f"\nContinual Learning Setup:")
-    print(f"  Task modification: {task_mod}")
-    print(f"  Multipliers: {default_mult}x -> {low_mult}x -> {high_mult}x (cycling)")
     print(f"  Number of tasks: {num_tasks}")
     print(f"  Episodes per task: {episodes_per_task}")
     print(f"  Population size: {pop_size}, Batch size: {batch_size}")
-    print(f"  Num evals per individual: {num_evals}")
     print(f"  k (novelty neighbors): {k}")
+    print(f"\nLeg damage sequence:")
+    for i, leg_idx in enumerate(leg_sequence):
+        print(f"  Task {i+1}: Damage {LEG_NAMES[leg_idx]} leg")
     
     # Output directory
-    mod_suffix = "gravity" if task_mod == "gravity" else "friction"
-    output_dir = args.output_dir or f"results_dns_continual_{env_name.lower()}_{mod_suffix}"
+    output_dir = args.output_dir or f"results_dns_continual_{env_name.lower()}_legdamage"
     os.makedirs(output_dir, exist_ok=True)
     checkpoint_dir = os.path.join(output_dir, "checkpoints")
     os.makedirs(checkpoint_dir, exist_ok=True)
     
     # Initialize environment to get dimensions
     base_env = registry.load(env_name)
-    key = jax.random.key(seed)
     key, reset_key = jax.random.split(key)
     state = base_env.reset(reset_key)
-    obs_dim = state.obs.shape[-1]
+    obs_dim = get_obs(state).shape[-1]
     action_dim = base_env.action_size
     
     print(f"  Observation dim: {obs_dim}")
     print(f"  Action dim: {action_dim}")
     
+    # Save config
+    config = {
+        'env': env_name,
+        'num_tasks': num_tasks,
+        'episodes_per_task': episodes_per_task,
+        'seed': seed,
+        'trial': trial,
+        'leg_sequence': [LEG_NAMES[l] for l in leg_sequence],
+        'leg_action_indices': {LEG_NAMES[k]: v for k, v in LEG_ACTION_INDICES.items()},
+        'avoid_consecutive': args.avoid_consecutive,
+        'pop_size': pop_size,
+        'batch_size': batch_size,
+        'k': k,
+        'iso_sigma': iso_sigma,
+        'line_sigma': line_sigma,
+    }
+    with open(os.path.join(output_dir, 'config.json'), 'w') as f:
+        json.dump(config, f, indent=2)
+    
     # Initialize wandb
-    run_name = args.run_name or f"dns_continual_{env_name}_{task_mod}_seed{seed}"
+    run_name = args.experiment_name or f"dns_go1_legdamage_trial{trial}"
     wandb.init(
         project=args.wandb_project,
-        config={
-            "algorithm": "DNS",
-            "env_name": env_name,
-            "seed": seed,
-            "task_mod": task_mod,
-            "num_tasks": num_tasks,
-            "episodes_per_task": episodes_per_task,
-            "episode_length": episode_length,
-            "batch_size": batch_size,
-            "population_size": pop_size,
-            "k": k,
-            "iso_sigma": iso_sigma,
-            "line_sigma": line_sigma,
-        },
+        config=config,
         name=run_name,
         reinit=True,
     )
@@ -506,14 +549,15 @@ def main():
     key, pop_key = jax.random.split(key)
     population = random.normal(pop_key, (pop_size, param_dim)) * 0.1
     
-    # Create environments and JIT-compiled scoring functions for each unique multiplier
-    unique_multipliers = list(set(multiplier_list))
+    # Create wrapped environments and scoring functions for each leg
+    print(f"\nCreating environments for each leg damage condition...")
     envs = {}
     scoring_fns = {}
-    for mult in unique_multipliers:
-        print(f"  Creating environment for {task_mod}={mult}...")
-        envs[mult] = create_modified_env(env_name, task_mod, mult)
-        scoring_fns[mult] = make_scoring_fn(envs[mult], policy, param_template, episode_length, num_evals=num_evals)
+    for leg_idx in range(4):  # 4 legs
+        print(f"  Creating environment for {LEG_NAMES[leg_idx]} damage...")
+        wrapped_env = LegDamageWrapper(registry.load(env_name), leg_idx)
+        envs[leg_idx] = wrapped_env
+        scoring_fns[leg_idx] = make_scoring_fn(wrapped_env, policy, param_template, episode_length, num_evals=num_evals)
     
     # Track metrics
     best_fitness_overall = -float('inf')
@@ -524,10 +568,10 @@ def main():
     start_time = time.time()
     iteration = 0
     
-    # Initial evaluation
-    current_multiplier = multiplier_list[0]
-    current_env = envs[current_multiplier]
-    current_scoring_fn = scoring_fns[current_multiplier]
+    # Initial evaluation with first task's leg damage
+    current_leg = leg_sequence[0]
+    current_env = envs[current_leg]
+    current_scoring_fn = scoring_fns[current_leg]
     
     print(f"\nEvaluating initial population (JIT compiling, may take a moment)...")
     key, eval_key = jax.random.split(key)
@@ -538,18 +582,18 @@ def main():
     
     # Main training loop
     for task_idx in range(num_tasks):
-        current_multiplier = multiplier_list[task_idx]
-        current_env = envs[current_multiplier]
-        current_scoring_fn = scoring_fns[current_multiplier]
-        task_label = f"{task_mod}_{current_multiplier:.2f}".replace(".", "p")
+        current_leg = leg_sequence[task_idx]
+        current_env = envs[current_leg]
+        current_scoring_fn = scoring_fns[current_leg]
+        task_label = LEG_NAMES[current_leg]
         
         print(f"\n{'='*60}")
-        print(f"TASK {task_idx + 1}/{num_tasks} - {task_mod}: {current_multiplier:.2f}")
+        print(f"TASK {task_idx + 1}/{num_tasks} - Damage: {task_label} leg")
         print(f"{'='*60}")
         
         # Re-evaluate population on new environment (except first task)
         if task_idx > 0:
-            print(f"  Re-evaluating population for {task_mod}={current_multiplier}...")
+            print(f"  Re-evaluating population for {task_label} damage...")
             key, eval_key = jax.random.split(key)
             fitnesses, descriptors = current_scoring_fn(population, eval_key)
             novelties = compute_novelty(descriptors, k)
@@ -588,19 +632,17 @@ def main():
             
             # Compute diversity metrics
             fitness_div = compute_fitness_diversity(fitnesses)
-            genomic_div = compute_genomic_diversity(population)
-            mean_novelty = float(jnp.nanmean(novelties))  # Use nanmean to ignore NaN
+            mean_novelty = float(jnp.nanmean(novelties))
             
             # Store metrics
             metrics_entry = {
                 'iteration': iteration,
                 'task': task_idx,
                 'task_iteration': ep,
-                'multiplier': current_multiplier,
+                'damaged_leg': task_label,
                 'best_fitness': gen_best_fitness,
                 'mean_fitness': float(jnp.mean(fitnesses)),
                 'fitness_diversity': fitness_div,
-                'genomic_diversity': genomic_div,
                 'mean_novelty': mean_novelty,
                 'task_best_fitness': task_best_fitness,
                 'best_overall_fitness': best_fitness_overall,
@@ -612,11 +654,10 @@ def main():
             wandb.log({
                 "iteration": iteration,
                 "task": task_idx,
-                "multiplier": current_multiplier,
+                "damaged_leg": task_label,
                 "best_fitness": gen_best_fitness,
                 "mean_fitness": float(jnp.mean(fitnesses)),
                 "fitness_diversity": fitness_div,
-                "genomic_diversity": genomic_div,
                 "mean_novelty": mean_novelty,
                 "task_best_fitness": task_best_fitness,
                 "best_overall_fitness": best_fitness_overall,
@@ -640,7 +681,7 @@ def main():
         best_genotype = task_best_genotype
         best_fitness_reported = task_best_fitness
         
-        # Verify by re-evaluating (catches any alignment issues)
+        # Verify by re-evaluating
         key, verify_key = jax.random.split(key)
         verify_fitness, _ = current_scoring_fn(best_genotype[None, :], verify_key)
         verify_fitness = float(verify_fitness[0])
@@ -660,8 +701,7 @@ def main():
                 'best_fitness_reported': best_fitness_reported,
                 'best_fitness_verified': verify_fitness,
                 'task_idx': task_idx,
-                'task_mod': task_mod,
-                'multiplier': current_multiplier,
+                'damaged_leg': task_label,
                 'task_best_fitness': task_best_fitness,
                 'overall_best_fitness': best_fitness_overall,
                 'iteration': iteration,
@@ -690,7 +730,7 @@ def main():
     # Save best policy
     if best_genotype_overall is not None:
         best_params = unflatten_params(best_genotype_overall, param_template)
-        save_path = os.path.join(output_dir, f"best_{env_name.lower()}_continual_{mod_suffix}_policy.pkl")
+        save_path = os.path.join(output_dir, f"best_{env_name.lower()}_dns_legdamage_policy.pkl")
         
         with open(save_path, 'wb') as f:
             pickle.dump({
@@ -703,8 +743,7 @@ def main():
                     'obs_dim': obs_dim,
                     'action_dim': action_dim,
                     'num_tasks': num_tasks,
-                    'task_mod': task_mod,
-                    'task_multipliers': multiplier_list,
+                    'leg_sequence': [LEG_NAMES[l] for l in leg_sequence],
                 }
             }, f)
         print(f"  Best policy saved to: {save_path}")

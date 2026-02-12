@@ -378,8 +378,8 @@ def parse_args():
                         help='OpenES noise standard deviation (default 0.04)')
     parser.add_argument('--learning_rate', type=float, default=0.01,
                         help='OpenES Adam optimizer learning rate (default 0.01)')
-    parser.add_argument('--num_evals', type=int, default=1,
-                        help='Number of evaluations per agent (averaged, default 1)')
+    parser.add_argument('--num_evals', type=int, default=10,
+                        help='Number of evaluations per agent (averaged, default 10)')
     parser.add_argument('--init_range', type=float, default=1.0,
                         help='Initial population range: values drawn from N(0, init_range) (default 1.0)')
     parser.add_argument('--gpus', type=str, default=None,
@@ -631,20 +631,20 @@ def main():
             # Tell strategy the fitness (evosax minimizes, so negate for maximization)
             es_state, _ = jit_tell(key_tell, population, -fitness, es_state, es_params)
             
-            # Track best - need to gather from all devices
+            # Track best (ES mean is the actual solution, population is noise samples)
             fitness_gathered = jax.device_get(fitness)
-            population_gathered = jax.device_get(population)
+            current_mean = jax.device_get(es_state.mean)
             
-            gen_best_idx = jnp.argmax(fitness_gathered)
-            gen_best_fitness = fitness_gathered[gen_best_idx]
+            gen_best_fitness = float(jnp.max(fitness_gathered))
             
+            # Always use ES mean as the solution (it's what ES actually optimizes)
+            best_params_task = current_mean.copy()
             if gen_best_fitness > best_fitness_task:
                 best_fitness_task = gen_best_fitness
-                best_params_task = population_gathered[gen_best_idx]
             
             if gen_best_fitness > best_fitness_overall:
                 best_fitness_overall = gen_best_fitness
-                best_params_overall = population_gathered[gen_best_idx]
+                best_params_overall = current_mean.copy()
             
             # Logging
             mean_fitness = jnp.mean(fitness_gathered)

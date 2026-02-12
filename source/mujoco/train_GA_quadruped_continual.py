@@ -227,7 +227,8 @@ def rollout_episode(env, policy, params, key, max_steps=1000, obs_key='state'):
         state, total_reward, done_flag, key = carry
         key, _ = jax.random.split(key)
         
-        obs = state.obs[obs_key] if isinstance(state.obs, dict) else state.obs
+        # Go1 returns dict observations with 'state' key
+        obs = state.obs[obs_key]
         action = policy.apply(params, obs)
         
         next_state = env.step(state, action)
@@ -288,9 +289,8 @@ def parse_args():
                         help='Generations per task')
     parser.add_argument('--pop_size', type=int, default=512)
     parser.add_argument('--mutation_std', type=float, default=0.1)
-    parser.add_argument('--crossover_rate', type=float, default=0.0)
     parser.add_argument('--elite_ratio', type=float, default=0.1)
-    parser.add_argument('--num_evals', type=int, default=1)
+    parser.add_argument('--num_evals', type=int, default=3)
     parser.add_argument('--init_range', type=float, default=0.1)
     parser.add_argument('--hidden_dims', type=str, default='512,256,128')
     parser.add_argument('--wandb_project', type=str, default='mujoco_evosax')
@@ -433,10 +433,7 @@ def main():
         std_schedule=std_schedule,
     )
     es.elite_ratio = args.elite_ratio
-    es_params = jax.device_put(
-        es.default_params.replace(crossover_rate=args.crossover_rate),
-        replicate_sharding
-    )
+    es_params = jax.device_put(es.default_params, replicate_sharding)
     
     key, init_key = jax.random.split(key)
     es_state = jax.jit(es.init, out_shardings=replicate_sharding)(
@@ -511,9 +508,10 @@ def main():
             gen_best_fitness = float(fitness_gathered[gen_best_idx])
             mean_fitness = float(jnp.mean(fitness_gathered))
             
+            # Always track current generation's best (final gen will be used for eval)
+            task_best_params = population_gathered[gen_best_idx]
             if gen_best_fitness > task_best_fitness:
                 task_best_fitness = gen_best_fitness
-                task_best_params = population_gathered[gen_best_idx]
             if gen_best_fitness > best_fitness_overall:
                 best_fitness_overall = gen_best_fitness
                 best_params = population_gathered[gen_best_idx]
@@ -574,15 +572,17 @@ def main():
             num_gifs = 3
             for gif_idx in range(num_gifs):
                 key, gif_key = jax.random.split(key)
-                jit_reset = jax.jit(wrapped_env.reset)
-                jit_step = jax.jit(wrapped_env.step)
+                jit_reset = jax.jit(env.reset)
+                jit_step = jax.jit(env.step)
                 
                 state = jit_reset(gif_key)
                 trajectory = [state]
                 total_reward = 0.0
                 
                 for _ in range(max_episode_steps):
-                    obs = jnp.expand_dims(state.obs, axis=0)
+                    # Go1 returns dict observations with 'state' key
+                    obs_array = state.obs['state']
+                    obs = jnp.expand_dims(obs_array, axis=0)
                     action = jit_policy(params, obs)[0]
                     # Apply leg damage mask
                     if damaged_leg is not None:
@@ -595,7 +595,7 @@ def main():
                         break
                 
                 # Render every 2nd frame
-                images = wrapped_env.render(trajectory[::2], height=240, width=320, camera="track")
+                images = env.render(trajectory[::2], height=240, width=320, camera="track")
                 gif_path = os.path.join(task_gifs_dir, f"trial{gif_idx}_reward{total_reward:.0f}.gif")
                 imageio.mimsave(gif_path, images, fps=30, loop=0)
             

@@ -1,16 +1,16 @@
 #!/bin/bash
-# Run non-continual ES on CheetahRun for multiple friction values
-# Usage: ./run_ES_cheetah.sh [GPU_ID] [NUM_TRIALS]
+# Run non-continual DNS on CheetahRun for multiple friction values
+# Usage: ./run_DNS_cheetah.sh [GPU_ID] [NUM_TRIALS]
 
-GPU_ID=${1:-5}
+GPU_ID=${1:-2}
 NUM_TRIALS=${2:-5}
-FRICTIONS="1.0 5.0"
+FRICTIONS="5.0"
 
 ENV="CheetahRun"
-OUTPUT_BASE="projects/mujoco/es_${ENV}"
+OUTPUT_BASE="projects/mujoco/dns_${ENV}"
 
 echo "=========================================="
-echo "ES Non-Continual - CheetahRun Friction"
+echo "DNS Non-Continual - CheetahRun Friction"
 echo "=========================================="
 echo "GPU: $GPU_ID"
 echo "Trials: $NUM_TRIALS"
@@ -34,14 +34,14 @@ for friction in $FRICTIONS; do
         SEED=$((42 + trial * 1000))
         TRIAL_OUTPUT="${OUTPUT_BASE}_friction${friction_label}/trial_${trial}"
         
-        python source/mujoco/train_ES_cheetah.py \
+        python source/mujoco/train_DNS_cheetah.py \
             --env "$ENV" \
             --gpus "$GPU_ID" \
             --friction $friction \
             --seed $SEED \
             --trial $trial \
             --output_dir "$TRIAL_OUTPUT" \
-            --wandb_project "continual_neuroevolution_es"
+            --wandb_project "continual_neuroevolution_dns"
         
         echo "Trial $trial (friction=${friction}) complete!"
     done

@@ -1,49 +1,50 @@
 #!/bin/bash
-# Run non-continual ES on CheetahRun for multiple friction values
-# Usage: ./run_ES_cheetah.sh [GPU_ID] [NUM_TRIALS]
+# Run non-continual PPO on Go1 quadruped for all 5 tasks (healthy + 4 leg damages)
+# Usage: ./run_RL_quadruped.sh [GPU_ID] [NUM_TRIALS]
 
-GPU_ID=${1:-5}
+GPU_ID=${1:-0}
 NUM_TRIALS=${2:-5}
-FRICTIONS="1.0 5.0"
+LEGS="NONE FR FL RR RL"
 
-ENV="CheetahRun"
-OUTPUT_BASE="projects/mujoco/es_${ENV}"
+ENV="Go1JoystickFlatTerrain"
+OUTPUT_BASE="projects/mujoco/ppo_${ENV}"
 
 echo "=========================================="
-echo "ES Non-Continual - CheetahRun Friction"
+echo "PPO Non-Continual - Go1 Leg Damage"
 echo "=========================================="
 echo "GPU: $GPU_ID"
 echo "Trials: $NUM_TRIALS"
-echo "Friction values: $FRICTIONS"
+echo "Tasks: $LEGS (NONE=healthy)"
 echo "=========================================="
 
-for friction in $FRICTIONS; do
+for leg in $LEGS; do
     echo ""
     echo "=========================================="
-    echo "Training for friction=${friction}"
+    if [ "$leg" = "NONE" ]; then
+        echo "Training for HEALTHY robot (no damage)"
+    else
+        echo "Training for damaged leg=${leg}"
+    fi
     echo "=========================================="
-    
-    # Convert friction to label (e.g., 0.5 -> friction0p5)
-    friction_label=$(echo $friction | sed 's/\./_/')
     
     for trial in $(seq 1 $NUM_TRIALS); do
         echo ""
-        echo "Starting Trial $trial / $NUM_TRIALS (friction=${friction})"
+        echo "Starting Trial $trial / $NUM_TRIALS (leg=${leg})"
         echo "----------------------------------------"
         
         SEED=$((42 + trial * 1000))
-        TRIAL_OUTPUT="${OUTPUT_BASE}_friction${friction_label}/trial_${trial}"
+        TRIAL_OUTPUT="${OUTPUT_BASE}_leg${leg}/trial_${trial}"
         
-        python source/mujoco/train_ES_cheetah.py \
+        python source/mujoco/train_RL_quadruped.py \
             --env "$ENV" \
             --gpus "$GPU_ID" \
-            --friction $friction \
+            --leg $leg \
             --seed $SEED \
             --trial $trial \
             --output_dir "$TRIAL_OUTPUT" \
-            --wandb_project "continual_neuroevolution_es"
+            --wandb_project "continual_neuroevolution_ppo"
         
-        echo "Trial $trial (friction=${friction}) complete!"
+        echo "Trial $trial (leg=${leg}) complete!"
     done
 done
 
