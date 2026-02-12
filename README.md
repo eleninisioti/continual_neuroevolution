@@ -12,7 +12,7 @@ This repository compares evolutionary strategies (SimpleGA, OpenES) against rein
 - **TRAC-PPO**: PPO with Trust Region-Aware Continual learning optimizer - adaptive learning rates for continual learning
 
 We have implemented RL algorithms by modifying the PPO implementation of brax to support TRAC-PPO and ReDO-PPO (our implementation is under folder my_brax).
-gi
+
 ### Evolutionary Algorithms
 - **SimpleGA**: Simple Genetic Algorithm with elitism
 - **OpenES**: OpenAI Evolution Strategy with adaptive noise
@@ -31,6 +31,14 @@ gi
 - **Task variation**: Different leg is damaged (locked in bent position) each task
 - **20 tasks** per trial (first task = healthy baseline)
 - **Continual setting**: Network weights preserved, random leg selection avoiding consecutive same leg
+
+### Gymnax Classic Control - Observation Noise Continual Learning
+- **Environments**: CartPole-v1, Acrobot-v1, MountainCar-v0 (JAX-based gymnax)
+- **3 environments** with discrete action spaces
+- **Task variation**: Observation noise vector sampled from N(0, noise_range) and added to all observations
+- **Task switching**: Every `task_interval` updates (default=200), a new noise vector is sampled
+- **First task (Task 0)**: Zero noise (baseline), subsequent tasks have random observation perturbations
+- **Continual setting**: Network weights preserved across tasks, agent must adapt to changing observation distributions
 
 ## Installation
 
@@ -84,10 +92,26 @@ All experiment scripts are located in `scripts/mujoco/`. Each script runs 10 tri
 ./scripts/mujoco/run_ES_quadruped_continual.sh [GPU_ID]
 ```
 
+### Gymnax Classic Control - Observation Noise
+
+```bash
+# SimpleGA continual (10 trials per environment)
+./scripts/gymnax/run_GA_gymnax_continual.sh
+
+# OpenES continual (10 trials per environment)
+./scripts/gymnax/run_ES_gymnax_continual.sh
+
+# DNS continual (10 trials per environment)
+./scripts/gymnax/run_DNS_gymnax_continual.sh
+
+# PPO continual (10 trials per environment)
+./scripts/gymnax/run_RL_gymnax_continual.sh
+```
+
 
 ## Output Structure
 
-Results are saved under `projects/mujoco/`:
+Results are saved under `projects/mujoco/` and `projects/gymnax/`:
 
 ```
 projects/mujoco/
@@ -96,6 +120,15 @@ projects/mujoco/
 │   │   ├── train.log
 │   │   ├── config.json
 │   │   └── checkpoints/
+│   ├── trial_2/
+│   └── ...
+
+projects/gymnax/
+├── ppo_CartPole_v1_continual/
+│   ├── trial_1/
+│   │   ├── training_metrics.json
+│   │   ├── gifs/
+│   │   └── *.pkl
 │   ├── trial_2/
 │   └── ...
 ```
@@ -131,6 +164,13 @@ tail -f projects/mujoco/ppo_CheetahRun_continual_friction/trial_1/train.log
 - Generations per task: 100 (CheetahRun), 50 (Quadruped)
 - Sigma: 0.04
 - Learning rate: 0.01
+
+### Gymnax (Classic Control)
+- Task interval: 200 updates (new noise vector sampled)
+- Noise range: 1.0 (std of observation noise)
+- Network: (64, 64) hidden layers
+- Population size (GA/ES/DNS): 128
+- Total updates: 2000
 
 
 ## License
