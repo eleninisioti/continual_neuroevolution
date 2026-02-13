@@ -52,48 +52,70 @@ from matplotlib.patches import Rectangle
 
 
 # ============================================================================
+# Logging Helper
+# ============================================================================
+
+class Tee:
+    """Duplicate stdout to a file and console."""
+    def __init__(self, filepath):
+        self.file = open(filepath, 'w', buffering=1)
+        self.stdout = sys.stdout
+    
+    def write(self, data):
+        self.file.write(data)
+        self.stdout.write(data)
+    
+    def flush(self):
+        self.file.flush()
+        self.stdout.flush()
+    
+    def close(self):
+        self.file.close()
+
+
+# ============================================================================
 # Environment Configs
 # ============================================================================
 
 ENV_CONFIGS = {
     "CartPole-v1": {
-        "num_generations": 1000,  # 5 tasks x 200 gens
+        "num_generations": 2000,  # 10 tasks x 200 gens
         "pop_size": 512,
         "batch_size": 256,
         "hidden_dims": (16, 16),
         "episode_length": 500,
-        "num_evals": 3,
+        "num_evals": 1,
         "k": 3,
         "iso_sigma": 0.05,
         "line_sigma": 0.5,
         "task_interval": 200,
-        "num_tasks": 5,
+        "num_tasks": 10,
     },
     "Acrobot-v1": {
-        "num_generations": 1000,
+        "num_generations": 2000,
         "pop_size": 512,
         "batch_size": 256,
         "hidden_dims": (32, 32),
         "episode_length": 500,
-        "num_evals": 3,
+        "num_evals": 1,
         "k": 3,
         "iso_sigma": 0.05,
         "line_sigma": 0.5,
         "task_interval": 200,
-        "num_tasks": 5,
+        "num_tasks": 10,
     },
     "MountainCar-v0": {
-        "num_generations": 1000,
+        "num_generations": 2000,
         "pop_size": 512,
         "batch_size": 256,
         "hidden_dims": (32, 32),
         "episode_length": 200,
-        "num_evals": 3,
+        "num_evals": 1,
         "k": 3,
         "iso_sigma": 0.05,
         "line_sigma": 0.5,
         "task_interval": 200,
-        "num_tasks": 5,
+        "num_tasks": 10,
     },
 }
 
@@ -211,96 +233,124 @@ def isoline_variation(genotypes, key, iso_sigma=0.05, line_sigma=0.5, batch_size
 # GIF Rendering
 # ============================================================================
 
-def render_cartpole_frame(obs, fig=None, ax=None):
+def render_cartpole_frame(obs, fig=None, ax=None, step=None):
     """Render a single CartPole frame from observation."""
     if fig is None or ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-    
+        fig, ax = plt.subplots(figsize=(6, 4))
     ax.clear()
-    cart_x = float(obs[0])
-    pole_angle = float(obs[2])
     
+    x, x_dot, theta, theta_dot = obs[0], obs[1], obs[2], obs[3]
+    
+    # Cart dimensions
     cart_width = 0.4
     cart_height = 0.2
     pole_length = 0.6
     
-    cart_left = cart_x - cart_width / 2
-    cart_bottom = 0
-    ax.add_patch(Rectangle((cart_left, cart_bottom), cart_width, cart_height, 
-                           facecolor='blue', edgecolor='black'))
+    # Draw track
+    ax.axhline(y=0, color='gray', linewidth=2)
     
-    pole_x = cart_x + pole_length * np.sin(pole_angle)
-    pole_y = cart_height + pole_length * np.cos(pole_angle)
-    ax.plot([cart_x, pole_x], [cart_height, pole_y], 'r-', linewidth=3)
-    ax.plot(pole_x, pole_y, 'ro', markersize=8)
+    # Draw cart
+    cart_x = float(x) - cart_width / 2
+    cart = Rectangle((cart_x, 0), cart_width, cart_height, color='blue')
+    ax.add_patch(cart)
     
-    ax.axhline(y=0, color='black', linewidth=2)
+    # Draw pole
+    pole_x_end = float(x) + pole_length * np.sin(float(theta))
+    pole_y_end = cart_height + pole_length * np.cos(float(theta))
+    ax.plot([float(x), pole_x_end], [cart_height, pole_y_end], 'r-', linewidth=4)
+    
+    # Draw pole tip
+    ax.plot(pole_x_end, pole_y_end, 'ro', markersize=8)
+    
     ax.set_xlim(-2.5, 2.5)
     ax.set_ylim(-0.5, 1.5)
     ax.set_aspect('equal')
-    ax.axis('off')
+    ax.set_title(f'CartPole - Step {step}' if step is not None else 'CartPole')
     
-    return fig, ax
+    fig.canvas.draw()
+    image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))[:, :, :3].copy()
+    
+    return image, fig, ax
 
 
-def render_mountaincar_frame(obs, fig=None, ax=None):
+def render_mountaincar_frame(obs, fig=None, ax=None, step=None):
     """Render a single MountainCar frame from observation."""
     if fig is None or ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=(6, 4))
-    
+        fig, ax = plt.subplots(figsize=(6, 4))
     ax.clear()
-    pos = float(obs[0])
     
-    x = np.linspace(-1.2, 0.6, 100)
-    y = np.sin(3 * x) * 0.45 + 0.55
-    ax.plot(x, y, 'k-', linewidth=2)
-    ax.fill_between(x, 0, y, alpha=0.3)
+    position, velocity = float(obs[0]), float(obs[1])
     
-    car_y = np.sin(3 * pos) * 0.45 + 0.55
-    ax.plot(pos, car_y + 0.05, 'ro', markersize=15)
+    # Draw mountain
+    xs = np.linspace(-1.2, 0.6, 100)
+    ys = np.sin(3 * xs) * 0.45 + 0.55
+    ax.fill_between(xs, 0, ys, color='green', alpha=0.3)
+    ax.plot(xs, ys, 'g-', linewidth=2)
     
-    ax.plot(0.5, np.sin(3 * 0.5) * 0.45 + 0.55, 'g^', markersize=15)
+    # Draw goal
+    ax.axvline(x=0.5, color='red', linestyle='--', linewidth=2)
+    ax.plot(0.5, np.sin(3 * 0.5) * 0.45 + 0.55, 'r*', markersize=15)
+    
+    # Draw car
+    car_y = np.sin(3 * position) * 0.45 + 0.55
+    ax.plot(position, car_y, 'bo', markersize=12)
     
     ax.set_xlim(-1.3, 0.7)
     ax.set_ylim(0, 1.2)
-    ax.axis('off')
+    ax.set_title(f'MountainCar - Step {step}' if step is not None else 'MountainCar')
     
-    return fig, ax
+    fig.canvas.draw()
+    image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))[:, :, :3].copy()
+    
+    return image, fig, ax
 
 
-def render_acrobot_frame(obs, fig=None, ax=None):
+def render_acrobot_frame(obs, fig=None, ax=None, step=None):
     """Render a single Acrobot frame from observation."""
     if fig is None or ax is None:
-        fig, ax = plt.subplots(1, 1, figsize=(6, 6))
-    
+        fig, ax = plt.subplots(figsize=(6, 6))
     ax.clear()
     
-    cos_t1, sin_t1 = float(obs[0]), float(obs[1])
-    cos_t2, sin_t2 = float(obs[2]), float(obs[3])
+    cos1, sin1, cos2, sin2, _, _ = obs[0], obs[1], obs[2], obs[3], obs[4], obs[5]
     
+    # Link lengths
     l1, l2 = 1.0, 1.0
     
-    x1 = l1 * sin_t1
-    y1 = -l1 * cos_t1
+    # Joint positions
+    p1 = [float(l1 * sin1), -float(l1 * cos1)]
+    p2 = [p1[0] + float(l2 * sin2) * float(cos1) + float(l2 * cos2) * float(sin1),
+          p1[1] - float(l2 * sin2) * float(sin1) + float(l2 * cos2) * float(cos1)]
     
-    x2 = x1 + l2 * sin_t2
-    y2 = y1 - l2 * cos_t2
+    # Simplified joint 2 calculation
+    theta1 = np.arctan2(float(sin1), float(cos1))
+    theta2 = np.arctan2(float(sin2), float(cos2))
+    p2 = [p1[0] + l2 * np.sin(theta1 + theta2),
+          p1[1] - l2 * np.cos(theta1 + theta2)]
     
-    ax.plot([0, x1], [0, y1], 'b-', linewidth=4)
-    ax.plot([x1, x2], [y1, y2], 'r-', linewidth=4)
+    # Draw links
+    ax.plot([0, p1[0]], [0, p1[1]], 'b-', linewidth=4)
+    ax.plot([p1[0], p2[0]], [p1[1], p2[1]], 'r-', linewidth=4)
     
+    # Draw joints
     ax.plot(0, 0, 'ko', markersize=10)
-    ax.plot(x1, y1, 'bo', markersize=8)
-    ax.plot(x2, y2, 'ro', markersize=8)
+    ax.plot(p1[0], p1[1], 'ko', markersize=8)
+    ax.plot(p2[0], p2[1], 'go', markersize=8)
     
-    ax.axhline(y=l1, color='g', linestyle='--', alpha=0.5)
+    # Draw goal line
+    ax.axhline(y=l1, color='green', linestyle='--', alpha=0.5)
     
     ax.set_xlim(-2.5, 2.5)
     ax.set_ylim(-2.5, 2.5)
     ax.set_aspect('equal')
-    ax.axis('off')
+    ax.set_title(f'Acrobot - Step {step}' if step is not None else 'Acrobot')
     
-    return fig, ax
+    fig.canvas.draw()
+    image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))[:, :, :3].copy()
+    
+    return image, fig, ax
 
 
 def get_render_fn(env_name):
@@ -317,8 +367,13 @@ def get_render_fn(env_name):
 # Scoring Function with Observation Noise
 # ============================================================================
 
-def make_scoring_fn(env, env_params, policy, param_template, episode_length, env_name, num_evals=1):
-    """Create scoring function that returns fitness and behavioral descriptor with noise."""
+def make_scoring_fn(env, env_params, policy, param_template, episode_length, env_name, num_evals=10):
+    """Create scoring function that returns fitness and behavioral descriptor with noise.
+    
+    Evaluates each individual with num_evals trials:
+    - Returns fitness from FIRST trial only (for selection)
+    - Returns mean fitness across all trials (for logging/tracking)
+    """
     
     def evaluate_single(flat_params, eval_key, noise_vector):
         """Evaluate a single individual and return fitness + descriptor."""
@@ -361,19 +416,24 @@ def make_scoring_fn(env, env_params, policy, param_template, episode_length, env
     
     @jax.jit
     def scoring_fn(flat_genotypes, key, noise_vector):
+        """Returns (fitness_for_selection, descriptors, mean_fitness_for_logging)."""
         pop_size = flat_genotypes.shape[0]
-        if num_evals == 1:
-            keys = random.split(key, pop_size)
-            fitnesses, descriptors = vmapped_eval(flat_genotypes, keys, noise_vector)
-        else:
-            all_keys = random.split(key, pop_size * num_evals)
-            flat_params_repeated = jnp.repeat(flat_genotypes, num_evals, axis=0)
-            all_fitnesses, all_descriptors = vmapped_eval(flat_params_repeated, all_keys, noise_vector)
-            all_fitnesses = all_fitnesses.reshape(pop_size, num_evals)
-            all_descriptors = all_descriptors.reshape(pop_size, num_evals, -1)
-            fitnesses = jnp.mean(all_fitnesses, axis=1)
-            descriptors = jnp.mean(all_descriptors, axis=1)
-        return fitnesses, descriptors
+        
+        # Always evaluate with num_evals trials per individual
+        all_keys = random.split(key, pop_size * num_evals)
+        flat_params_repeated = jnp.repeat(flat_genotypes, num_evals, axis=0)
+        all_fitnesses, all_descriptors = vmapped_eval(flat_params_repeated, all_keys, noise_vector)
+        all_fitnesses = all_fitnesses.reshape(pop_size, num_evals)
+        all_descriptors = all_descriptors.reshape(pop_size, num_evals, -1)
+        
+        # Fitness for selection: use FIRST trial only
+        fitnesses = all_fitnesses[:, 0]
+        descriptors = all_descriptors[:, 0, :]  # Use first trial descriptors too
+        
+        # Mean fitness for logging/tracking
+        mean_fitnesses = jnp.mean(all_fitnesses, axis=1)
+        
+        return fitnesses, descriptors, mean_fitnesses
     
     return scoring_fn
 
@@ -470,7 +530,7 @@ def main():
     args = parse_args()
     
     env_name = args.env
-    seed = args.seed
+    seed = args.seed + args.trial  # Different seed per trial
     trial = args.trial
     
     # Get env-specific config
@@ -491,6 +551,10 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     gifs_dir = os.path.join(output_dir, "gifs")
     os.makedirs(gifs_dir, exist_ok=True)
+    
+    # Set up logging to file
+    log_file = os.path.join(output_dir, "train.log")
+    sys.stdout = Tee(log_file)
     
     print("=" * 60)
     print(f"DNS on {env_name} (CONTINUAL)")
@@ -551,16 +615,19 @@ def main():
     # Initial evaluation
     print(f"\nEvaluating initial population...")
     key, eval_key = jax.random.split(key)
-    fitnesses, descriptors = scoring_fn(population, eval_key, noise_vector)
+    fitnesses, descriptors, mean_fitnesses = scoring_fn(population, eval_key, noise_vector)
     novelties = compute_novelty(descriptors, k)
     
-    print(f"  Initial best fitness: {float(jnp.max(fitnesses)):.2f}")
+    print(f"  Initial best fitness (mean-of-10): {float(jnp.max(mean_fitnesses)):.2f}")
     print(f"  Task 0 noise vector: {jax.device_get(noise_vector)}")
     print(f"  Noise magnitude: {float(jnp.linalg.norm(noise_vector)):.4f}")
     
     # Training loop
     best_overall_fitness = -float('inf')
     best_params = None
+    # Track per-task best separately (for GIF evaluation)
+    task_best_fitness = -float('inf')
+    task_best_params = None
     start_time = time.time()
     render_fn = get_render_fn(env_name)
     
@@ -569,30 +636,41 @@ def main():
     for gen in range(num_generations):
         # Check if we need to switch task
         if gen > 0 and gen % task_interval == 0:
-            # Save GIF of best solution BEFORE switching task
-            if best_params is not None:
-                try:
+            # Save 10 GIFs for THIS TASK before switching
+            fitness_host = jax.device_get(fitnesses)
+            population_host = jax.device_get(population)
+            current_best_idx = int(np.argmax(fitness_host))
+            current_best_fitness = float(np.max(fitness_host))
+            current_best_params = population_host[current_best_idx].copy()
+            
+            print(f"  Debug: task_best_fitness={task_best_fitness:.2f}, current_gen_best={current_best_fitness:.2f}")
+            
+            # Create task subfolder and save 10 GIFs
+            task_gif_dir = os.path.join(gifs_dir, f"task{current_task}")
+            os.makedirs(task_gif_dir, exist_ok=True)
+            
+            try:
+                for gif_idx in range(10):
                     key, gif_key = random.split(key)
                     obs_list, total_reward = rollout_for_gif(
-                        env, env_params, policy, best_params, param_template, 
+                        env, env_params, policy, current_best_params, param_template, 
                         episode_length, gif_key, noise_vector
                     )
                     
                     frames = []
                     fig, ax = None, None
-                    for obs in obs_list[::2]:
-                        fig, ax = render_fn(obs, fig, ax)
-                        fig.canvas.draw()
-                        image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
-                        image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))[:, :, :3].copy()
-                        frames.append(image)
+                    for idx, obs in enumerate(obs_list[::2]):
+                        step = idx * 2  # Actual step in episode
+                        frame, fig, ax = render_fn(obs, fig, ax, step=step)
+                        frames.append(frame)
                     plt.close(fig)
                     
-                    gif_path = os.path.join(gifs_dir, f"task{current_task}_gen{gen}_reward{total_reward:.0f}.gif")
+                    gif_path = os.path.join(task_gif_dir, f"task{current_task}_rollout_{gif_idx:02d}_reward{total_reward:.0f}.gif")
                     imageio.mimsave(gif_path, frames, fps=30)
-                    print(f"  Saved GIF: {gif_path} ({len(frames)} frames)")
-                except Exception as e:
-                    print(f"  Warning: Failed to save GIF: {e}")
+                
+                print(f"  Saved 10 GIFs for task {current_task} in {task_gif_dir}")
+            except Exception as e:
+                print(f"  Warning: Failed to save GIFs: {e}")
             
             # Switch to new task
             current_task += 1
@@ -602,9 +680,13 @@ def main():
             print(f"  Full noise: {jax.device_get(noise_vector)}")
             print(f"  Noise magnitude: {float(jnp.linalg.norm(noise_vector)):.4f}")
             
+            # Reset task-specific best tracking for new task
+            task_best_fitness = -float('inf')
+            task_best_params = None
+            
             # Re-evaluate population with new noise
             key, eval_key = jax.random.split(key)
-            fitnesses, descriptors = scoring_fn(population, eval_key, noise_vector)
+            fitnesses, descriptors, mean_fitnesses = scoring_fn(population, eval_key, noise_vector)
             novelties = compute_novelty(descriptors, k)
         
         # Generate offspring
@@ -613,23 +695,34 @@ def main():
         
         # Evaluate offspring
         key, eval_key = jax.random.split(key)
-        offspring_fitnesses, offspring_descriptors = scoring_fn(offspring, eval_key, noise_vector)
+        offspring_fitnesses, offspring_descriptors, offspring_mean_fitnesses = scoring_fn(offspring, eval_key, noise_vector)
         
-        # DNS selection
+        # DNS selection (uses single-trial fitness for selection)
         population, fitnesses, descriptors, novelties = dns_selection(
             population, fitnesses, descriptors,
             offspring, offspring_fitnesses, offspring_descriptors,
             pop_size, k
         )
         
-        # Copy to host for numpy operations
-        fitness_host = jax.device_get(fitnesses)
+        # Re-evaluate population to get mean fitness for logging
+        # (since DNS selection mixed parents and offspring, we need fresh mean_fitnesses)
+        key, eval_key = jax.random.split(key)
+        _, _, mean_fitnesses = scoring_fn(population, eval_key, noise_vector)
+        
+        # Copy to host for numpy operations - use mean-of-10 for tracking
+        mean_fitness_host = jax.device_get(mean_fitnesses)
         population_host = jax.device_get(population)
         
-        gen_best = float(np.max(fitness_host))
-        gen_mean = float(np.mean(fitness_host))
-        best_idx = int(np.argmax(fitness_host))
+        gen_best = float(np.max(mean_fitness_host))
+        gen_mean = float(np.mean(mean_fitness_host))
+        best_idx = int(np.argmax(mean_fitness_host))
         
+        # Update task-specific best (for GIF evaluation)
+        if gen_best > task_best_fitness:
+            task_best_fitness = gen_best
+            task_best_params = population_host[best_idx].copy()
+        
+        # Update overall best (for checkpoint)
         if gen_best > best_overall_fitness:
             best_overall_fitness = gen_best
             best_params = population_host[best_idx].copy()
@@ -655,30 +748,40 @@ def main():
     print(f"  Best overall: {best_overall_fitness:.2f}")
     print(f"  Total tasks: {current_task + 1}")
     
-    # Save final GIF
-    if best_params is not None:
-        try:
+    # Save 10 GIFs for final task
+    fitness_host = jax.device_get(fitnesses)
+    population_host = jax.device_get(population)
+    final_best_idx = int(np.argmax(fitness_host))
+    final_best_params = population_host[final_best_idx].copy()
+    final_best_fitness = float(np.max(fitness_host))
+    
+    print(f"  Debug: Final task_best_fitness={task_best_fitness:.2f}, current_best={final_best_fitness:.2f}")
+    
+    task_gif_dir = os.path.join(gifs_dir, f"task{current_task}")
+    os.makedirs(task_gif_dir, exist_ok=True)
+    
+    try:
+        for gif_idx in range(10):
             key, gif_key = random.split(key)
             obs_list, total_reward = rollout_for_gif(
-                env, env_params, policy, best_params, param_template, 
+                env, env_params, policy, final_best_params, param_template, 
                 episode_length, gif_key, noise_vector
             )
             
             frames = []
             fig, ax = None, None
-            for obs in obs_list[::2]:
-                fig, ax = render_fn(obs, fig, ax)
-                fig.canvas.draw()
-                image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
-                image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))[:, :, :3].copy()
-                frames.append(image)
+            for idx, obs in enumerate(obs_list[::2]):
+                step = idx * 2  # Actual step in episode
+                frame, fig, ax = render_fn(obs, fig, ax, step=step)
+                frames.append(frame)
             plt.close(fig)
             
-            gif_path = os.path.join(gifs_dir, f"task{current_task}_final_reward{total_reward:.0f}.gif")
+            gif_path = os.path.join(task_gif_dir, f"task{current_task}_rollout_{gif_idx:02d}_reward{total_reward:.0f}.gif")
             imageio.mimsave(gif_path, frames, fps=30)
-            print(f"Saved final GIF: {gif_path} ({len(frames)} frames)")
-        except Exception as e:
-            print(f"Warning: Failed to save final GIF: {e}")
+        
+        print(f"Saved 10 GIFs for final task {current_task} in {task_gif_dir}")
+    except Exception as e:
+        print(f"Warning: Failed to save final GIFs: {e}")
     
     # Save checkpoint
     ckpt_path = os.path.join(output_dir, f"dns_{env_name}_continual_best.pkl")

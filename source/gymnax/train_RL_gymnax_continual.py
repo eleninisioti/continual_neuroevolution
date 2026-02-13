@@ -65,10 +65,32 @@ from matplotlib.lines import Line2D
 
 
 # ============================================================================
+# Logging Helper
+# ============================================================================
+
+class Tee:
+    """Duplicate stdout to a file and console."""
+    def __init__(self, filepath):
+        self.file = open(filepath, 'w', buffering=1)
+        self.stdout = sys.stdout
+    
+    def write(self, data):
+        self.file.write(data)
+        self.stdout.write(data)
+    
+    def flush(self):
+        self.file.flush()
+        self.stdout.flush()
+    
+    def close(self):
+        self.file.close()
+
+
+# ============================================================================
 # GIF Rendering Functions
 # ============================================================================
 
-def render_cartpole_frame(obs, fig=None, ax=None):
+def render_cartpole_frame(obs, fig=None, ax=None, step=None):
     """Render a single CartPole frame from observation."""
     if fig is None or ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
@@ -100,7 +122,7 @@ def render_cartpole_frame(obs, fig=None, ax=None):
     ax.set_xlim(-2.5, 2.5)
     ax.set_ylim(-0.5, 1.5)
     ax.set_aspect('equal')
-    ax.set_title('CartPole')
+    ax.set_title(f'CartPole - Step {step}' if step is not None else 'CartPole')
     
     fig.canvas.draw()
     image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
@@ -108,7 +130,7 @@ def render_cartpole_frame(obs, fig=None, ax=None):
     return image
 
 
-def render_acrobot_frame(obs, fig=None, ax=None):
+def render_acrobot_frame(obs, fig=None, ax=None, step=None):
     """Render a single Acrobot frame from observation."""
     if fig is None or ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
@@ -145,7 +167,7 @@ def render_acrobot_frame(obs, fig=None, ax=None):
     ax.set_xlim(-2.5, 2.5)
     ax.set_ylim(-2.5, 2.5)
     ax.set_aspect('equal')
-    ax.set_title('Acrobot')
+    ax.set_title(f'Acrobot - Step {step}' if step is not None else 'Acrobot')
     
     fig.canvas.draw()
     image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
@@ -153,7 +175,7 @@ def render_acrobot_frame(obs, fig=None, ax=None):
     return image
 
 
-def render_mountaincar_frame(obs, fig=None, ax=None):
+def render_mountaincar_frame(obs, fig=None, ax=None, step=None):
     """Render a single MountainCar frame from observation."""
     if fig is None or ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
@@ -177,7 +199,7 @@ def render_mountaincar_frame(obs, fig=None, ax=None):
     
     ax.set_xlim(-1.3, 0.7)
     ax.set_ylim(0, 1.2)
-    ax.set_title('MountainCar')
+    ax.set_title(f'MountainCar - Step {step}' if step is not None else 'MountainCar')
     
     fig.canvas.draw()
     image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
@@ -527,7 +549,7 @@ def evaluate(key, policy_network, policy_params, env, env_params, noise_vector, 
 
 ENV_CONFIGS = {
     "CartPole-v1": {
-        "num_timesteps": 512 * 500 * 50,  # 204,800,000
+        "num_timesteps": 512 * 500 * 100,  # ~10 tasks
         "num_envs": 2048,
         "num_steps": 20,  # unroll_length
         "num_epochs": 8,  # num_updates_per_batch
@@ -541,7 +563,7 @@ ENV_CONFIGS = {
         "episode_length": 500,
     },
     "Acrobot-v1": {
-        "num_timesteps": 512 * 500 * 200 * 10,  # 512,000,000
+        "num_timesteps": 512 * 500 * 200 * 20,  # ~10 tasks
         "num_envs": 2048,
         "num_steps": 50,  # unroll_length
         "num_epochs": 10,  # num_updates_per_batch
@@ -555,7 +577,7 @@ ENV_CONFIGS = {
         "episode_length": 500,
     },
     "MountainCar-v0": {
-        "num_timesteps": 512 * 500 * 200 * 20,  # 1,024,000,000
+        "num_timesteps": 512 * 500 * 200 * 40,  # ~10 tasks
         "num_envs": 2048,
         "num_steps": 50,  # unroll_length
         "num_epochs": 10,  # num_updates_per_batch
@@ -651,7 +673,7 @@ def main():
     
     env_name = args.env
     method = args.method
-    seed = args.seed
+    seed = args.seed + args.trial  # Different seed per trial
     trial = args.trial
     task_interval = args.task_interval
     noise_range = args.noise_range
@@ -688,7 +710,16 @@ def main():
     else:
         output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Set up logging to file
+    log_file = os.path.join(output_dir, "train.log")
+    sys.stdout = Tee(log_file)
+    
     print(f"  Output: {output_dir}")
+    
+    # Create gifs directory
+    gifs_dir = os.path.join(output_dir, "gifs")
+    os.makedirs(gifs_dir, exist_ok=True)
     
     # Initialize random key
     key = random.key(seed + trial * 1000)
@@ -798,11 +829,70 @@ def main():
     current_task = 0
     print(f"\n  Task 0 (baseline): no noise")
     
+    # Helper function to save GIFs for current task
+    def save_task_gifs(task_idx, noise_vec, task_name):
+        """Save evaluation GIFs at end of a task."""
+        nonlocal key
+        try:
+            render_fn = get_render_fn(env_name)
+            if render_fn is None:
+                print(f"  Warning: No render function for {env_name}")
+                return
+            
+            num_gifs = 10
+            noise_mag = float(jnp.linalg.norm(noise_vec))
+            
+            # Create task-specific subdirectory with task name
+            task_gifs_dir = os.path.join(gifs_dir, f"task_{task_idx:02d}_{task_name}")
+            os.makedirs(task_gifs_dir, exist_ok=True)
+            
+            fig, ax = plt.subplots(figsize=(6, 4))
+            
+            for gif_idx in range(num_gifs):
+                key, gif_key = random.split(key)
+                obs, env_state = env.reset(gif_key, env_params)
+                
+                frames = []
+                total_reward = 0.0
+                
+                for step in range(hp['episode_length']):
+                    # Render frame
+                    frame = render_fn(obs, fig, ax, step=step)
+                    frames.append(frame)
+                    
+                    # Get action (with noisy observation)
+                    noisy_obs = obs + noise_vec
+                    logits = policy_network.apply(policy_state.params, noisy_obs)
+                    action = jnp.argmax(logits)
+                    
+                    # Step
+                    gif_key, step_key = random.split(gif_key)
+                    obs, env_state, reward, done, _ = env.step(step_key, env_state, action, env_params)
+                    total_reward += float(reward)
+                    
+                    if bool(done):
+                        break
+                
+                # Save GIF with task name in filename
+                gif_path = os.path.join(task_gifs_dir, f"task{task_idx}_{task_name}_rollout_{gif_idx:02d}_reward{total_reward:.0f}.gif")
+                imageio.mimsave(gif_path, frames, fps=30, loop=0)
+            
+            plt.close(fig)
+            print(f"  Saved {num_gifs} GIFs for task {task_idx} ({task_name}) in {task_gifs_dir}")
+            
+        except Exception as e:
+            print(f"  Warning: Failed to save GIFs for task {task_idx}: {e}")
+    
     for update in range(num_updates):
         timestep = (update + 1) * timesteps_per_update
         
         # Check for task switch
         if update > 0 and update % task_interval == 0:
+            # Save GIFs for the ending task BEFORE switching
+            prev_noise_mag = float(jnp.linalg.norm(noise_vector))
+            prev_task_name = "baseline" if current_task == 0 else f"noise_{prev_noise_mag:.2f}"
+            save_task_gifs(current_task, noise_vector, prev_task_name)
+            
             current_task += 1
             key, noise_key = random.split(key)
             noise_vector = random.normal(noise_key, (obs_dim,)) * noise_range
@@ -909,7 +999,7 @@ def main():
     print(f"\nTraining complete! Time: {total_time:.1f}s, Best (training): {best_reward:.2f}")
     
     # Final evaluation with 10 trials
-    print(f"\nFinal evaluation (10 trials) on Task {task} with noise magnitude {float(jnp.linalg.norm(noise_vector)):.4f}...")
+    print(f"\nFinal evaluation (10 trials) on Task {current_task} with noise magnitude {float(jnp.linalg.norm(noise_vector)):.4f}...")
     final_eval_rewards = []
     for eval_trial in range(10):
         key, eval_key = random.split(key)
@@ -962,52 +1052,10 @@ def main():
     with open(metrics_path, 'w') as f:
         json.dump(training_metrics, f, indent=2)
     
-    # Save GIFs
-    try:
-        gifs_dir = os.path.join(output_dir, "gifs")
-        os.makedirs(gifs_dir, exist_ok=True)
-        
-        render_fn = get_render_fn(env_name)
-        if render_fn is not None:
-            num_gifs = 10
-            fig, ax = plt.subplots(figsize=(6, 4))
-            
-            for gif_idx in range(num_gifs):
-                key, gif_key = random.split(key)
-                obs, env_state = env.reset(gif_key, env_params)
-                
-                frames = []
-                total_reward = 0.0
-                done = False
-                
-                for step in range(hp['episode_length']):
-                    # Render frame
-                    frame = render_fn(obs, fig, ax)
-                    frames.append(frame)
-                    
-                    # Get action (with noisy observation)
-                    noisy_obs = obs + noise_vector
-                    logits = policy_network.apply(policy_state.params, noisy_obs)
-                    action = jnp.argmax(logits)
-                    
-                    # Step
-                    gif_key, step_key = random.split(gif_key)
-                    obs, env_state, reward, done, _ = env.step(step_key, env_state, action, env_params)
-                    total_reward += float(reward)
-                    
-                    if bool(done):
-                        break
-                
-                # Save GIF
-                gif_path = os.path.join(gifs_dir, f"eval_{gif_idx:02d}_reward{total_reward:.0f}.gif")
-                imageio.mimsave(gif_path, frames, fps=30, loop=0)
-            
-            plt.close(fig)
-            print(f"Saved {num_gifs} GIFs to: {gifs_dir}")
-        else:
-            print(f"Warning: No render function for {env_name}")
-    except Exception as e:
-        print(f"Warning: Failed to save GIFs: {e}")
+    # Save GIFs for the final task
+    final_noise_mag = float(jnp.linalg.norm(noise_vector))
+    final_task_name = "baseline" if current_task == 0 else f"noise_{final_noise_mag:.2f}"
+    save_task_gifs(current_task, noise_vector, final_task_name)
     
     wandb.finish()
     print("Done!")

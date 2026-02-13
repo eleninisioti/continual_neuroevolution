@@ -8,10 +8,10 @@
 set -e
 
 # Configuration
-GPU="${GPU:-0}"
+GPU="${GPU:-3}"
 NUM_TRIALS="${NUM_TRIALS:-2}"
-METHODS="${1:-ppo trac redo}"
-ENVS="${ENVS:-CartPole-v1 Acrobot-v1 MountainCar-v0}"
+METHODS="${1:- trac redo}"
+ENVS="${ENVS:-MountainCar-v0}"
 
 echo "=========================================="
 echo "PPO/TRAC/ReDo on Gymnax (Non-Continual)"

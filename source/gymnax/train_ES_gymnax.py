@@ -52,6 +52,28 @@ from matplotlib.patches import Rectangle
 
 
 # ============================================================================
+# Logging Helper
+# ============================================================================
+
+class Tee:
+    """Duplicate stdout to a file and console."""
+    def __init__(self, filepath):
+        self.file = open(filepath, 'w', buffering=1)
+        self.stdout = sys.stdout
+    
+    def write(self, data):
+        self.file.write(data)
+        self.stdout.write(data)
+    
+    def flush(self):
+        self.file.flush()
+        self.stdout.flush()
+    
+    def close(self):
+        self.file.close()
+
+
+# ============================================================================
 # Policy Network (Discrete Actions)
 # ============================================================================
 
@@ -96,7 +118,7 @@ ENV_CONFIGS = {
         "pop_size": 512,
         "hidden_dims": (16, 16),
         "episode_length": 500,
-        "num_evals": 3,
+        "num_evals": 1,
         "sigma": 0.5,
         "learning_rate": 0.01,
     },
@@ -105,7 +127,7 @@ ENV_CONFIGS = {
         "pop_size": 512,
         "hidden_dims": (32, 32),
         "episode_length": 500,
-        "num_evals": 3,
+        "num_evals": 1,
         "sigma": 0.5,
         "learning_rate": 0.01,
     },
@@ -114,7 +136,7 @@ ENV_CONFIGS = {
         "pop_size": 512,
         "hidden_dims": (32, 32),
         "episode_length": 200,
-        "num_evals": 3,
+        "num_evals": 1,
         "sigma": 0.5,
         "learning_rate": 0.01,
     },
@@ -125,81 +147,124 @@ ENV_CONFIGS = {
 # GIF Rendering
 # ============================================================================
 
-def render_cartpole_frame(obs, fig=None, ax=None):
+def render_cartpole_frame(obs, fig=None, ax=None, step=None):
     """Render a single CartPole frame from observation."""
     if fig is None or ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
     ax.clear()
     
     x, x_dot, theta, theta_dot = obs[0], obs[1], obs[2], obs[3]
-    cart_width, cart_height, pole_length = 0.4, 0.2, 0.6
     
+    # Cart dimensions
+    cart_width = 0.4
+    cart_height = 0.2
+    pole_length = 0.6
+    
+    # Draw track
     ax.axhline(y=0, color='gray', linewidth=2)
+    
+    # Draw cart
     cart_x = float(x) - cart_width / 2
     cart = Rectangle((cart_x, 0), cart_width, cart_height, color='blue')
     ax.add_patch(cart)
     
+    # Draw pole
     pole_x_end = float(x) + pole_length * np.sin(float(theta))
     pole_y_end = cart_height + pole_length * np.cos(float(theta))
     ax.plot([float(x), pole_x_end], [cart_height, pole_y_end], 'r-', linewidth=4)
+    
+    # Draw pole tip
     ax.plot(pole_x_end, pole_y_end, 'ro', markersize=8)
     
     ax.set_xlim(-2.5, 2.5)
     ax.set_ylim(-0.5, 1.5)
     ax.set_aspect('equal')
-    ax.set_title(f'x={float(x):.2f}, θ={float(theta):.2f}')
+    ax.set_title(f'CartPole - Step {step}' if step is not None else 'CartPole')
     
-    return fig, ax
+    fig.canvas.draw()
+    image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))[:, :, :3].copy()
+    
+    return image, fig, ax
 
 
-def render_acrobot_frame(obs, fig=None, ax=None):
-    """Render Acrobot frame."""
+def render_acrobot_frame(obs, fig=None, ax=None, step=None):
+    """Render a single Acrobot frame from observation."""
     if fig is None or ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
     ax.clear()
     
-    cos1, sin1, cos2, sin2 = obs[0], obs[1], obs[2], obs[3]
-    link1, link2 = 1.0, 1.0
+    cos1, sin1, cos2, sin2, _, _ = obs[0], obs[1], obs[2], obs[3], obs[4], obs[5]
     
-    p1 = (link1 * float(sin1), -link1 * float(cos1))
-    p2 = (p1[0] + link2 * float(sin2), p1[1] - link2 * float(cos2))
+    # Link lengths
+    l1, l2 = 1.0, 1.0
     
+    # Joint positions
+    p1 = [float(l1 * sin1), -float(l1 * cos1)]
+    p2 = [p1[0] + float(l2 * sin2) * float(cos1) + float(l2 * cos2) * float(sin1),
+          p1[1] - float(l2 * sin2) * float(sin1) + float(l2 * cos2) * float(cos1)]
+    
+    # Simplified joint 2 calculation
+    theta1 = np.arctan2(float(sin1), float(cos1))
+    theta2 = np.arctan2(float(sin2), float(cos2))
+    p2 = [p1[0] + l2 * np.sin(theta1 + theta2),
+          p1[1] - l2 * np.cos(theta1 + theta2)]
+    
+    # Draw links
     ax.plot([0, p1[0]], [0, p1[1]], 'b-', linewidth=4)
     ax.plot([p1[0], p2[0]], [p1[1], p2[1]], 'r-', linewidth=4)
+    
+    # Draw joints
     ax.plot(0, 0, 'ko', markersize=10)
-    ax.plot(p1[0], p1[1], 'bo', markersize=8)
-    ax.plot(p2[0], p2[1], 'ro', markersize=8)
-    ax.axhline(y=1.0, color='g', linestyle='--', linewidth=2)
+    ax.plot(p1[0], p1[1], 'ko', markersize=8)
+    ax.plot(p2[0], p2[1], 'go', markersize=8)
+    
+    # Draw goal line
+    ax.axhline(y=l1, color='green', linestyle='--', alpha=0.5)
     
     ax.set_xlim(-2.5, 2.5)
     ax.set_ylim(-2.5, 2.5)
     ax.set_aspect('equal')
+    ax.set_title(f'Acrobot - Step {step}' if step is not None else 'Acrobot')
     
-    return fig, ax
+    fig.canvas.draw()
+    image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))[:, :, :3].copy()
+    
+    return image, fig, ax
 
 
-def render_mountaincar_frame(obs, fig=None, ax=None):
-    """Render MountainCar frame."""
+def render_mountaincar_frame(obs, fig=None, ax=None, step=None):
+    """Render a single MountainCar frame from observation."""
     if fig is None or ax is None:
-        fig, ax = plt.subplots(figsize=(8, 4))
+        fig, ax = plt.subplots(figsize=(6, 4))
     ax.clear()
     
     position, velocity = float(obs[0]), float(obs[1])
+    
+    # Draw mountain
     xs = np.linspace(-1.2, 0.6, 100)
     ys = np.sin(3 * xs) * 0.45 + 0.55
-    
-    ax.fill_between(xs, 0, ys, color='lightgreen', alpha=0.7)
+    ax.fill_between(xs, 0, ys, color='green', alpha=0.3)
     ax.plot(xs, ys, 'g-', linewidth=2)
     
+    # Draw goal
+    ax.axvline(x=0.5, color='red', linestyle='--', linewidth=2)
+    ax.plot(0.5, np.sin(3 * 0.5) * 0.45 + 0.55, 'r*', markersize=15)
+    
+    # Draw car
     car_y = np.sin(3 * position) * 0.45 + 0.55
-    ax.plot(position, car_y + 0.05, 'rs', markersize=15)
-    ax.axvline(x=0.5, color='gold', linewidth=3, linestyle='--')
+    ax.plot(position, car_y, 'bo', markersize=12)
     
     ax.set_xlim(-1.3, 0.7)
-    ax.set_ylim(0, 1.5)
-    ax.set_title(f'pos={position:.2f}, vel={velocity:.3f}')
+    ax.set_ylim(0, 1.2)
+    ax.set_title(f'MountainCar - Step {step}' if step is not None else 'MountainCar')
     
-    return fig, ax
+    fig.canvas.draw()
+    image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+    image = image.reshape(fig.canvas.get_width_height()[::-1] + (4,))[:, :, :3].copy()
+    
+    return image, fig, ax
 
 
 def save_gif(frames, path, fps=30):
@@ -214,8 +279,13 @@ def save_gif(frames, path, fps=30):
 # Scoring Function
 # ============================================================================
 
-def make_scoring_fn(env, env_params, policy, param_template, episode_length, num_evals=1):
-    """Create JIT-compiled scoring function for gymnax."""
+def make_scoring_fn(env, env_params, policy, param_template, episode_length, num_evals=10):
+    """Create JIT-compiled scoring function for gymnax.
+    
+    Evaluates each individual with num_evals trials:
+    - Returns fitness from FIRST trial only (for selection)
+    - Returns mean fitness across all trials (for logging/tracking)
+    """
     
     def evaluate_single(flat_params, eval_key):
         params = unflatten_params(flat_params, param_template)
@@ -241,21 +311,24 @@ def make_scoring_fn(env, env_params, policy, param_template, episode_length, num
     
     vmapped_eval = jax.vmap(evaluate_single)
     
-    def evaluate_with_multi_evals(flat_params, eval_key):
-        """Evaluate single individual with multiple rollouts and average."""
-        keys = random.split(eval_key, num_evals)
-        rewards = jax.vmap(lambda k: evaluate_single(flat_params, k))(keys)
-        return jnp.mean(rewards)
-    
     @jax.jit
     def scoring_fn(flat_genotypes, key):
+        """Returns (fitness_for_selection, mean_fitness_for_logging)."""
         pop_size = flat_genotypes.shape[0]
-        keys = random.split(key, pop_size)
-        if num_evals == 1:
-            fitnesses = vmapped_eval(flat_genotypes, keys)
-        else:
-            fitnesses = jax.vmap(evaluate_with_multi_evals)(flat_genotypes, keys)
-        return fitnesses
+        
+        # Always evaluate with num_evals trials per individual
+        all_keys = random.split(key, pop_size * num_evals)
+        flat_params_repeated = jnp.repeat(flat_genotypes, num_evals, axis=0)
+        all_fitnesses = vmapped_eval(flat_params_repeated, all_keys)
+        all_fitnesses = all_fitnesses.reshape(pop_size, num_evals)
+        
+        # Fitness for selection: use FIRST trial only
+        fitnesses = all_fitnesses[:, 0]
+        
+        # Mean fitness for logging/tracking
+        mean_fitnesses = jnp.mean(all_fitnesses, axis=1)
+        
+        return fitnesses, mean_fitnesses
     
     return scoring_fn
 
@@ -326,6 +399,10 @@ def main():
     
     output_dir = args.output_dir or f"projects/gymnax/es_{env_name}/trial_{trial}"
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Set up logging to file
+    log_file = os.path.join(output_dir, "train.log")
+    sys.stdout = Tee(log_file)
     
     print(f"\nOpenES on {env_name} (Non-Continual)")
     print(f"  Generations: {num_generations}")
@@ -412,11 +489,11 @@ def main():
     print("\nJIT compiling...")
     key, warmup_key, warmup_ask_key = random.split(key, 3)
     warmup_pop, _ = jit_ask(warmup_ask_key, es_state, es_params)
-    _ = scoring_fn(warmup_pop, warmup_key)
+    _, _ = scoring_fn(warmup_pop, warmup_key)
     print("  JIT compilation complete!")
     
     # Training loop
-    best_overall_fitness = -float('inf')
+    best_overall_fitness = -float('inf')  # Tracks mean-of-10 fitness
     start_time = time.time()
     
     print(f"\nStarting training...")
@@ -425,17 +502,15 @@ def main():
         key, ask_key, eval_key, tell_key = random.split(key, 4)
         
         population, es_state = jit_ask(ask_key, es_state, es_params)
-        fitness = scoring_fn(population, eval_key)
-        # evosax minimizes, so negate fitness for maximization
+        fitness, mean_fitness = scoring_fn(population, eval_key)
+        # evosax minimizes, so negate fitness for maximization (use single-trial for selection)
         es_state, _ = jit_tell(tell_key, population, -fitness, es_state, es_params)
         
-        fitness_host = jax.device_get(fitness)
+        mean_fitness_host = jax.device_get(mean_fitness)
         
-        gen_best = float(np.max(fitness_host))
-        gen_mean = float(np.mean(fitness_host))
-        
-        # ES optimizes the mean - that's the actual solution
-        current_mean = jax.device_get(es_state.mean)
+        # Track using mean-of-10 fitness
+        gen_best = float(np.max(mean_fitness_host))
+        gen_mean = float(np.mean(mean_fitness_host))
         
         if gen_best > best_overall_fitness:
             best_overall_fitness = gen_best
@@ -518,11 +593,8 @@ def main():
             
             frames = []
             obs_to_render = obs_list[:min(len(obs_list), 200)]
-            for obs in obs_to_render:
-                render_fn(obs, fig, ax)
-                fig.canvas.draw()
-                frame = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
-                frame = frame.reshape(fig.canvas.get_width_height()[::-1] + (4,))[:, :, :3].copy()
+            for step, obs in enumerate(obs_to_render):
+                frame, fig, ax = render_fn(obs, fig, ax, step=step)
                 frames.append(frame)
             
             gif_path = os.path.join(gifs_dir, f"eval_{gif_idx:02d}_reward{reward:.0f}.gif")

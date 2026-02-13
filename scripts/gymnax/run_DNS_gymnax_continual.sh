@@ -2,8 +2,8 @@
 # Run DNS gymnax continual experiments across 3 envs and 3 trials
 
 ENVS=("CartPole-v1" "Acrobot-v1" "MountainCar-v0")
-TRIALS=(1 2 3)
-GPU="5"
+TRIALS=(1)
+GPU="1"
 
 for env in "${ENVS[@]}"; do
     for trial in "${TRIALS[@]}"; do

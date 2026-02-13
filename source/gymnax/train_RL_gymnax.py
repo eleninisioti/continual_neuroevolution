@@ -63,10 +63,32 @@ from matplotlib.lines import Line2D
 
 
 # ============================================================================
+# Logging Helper
+# ============================================================================
+
+class Tee:
+    """Duplicate stdout to a file and console."""
+    def __init__(self, filepath):
+        self.file = open(filepath, 'w', buffering=1)
+        self.stdout = sys.stdout
+    
+    def write(self, data):
+        self.file.write(data)
+        self.stdout.write(data)
+    
+    def flush(self):
+        self.file.flush()
+        self.stdout.flush()
+    
+    def close(self):
+        self.file.close()
+
+
+# ============================================================================
 # GIF Rendering Functions
 # ============================================================================
 
-def render_cartpole_frame(obs, fig=None, ax=None):
+def render_cartpole_frame(obs, fig=None, ax=None, step=None):
     """Render a single CartPole frame from observation."""
     if fig is None or ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
@@ -98,7 +120,7 @@ def render_cartpole_frame(obs, fig=None, ax=None):
     ax.set_xlim(-2.5, 2.5)
     ax.set_ylim(-0.5, 1.5)
     ax.set_aspect('equal')
-    ax.set_title('CartPole')
+    ax.set_title(f'CartPole - Step {step}' if step is not None else 'CartPole')
     
     fig.canvas.draw()
     image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
@@ -106,7 +128,7 @@ def render_cartpole_frame(obs, fig=None, ax=None):
     return image
 
 
-def render_acrobot_frame(obs, fig=None, ax=None):
+def render_acrobot_frame(obs, fig=None, ax=None, step=None):
     """Render a single Acrobot frame from observation."""
     if fig is None or ax is None:
         fig, ax = plt.subplots(figsize=(6, 6))
@@ -143,7 +165,7 @@ def render_acrobot_frame(obs, fig=None, ax=None):
     ax.set_xlim(-2.5, 2.5)
     ax.set_ylim(-2.5, 2.5)
     ax.set_aspect('equal')
-    ax.set_title('Acrobot')
+    ax.set_title(f'Acrobot - Step {step}' if step is not None else 'Acrobot')
     
     fig.canvas.draw()
     image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
@@ -151,7 +173,7 @@ def render_acrobot_frame(obs, fig=None, ax=None):
     return image
 
 
-def render_mountaincar_frame(obs, fig=None, ax=None):
+def render_mountaincar_frame(obs, fig=None, ax=None, step=None):
     """Render a single MountainCar frame from observation."""
     if fig is None or ax is None:
         fig, ax = plt.subplots(figsize=(6, 4))
@@ -175,7 +197,7 @@ def render_mountaincar_frame(obs, fig=None, ax=None):
     
     ax.set_xlim(-1.3, 0.7)
     ax.set_ylim(0, 1.2)
-    ax.set_title('MountainCar')
+    ax.set_title(f'MountainCar - Step {step}' if step is not None else 'MountainCar')
     
     fig.canvas.draw()
     image = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
@@ -666,6 +688,11 @@ def main():
     else:
         output_dir = args.output_dir
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Set up logging to file
+    log_file = os.path.join(output_dir, "train.log")
+    sys.stdout = Tee(log_file)
+    
     print(f"  Output: {output_dir}")
     
     # Initialize random key
@@ -939,7 +966,7 @@ def main():
                 
                 for step in range(hp['episode_length']):
                     # Render frame
-                    frame = render_fn(obs, fig, ax)
+                    frame = render_fn(obs, fig, ax, step=step)
                     frames.append(frame)
                     
                     # Get action

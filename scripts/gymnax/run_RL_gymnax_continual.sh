@@ -8,8 +8,8 @@
 set -e
 
 # Configuration
-GPU="${GPU:-2}"
-NUM_TRIALS="${NUM_TRIALS:-3}"
+GPU="${GPU:-1}"
+NUM_TRIALS="${NUM_TRIALS:-1}"
 METHODS="${1:-ppo trac redo}"
 ENVS="${ENVS:-CartPole-v1 Acrobot-v1 MountainCar-v0}"
 

@@ -8,7 +8,7 @@ REPO_ROOT="$(dirname "$(dirname "$SCRIPT_DIR")")"
 
 cd "$REPO_ROOT"
 
-GPUS="${1:-0}"
+GPUS="${1:-2}"
 WANDB_PROJECT="continual_neuroevolution_gymnax"
 BASE_SEED=42
 
