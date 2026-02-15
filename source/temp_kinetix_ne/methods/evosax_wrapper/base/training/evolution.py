@@ -1,5 +1,5 @@
-from methods.evosax_wrapper.base.training.logging import Logger
-from methods.evosax_wrapper.base.training.base import BaseMultiTrainer, BaseTrainer
+from .logging import Logger
+from .base import BaseMultiTrainer, BaseTrainer
 
 import jax
 import jax.numpy as jnp
@@ -8,7 +8,7 @@ import jax.nn as jnn
 from jax.experimental.shard_map import shard_map as shmap
 from jax.sharding import Mesh, PartitionSpec as P
 from jax.experimental import mesh_utils
-import methods.evosax_wrapper.evosax as ex
+from ... import evosax as ex
 import equinox as eqx
 from typing import Any, Callable, Collection, Dict, Optional, Union, NamedTuple, Tuple
 from jaxtyping import Array, Float, PyTree

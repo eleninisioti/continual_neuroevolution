@@ -5,7 +5,7 @@ import chex
 import jax
 import jax.numpy as jnp
 from functools import partial
-from evosax.utils.visualizer_2d import BBOBVisualizer
+from ..utils.visualizer_2d import BBOBVisualizer
 from .bbob_helpers import (
     get_rotation,
     lambda_alpha_trafo,

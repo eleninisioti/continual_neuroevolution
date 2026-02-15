@@ -74,9 +74,6 @@ class Experiment:
         elif self.config["env_config"]["env_type"] == "brax":
             self.setup_brax_env()
             
-        elif self.config["env_config"]["env_type"] == "ecorobot":
-            self.setup_ecorobot_env()
-            
         elif self.config["env_config"]["env_type"] == "gymnax":
             self.setup_gymnax_env()
             
@@ -104,13 +101,7 @@ class Experiment:
         self.config["exp_config"]["trial_seed"] = trial
 
         # start logging
-        if self.config["env_config"]["env_type"] == "ecorobot":
-            if self.config["optimizer_config"]["optimizer_name"] == "ppo":
-                env_part = self.config["env_config"]["env_name"].replace("/", "_") + "_" + self.config["env_config"]["env_params"]["params"]["robot_type"]
-            else:
-                env_part = self.config["env_config"]["env_name"].replace("/", "_") + "_" + self.config["env_config"]["env_params"]["robot_type"]
-        else:
-            env_part = self.config["env_config"]["env_name"].replace("/", "_")
+        env_part = self.config["env_config"]["env_name"].replace("/", "_")
             
         if self.config["env_config"]["env_type"] == "kinetix":
             run_name = self.opt_alias + "_trial_" + str(trial) + "_noncont_pixels"

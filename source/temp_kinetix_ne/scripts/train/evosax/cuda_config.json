@@ -1,8 +1,0 @@
-{
-  "visible_devices": "5",
-  "device_id": 5,
-  "gpu_selection": {
-    "method": "cuda_visible_devices",
-    "device_index": 5
-  }
-}

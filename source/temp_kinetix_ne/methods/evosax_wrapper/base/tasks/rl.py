@@ -19,23 +19,6 @@ from kinetix.environment.utils import ActionType, ObservationType
 from kinetix.environment.env_state import EnvParams, StaticEnvParams
 from kinetix.util.config import normalise_config
 
-# Import envs first to set up the path for ecorobot
-try:
-    import envs  # This sets up sys.path for ecorobot
-except ImportError:
-    pass
-try:
-    from ecorobot import envs as ecorobot_envs
-except ImportError:
-    # Try alternative import path
-    import sys
-    import os
-    # Add envs/ecorobot to path if not already there
-    base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-    envs_path = os.path.join(base_dir, "envs", "ecorobot")
-    if envs_path not in sys.path:
-        sys.path.insert(0, envs_path)
-    from ecorobot import envs as ecorobot_envs
 from flax.serialization import to_state_dict
 import yaml
 from methods.Kinetix.kinetix.util.saving import load_from_json_file
@@ -808,112 +791,6 @@ class KinetixTask(eqx.Module):
         data["n_dormant"] = 0
         return state, states, data, policy_states
 
-
-
-#=======================================================================
-#=======================================================================
-#=======================================================================
-class EcorobotTask(eqx.Module):
-    """
-    """
-    #-------------------------------------------------------------------
-    env: PyTree
-    statics: PyTree[...]
-    max_steps: int    
-    num_tasks: int
-    current_task: int
-    reward_for_solved: float
-    data_fn: Callable[[PyTree], dict]
-    obs_size: int
-    action_size: int
-    env_name: str
-    env_params: dict
-    #-------------------------------------------------------------------
-    def __init__(
-        self, 
-        statics: PyTree[...],
-        env: Union[str, PyTree],
-        max_steps: int,
-        backend: str="mjx",
-        data_fn: Callable=lambda x: x, 
-        env_kwargs: dict={}):
-
-        if isinstance(env, str):
-            self.env = ecorobot_envs.get_environment(env_name=env, backend=backend, **env_kwargs)
-        else:
-            self.env = env
-
-        self.statics = statics
-        self.max_steps = max_steps
-        self.data_fn = data_fn
-        self.num_tasks = 1
-        self.reward_for_solved = 9000
-        self.current_task = 0
-        
-        self.env_name = env
-        self.env_params = env_kwargs
-        
-        self.obs_size = self.env.observation_size
-        self.action_size = self.env.action_size
-
-
-    def __call__(
-        self, 
-        params: Params, 
-        key: jax.Array, 
-        task_params: Optional[TaskParams]=None,
-        current_gen: int=0,
-        env_state: Optional[EnvState]=None,
-        noise: Optional[jax.Array]=None)->Tuple[Float, PyTree]:
-
-        _, _, data, policy_states = self.rollout(params, key)
-        return jnp.sum(data["reward"]), data, policy_states, 0.0, None
-
- 
-    def initialize(self, key: jax.Array, target_function=None, current_task=0) -> EnvState:
-        state = self.env.reset(key)
-        return state.obs, state
-
-    def rollout(
-        self, 
-        params: Params, 
-        key: jax.Array, 
-        task_params: Optional[TaskParams]=None)->Tuple[State, State, dict]:
-
-        init_env_key, init_policy_key, rollout_key = jr.split(key, 3)
-        policy = eqx.combine(params, self.statics)
-
-        policy_state, policy_states = policy.initialize(init_policy_key)
-        obs, env_state = self.initialize(init_env_key)
-        init_state = State(env_state=env_state, policy_state=policy_state)
-
-        obs_size = self.env.observation_size
-        action_size = self.env.action_size
-
-        def env_step(carry, x):
-            state, key = carry
-            key, _key = jr.split(key)
-            action, policy_state = policy(state.env_state.obs, state.policy_state, _key,obs_size=obs_size,action_size=action_size)
-            env_state = self.env.step(state.env_state, action)
-            new_state = State(env_state=env_state, policy_state=policy_state)
-            
-            return [new_state, key], (state, action)
-
-        [state, _], (states, actions) = jax.lax.scan(env_step, [init_state, rollout_key], None, self.max_steps)    
-        data = {"policy_states": states.policy_state, "obs": states.env_state.obs}
-        data = self.data_fn(data)
-        first_done = jnp.argmax(states.env_state.done)
-		# If no episode is done, first_done will be 0, but we want to check if any are actually done
-        any_done = jnp.any(states.env_state.done)
-        first_done = jnp.where(any_done, first_done, states.env_state.done.shape[0])
-        indexes = jnp.arange(states.env_state.reward.shape[0])
-        data["reward"] = jnp.where(indexes > first_done, 0, states.env_state.reward)
-        #data["reward"] = states.env_state.reward
-        data["episode_length"] = first_done
-        data["actions"]  = actions
-        data["n_dormant"] = jnp.mean(states.policy_state.n_dormant[:,0])
-
-        return state, states, data, policy_states
 
 class BraxTask(eqx.Module):
     

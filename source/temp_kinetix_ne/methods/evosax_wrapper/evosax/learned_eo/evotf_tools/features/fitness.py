@@ -4,9 +4,9 @@ import chex
 from flax import struct
 import jax
 import jax.numpy as jnp
-from methods.evosax_wrapper.evosax.strategies.des import get_des_weights
-from methods.evosax_wrapper.evosax.strategies.snes import get_snes_weights
-from methods.evosax_wrapper.evosax.core.fitness import (
+from ....strategies.des import get_des_weights
+from ....strategies.snes import get_snes_weights
+from ....core.fitness import (
     centered_rank_trafo,
     z_score_trafo,
     compute_l2_norm,

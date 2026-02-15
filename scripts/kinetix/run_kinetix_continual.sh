@@ -103,10 +103,10 @@ mkdir -p "$PROJECT_DIR"
 
 cd "$KINETIX_DIR"
 
-# Activate kinetix-specific venv if it exists
-if [ -f "$REPO_ROOT/.venv-kinetix/bin/activate" ]; then
-    source "$REPO_ROOT/.venv-kinetix/bin/activate"
-    echo "Using kinetix venv: $REPO_ROOT/.venv-kinetix"
+# Activate venv
+if [ -f "$REPO_ROOT/.venv/bin/activate" ]; then
+    source "$REPO_ROOT/.venv/bin/activate"
+    echo "Using venv: $REPO_ROOT/.venv"
 fi
 
 # Function to extract checkpoint path from wandb log
@@ -251,16 +251,17 @@ run_continual_variant() {
 }
 
 # Run the requested variant(s)
+# Order: trac first, then vanilla, then redo
+if [[ "$VARIANT" == "all" || "$VARIANT" == "trac" ]]; then
+    run_continual_variant "trac" "False" "False" "True"
+fi
+
 if [[ "$VARIANT" == "all" || "$VARIANT" == "vanilla" ]]; then
     run_continual_variant "vanilla" "False" "False" "False"
 fi
 
 if [[ "$VARIANT" == "all" || "$VARIANT" == "redo" ]]; then
     run_continual_variant "redo" "True" "True" "False"
-fi
-
-if [[ "$VARIANT" == "all" || "$VARIANT" == "trac" ]]; then
-    run_continual_variant "trac" "False" "False" "True"
 fi
 
 echo ""

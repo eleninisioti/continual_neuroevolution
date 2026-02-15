@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import chex
 from typing import Tuple, Optional, Union, Any
 from flax import struct
-from evosax.core import ParameterReshaper, FitnessShaper
+from ..core import ParameterReshaper, FitnessShaper
 
 
 @struct.dataclass

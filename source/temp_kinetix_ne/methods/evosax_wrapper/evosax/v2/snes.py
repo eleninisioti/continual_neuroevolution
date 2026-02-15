@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import chex
 from flax import struct
 from .distributed import DistributedStrategy
-from evosax.strategies.des import get_des_weights
+from ..strategies.des import get_des_weights
 
 
 @struct.dataclass

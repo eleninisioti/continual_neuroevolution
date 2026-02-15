@@ -35,9 +35,6 @@ class Task:
         elif config["env_config"]["env_type"] == "brax":
             self.num_eval_trials = 2
 
-        elif config["env_config"]["env_type"] == "ecorobot":
-            self.num_eval_trials = 2
-
         elif config["env_config"]["env_type"] == "gymnax":
             self.num_eval_trials = 10
 

@@ -4,8 +4,8 @@ import chex
 from flax import struct
 import jax
 import jax.numpy as jnp
-from evosax.core.fitness import range_norm_trafo
-from evosax.utils.helpers import get_best_fitness_member
+from ....core.fitness import range_norm_trafo
+from ....utils.helpers import get_best_fitness_member
 
 
 @struct.dataclass

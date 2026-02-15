@@ -1,6 +1,6 @@
 
 
-from methods.evosax_wrapper.base.training.utils import progress_bar_scan, progress_bar_fori
+from .utils import progress_bar_scan, progress_bar_fori
 import jax
 import jax.numpy as jnp
 import jax.random as jr
@@ -15,7 +15,7 @@ TaskParams: TypeAlias = PyTree[...]
 TrainState: TypeAlias = PyTree[...]
 
 
-from methods.evosax_wrapper.base.training.logging import Logger
+from .logging import Logger
 
 class BaseTrainer(eqx.Module):
 	

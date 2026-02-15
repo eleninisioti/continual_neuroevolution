@@ -5,9 +5,9 @@ from flax import struct
 from chex import Array, ArrayTree
 import jax.numpy as jnp
 
-from evosax.core import OptState, exp_decay
-from evosax.strategies.open_es import EvoParams, OpenES
-from evosax.utils.kernel import RBF, Kernel
+from ..core import OptState, exp_decay
+from .open_es import EvoParams, OpenES
+from ..utils.kernel import RBF, Kernel
 
 
 @struct.dataclass

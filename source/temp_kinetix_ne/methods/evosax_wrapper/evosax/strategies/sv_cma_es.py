@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from chex import Array, ArrayTree, PRNGKey
 from flax.struct import dataclass
 
-from evosax.strategies.cma_es import (
+from .cma_es import (
     get_cma_elite_weights,
     update_p_c,
     update_p_sigma,
@@ -15,8 +15,8 @@ from evosax.strategies.cma_es import (
     EvoParams,
     CMA_ES,
 )
-from evosax.utils.eigen_decomp import full_eigen_decomp
-from evosax.utils.kernel import Kernel, RBF
+from ..utils.eigen_decomp import full_eigen_decomp
+from ..utils.kernel import Kernel, RBF
 
 
 @dataclass

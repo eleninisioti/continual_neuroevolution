@@ -1,27 +1,29 @@
 #!/bin/bash
 
-# Non-continual GA (SimpleGA) training on 20 medium Kinetix tasks (h0-h19)
-# Uses actor-only network with evosax SimpleGA ask/tell pattern.
+# Continual GA (SimpleGA) training on 20 medium Kinetix tasks (h0-h19)
+# Population carries over between tasks – no reset.
+# Each task gets --generations_per_task generations (default 200).
 #
 # Usage:
-#   ./run_GA_kinetix_noncontinual.sh                  # Run all envs on GPU 0
-#   ./run_GA_kinetix_noncontinual.sh --cuda 3         # Run on GPU 3
-#   ./run_GA_kinetix_noncontinual.sh --env h0_unicycle  # Run single env
-#   ./run_GA_kinetix_noncontinual.sh --num_trials 5   # Run 5 trials
-#   ./run_GA_kinetix_noncontinual.sh --popsize 512    # Custom population size
+#   ./run_GA_kinetix_continual.sh                          # Run on GPU 0
+#   ./run_GA_kinetix_continual.sh --cuda 3                 # Run on GPU 3
+#   ./run_GA_kinetix_continual.sh --generations_per_task 100
+#   ./run_GA_kinetix_continual.sh --num_trials 5
+#   ./run_GA_kinetix_continual.sh --no_wandb
 
 set -e
 
 # Default settings
-GPU=3
+GPU=2
 NUM_TRIALS=1
 POPSIZE=1024
-GENERATIONS=200
+GENERATIONS_PER_TASK=200
 SIGMA_INIT=0.001
 SEED=0
-ENV=""
-WANDB_PROJECT="Kinetix-noncontinual-ga"
+WANDB_PROJECT="Kinetix-continual-ga"
 NO_WANDB=""
+EVAL_REPS=10
+EVOLVE_REPS=1
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -34,16 +36,12 @@ while [[ $# -gt 0 ]]; do
             NUM_TRIALS="$2"
             shift 2
             ;;
-        --env)
-            ENV="$2"
-            shift 2
-            ;;
         --popsize)
             POPSIZE="$2"
             shift 2
             ;;
-        --generations)
-            GENERATIONS="$2"
+        --generations_per_task)
+            GENERATIONS_PER_TASK="$2"
             shift 2
             ;;
         --sigma_init)
@@ -58,13 +56,21 @@ while [[ $# -gt 0 ]]; do
             WANDB_PROJECT="$2"
             shift 2
             ;;
+        --eval_reps)
+            EVAL_REPS="$2"
+            shift 2
+            ;;
+        --evolve_reps)
+            EVOLVE_REPS="$2"
+            shift 2
+            ;;
         --no_wandb)
             NO_WANDB="--no_wandb"
             shift
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--cuda GPU] [--num_trials N] [--env ENV] [--popsize N] [--generations N] [--sigma_init F] [--seed S] [--no_wandb]"
+            echo "Usage: $0 [--cuda GPU] [--num_trials N] [--popsize N] [--generations_per_task N] [--sigma_init F] [--seed S] [--eval_reps N] [--evolve_reps N] [--no_wandb]"
             exit 1
             ;;
     esac
@@ -77,19 +83,16 @@ KINETIX_DIR="$REPO_ROOT/source/kinetix"
 PROJECT_DIR="$REPO_ROOT/projects/kinetix"
 
 echo "========================================"
-echo "Kinetix SimpleGA Non-Continual Training"
+echo "Kinetix SimpleGA Continual Training"
 echo "========================================"
 echo "GPU: $GPU"
 echo "Num trials: $NUM_TRIALS"
 echo "Population size: $POPSIZE"
-echo "Generations: $GENERATIONS"
+echo "Generations per task: $GENERATIONS_PER_TASK"
 echo "Sigma init: $SIGMA_INIT"
 echo "Seed: $SEED"
-if [ -n "$ENV" ]; then
-    echo "Environment: $ENV"
-else
-    echo "Environment: ALL (20 medium tasks)"
-fi
+echo "Eval reps: $EVAL_REPS"
+echo "Evolve reps: $EVOLVE_REPS"
 echo "Working directory: $KINETIX_DIR"
 echo "Project directory: $PROJECT_DIR"
 echo "========================================"
@@ -106,24 +109,23 @@ if [ -f "$REPO_ROOT/.venv/bin/activate" ]; then
 fi
 
 # Build command
-CMD="python experiments/ga.py"
+CMD="python experiments/ga_continual.py"
 CMD="$CMD --gpu $GPU"
 CMD="$CMD --popsize $POPSIZE"
-CMD="$CMD --generations $GENERATIONS"
+CMD="$CMD --generations_per_task $GENERATIONS_PER_TASK"
 CMD="$CMD --sigma_init $SIGMA_INIT"
 CMD="$CMD --seed $SEED"
 CMD="$CMD --num_trials $NUM_TRIALS"
 CMD="$CMD --wandb_project $WANDB_PROJECT"
 CMD="$CMD --project_dir $PROJECT_DIR"
-if [ -n "$ENV" ]; then
-    CMD="$CMD --env $ENV"
-fi
+CMD="$CMD --eval_reps $EVAL_REPS"
+CMD="$CMD --evolve_reps $EVOLVE_REPS"
 if [ -n "$NO_WANDB" ]; then
     CMD="$CMD --no_wandb"
 fi
 
 echo ""
-echo "Starting training..."
+echo "Starting continual training..."
 echo "Command: $CMD"
 echo ""
 
@@ -131,5 +133,5 @@ eval $CMD
 
 echo ""
 echo "========================================"
-echo "All SimpleGA training completed!"
+echo "All SimpleGA continual training completed!"
 echo "========================================"

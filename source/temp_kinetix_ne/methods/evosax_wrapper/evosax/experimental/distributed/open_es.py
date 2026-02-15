@@ -5,8 +5,8 @@ import jax.numpy as jnp
 import chex
 from typing import Tuple, Optional, Union
 from flax import struct
-from evosax import Strategy
-from evosax.core import GradientOptimizer, OptState, OptParams, exp_decay
+from ... import Strategy
+from ...core import GradientOptimizer, OptState, OptParams, exp_decay
 
 
 @struct.dataclass

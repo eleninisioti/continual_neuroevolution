@@ -12,7 +12,6 @@ import jax
 from scripts.train.base.visuals import viz_histogram, viz_heatmap
 from scripts.train.rl.ppo.hyperparams import hyperparams
 from scipy import stats
-from methods.evosax_wrapper.base.tasks.rl import EcorobotTask
 from methods.evosax_wrapper.direct_encodings.model import make_model
 from methods.evosax_wrapper.base.training.evolution import EvosaxTrainer
 from methods.evosax_wrapper.base.training.logging  import Logger
@@ -33,7 +32,6 @@ from kinetix.environment.utils import ActionType, ObservationType
 from kinetix.environment.env_state import EnvParams, StaticEnvParams
 from kinetix.util.config import normalise_config
 from flax.serialization import to_state_dict
-from ecorobot import envs as ecorobot_envs
 from methods.Kinetix.kinetix.util.saving import load_from_json_file
 
 
@@ -76,19 +74,6 @@ class EvosaxExperiment(Experiment):
         self.config["env_config"]["observation_size"] = self.env.observation_size
         self.config["env_config"]["episode_length"] = self.env.episode_length
         self.config["env_config"]["num_tasks"] = self.env.num_tasks
-        
-    def setup_ecorobot_env(self):
-        self.env = ecorobot_envs.get_environment(env_name=self.config["env_config"]["env_name"],
-                                                      **self.config["env_config"]["env_params"])
-        
-        self.config["env_config"]["action_size"] = self.env.action_size
-        self.config["env_config"]["observation_size"] = self.env.observation_size
-        self.config["env_config"]["episode_length"] = 1000
-        self.config["env_config"]["num_tasks"] = self.env.num_tasks
-        self.config["env_config"]["gymnax_env_params"] = None
-        self.config["env_config"]["kinetix_config"] = None
-        self.for_eval = None
-        
         
     def setup_brax_env(self):
         self.env = brax_envs.get_environment(env_name=self.config["env_config"]["env_name"],backend="mjx",
@@ -712,15 +697,7 @@ class EvosaxExperiment(Experiment):
                         data_fn=data_fn, env_kwargs={**self.config["env_config"]["env_params"]})
         """
         
-        if self.config["env_config"]["env_type"] == "ecorobot":
-        
-            self.env = EcorobotTask(statics=self.statics,
-                                env=self.config["env_config"]["env_name"],
-                                max_steps=500,
-                                data_fn=data_fn,
-                                env_kwargs={**self.config["env_config"]["env_params"]})
-            
-        elif self.config["env_config"]["env_type"] == "brax":
+        if self.config["env_config"]["env_type"] == "brax":
                 self.env = BraxTask(statics=self.statics,
                                     env=self.config["env_config"]["env_name"],
                                     max_steps=1000,

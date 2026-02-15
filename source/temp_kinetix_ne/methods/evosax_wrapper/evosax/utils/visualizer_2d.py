@@ -33,7 +33,7 @@ class BBOBVisualizer(object):
         plot_labels: bool = True,
         plot_colorbar: bool = True,
     ):
-        from evosax.problems.bbob import BBOB_fns, get_rotation
+        from ..problems.bbob import BBOB_fns, get_rotation
 
         self.X = X
         self.fitness = fitness
@@ -263,8 +263,8 @@ class BBOBVisualizer(object):
 
 if __name__ == "__main__":
     import jax
-    from evosax import CMA_ES
-    from evosax.problems import BBOBFitness
+    from .. import CMA_ES
+    from ..problems import BBOBFitness
 
     # from jax.config import config
     # config.update("jax_enable_x64", True)
