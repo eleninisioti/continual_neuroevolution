@@ -135,7 +135,7 @@ ENV_CONFIGS = {
         "num_generations": 2000,
         "pop_size": 512,
         "hidden_dims": (32, 32),
-        "episode_length": 200,
+        "episode_length": 500,
         "num_evals": 1,
         "sigma": 0.5,
         "learning_rate": 0.01,

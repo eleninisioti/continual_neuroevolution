@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=64.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kinetix-env"
+version = "1.0.7"
+authors = [
+  { name="Michael Matthews", email="michael.matthews@eng.ox.ac.uk" },
+  { name="Michael Beukman", email="michael.beukman@eng.ox.ac.uk" },
+]
+description = "An open-ended space of 2D physics-based RL environments"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "jax>=0.4.37,<0.6.0",
+    "distrax",
+    "optax",
+    "flax>=0.10.4",
+    "numpy==1.26.4",
+    "argparse",
+    "wandb",
+    "orbax-checkpoint",
+    "pygame",
+    "gymnax",
+    "chex",
+    "matplotlib",
+    "imageio",
+    "seaborn",
+    "hydra-core",
+    "safetensors",
+    "pygame_widgets==1.1.5",
+    "jaxgl",
+    "jax2d==1.0.1",
+    "moviepy==1.0.3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "jaxued",
+  "black",
+  "pre-commit",
+]
+
+[project.urls]
+Homepage = "https://github.com/FLAIROx/Kinetix"
+Issues = "https://github.com/FLAIROx/Kinetix/Issues"
+
+[tool.setuptools.packages.find]
+include=["kinetix*"]

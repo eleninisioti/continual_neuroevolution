@@ -549,7 +549,8 @@ def evaluate(key, policy_network, policy_params, env, env_params, noise_vector, 
 
 ENV_CONFIGS = {
     "CartPole-v1": {
-        "num_timesteps": 512 * 500 * 100,  # ~10 tasks
+        "num_timesteps": 512 * 200 * 500 * 10,  # 10 tasks, 512*200*500 per task
+        "task_interval": 1250,  # 512*200*500 / (2048*20) = 1250 updates per task
         "num_envs": 2048,
         "num_steps": 20,  # unroll_length
         "num_epochs": 8,  # num_updates_per_batch
@@ -563,7 +564,8 @@ ENV_CONFIGS = {
         "episode_length": 500,
     },
     "Acrobot-v1": {
-        "num_timesteps": 512 * 500 * 200 * 20,  # ~10 tasks
+        "num_timesteps": 512 * 200 * 500 * 10,  # 10 tasks, 512*200*500 per task
+        "task_interval": 500,  # 512*200*500 / (2048*50) = 500 updates per task
         "num_envs": 2048,
         "num_steps": 50,  # unroll_length
         "num_epochs": 10,  # num_updates_per_batch
@@ -577,7 +579,8 @@ ENV_CONFIGS = {
         "episode_length": 500,
     },
     "MountainCar-v0": {
-        "num_timesteps": 512 * 500 * 200 * 40,  # ~10 tasks
+        "num_timesteps": 512 * 200 * 500 * 10,  # 10 tasks, 512*200*500 per task
+        "task_interval": 500,  # 512*200*500 / (2048*50) = 500 updates per task
         "num_envs": 2048,
         "num_steps": 50,  # unroll_length
         "num_epochs": 10,  # num_updates_per_batch
@@ -588,7 +591,7 @@ ENV_CONFIGS = {
         "normalize_observations": True,
         "policy_hidden_dims": (16, 16),
         "value_hidden_dims": (128, 128, 128),
-        "episode_length": 200,
+        "episode_length": 500,
     },
 }
 
@@ -610,8 +613,8 @@ def parse_args():
     parser.add_argument('--gpus', type=str, default=None)
     
     # Continual learning parameters
-    parser.add_argument('--task_interval', type=int, default=200,
-                        help='Change task every N updates')
+    parser.add_argument('--task_interval', type=int, default=None,
+                        help='Change task every N updates (default: env-specific for 10 tasks)')
     parser.add_argument('--noise_range', type=float, default=1.0,
                         help='Scale for observation noise (task definition)')
     
@@ -652,6 +655,7 @@ def get_hyperparams(args):
     
     return {
         'num_timesteps': args.num_timesteps if args.num_timesteps is not None else env_config['num_timesteps'],
+        'task_interval': args.task_interval if args.task_interval is not None else env_config['task_interval'],
         'num_envs': args.num_envs if args.num_envs is not None else env_config['num_envs'],
         'num_steps': args.num_steps if args.num_steps is not None else env_config['num_steps'],
         'episode_length': args.episode_length if args.episode_length is not None else env_config['episode_length'],
@@ -675,12 +679,12 @@ def main():
     method = args.method
     seed = args.seed + args.trial  # Different seed per trial
     trial = args.trial
-    task_interval = args.task_interval
     noise_range = args.noise_range
     
     # Get environment-specific hyperparameters
     hp = get_hyperparams(args)
     num_timesteps = hp['num_timesteps']
+    task_interval = hp['task_interval']
     
     print("=" * 60)
     print(f"PPO ({method.upper()}) on {env_name} (CONTINUAL)")

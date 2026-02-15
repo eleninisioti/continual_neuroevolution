@@ -3,7 +3,7 @@
 
 ENVS=("CartPole-v1" "Acrobot-v1" "MountainCar-v0")
 TRIALS=(1)
-GPU="0"
+GPU="2"
 
 for env in "${ENVS[@]}"; do
     for trial in "${TRIALS[@]}"; do

@@ -576,7 +576,7 @@ ENV_CONFIGS = {
         "normalize_observations": True,
         "policy_hidden_dims": (16, 16),
         "value_hidden_dims": (128, 128, 128),
-        "episode_length": 200,
+        "episode_length": 500,
     },
 }
 

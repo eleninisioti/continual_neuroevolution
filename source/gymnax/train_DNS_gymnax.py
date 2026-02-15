@@ -104,7 +104,7 @@ ENV_CONFIGS = {
         "pop_size": 512,
         "batch_size": 256,
         "hidden_dims": (32, 32),
-        "episode_length": 200,
+        "episode_length": 500,
         "num_evals": 1,
         "k": 3,
         "iso_sigma": 0.05,

@@ -1,0 +1,652 @@
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 8, in <module>
+    import hydra
+ModuleNotFoundError: No module named 'hydra'
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 11, in <module>
+    from kinetix.environment import make_reset_fn_from_config
+ModuleNotFoundError: No module named 'kinetix'
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 11, in <module>
+    from kinetix.environment import make_reset_fn_from_config
+ModuleNotFoundError: No module named 'kinetix'
+/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jaxlib/plugin_support.py:71: RuntimeWarning: JAX plugin jax_cuda12_plugin version 0.8.2 is installed, but it is not compatible with the installed jaxlib version 0.5.3, so it will not be used.
+  warnings.warn(
+ERROR:2026-02-13 11:55:54,391:jax._src.xla_bridge:626: Jax plugin configuration error: Exception when calling jax_plugins.xla_cuda12.initialize()
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/xla_bridge.py", line 624, in discover_pjrt_plugins
+    plugin_module.initialize()
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax_plugins/xla_cuda12/__init__.py", line 338, in initialize
+    xla_client.register_custom_type_handler(
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'jaxlib.xla_client' has no attribute 'register_custom_type_handler'. Did you mean: 'register_custom_type_id_handler'?
+F0213 11:55:54.698994 3594238 pjrt_c_api_helpers.cc:259] Unexpected error status Unexpected PJRT_Plugin_Attributes_Args size: expected 32, got 24. The plugin is likely built with a later version than the framework. This plugin is built with PJRT API version 0.85.
+*** Check failure stack trace: ***
+    @     0x7fa7898a0c94  absl::lts_20230802::log_internal::LogMessage::SendToLog()
+    @     0x7fa7898a0b04  absl::lts_20230802::log_internal::LogMessage::Flush()
+    @     0x7fa7898a1039  absl::lts_20230802::log_internal::LogMessageFatal::~LogMessageFatal()
+    @     0x7fa7804a61e8  pjrt::LogFatalIfPjrtError()
+    @     0x7fa78048796b  xla::PjRtCApiClient::InitAttributes()
+    @     0x7fa780486435  xla::PjRtCApiClient::PjRtCApiClient()
+    @     0x7fa78049a864  xla::WrapClientAroundCApi()
+    @     0x7fa78049a41c  xla::GetCApiClient()
+    @     0x7fa780344fa6  nanobind::detail::func_create<>()::{lambda()#1}::__invoke()
+    @     0x7fa7887f5631  nanobind::detail::nb_func_vectorcall_complex()
+    @          0x1c26a6e  _PyEval_EvalFrameDefault
+/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jaxlib/plugin_support.py:71: RuntimeWarning: JAX plugin jax_cuda12_plugin version 0.8.2 is installed, but it is not compatible with the installed jaxlib version 0.9.0.1, so it will not be used.
+  warnings.warn(
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 11, in <module>
+    from kinetix.environment import make_reset_fn_from_config
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/environment/__init__.py", line 1, in <module>
+    from kinetix.environment.env import make_kinetix_env
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/environment/env.py", line 13, in <module>
+    from kinetix.environment.ued.ued import make_reset_fn_from_config
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/environment/ued/ued.py", line 29, in <module>
+    from kinetix.util.saving import load_evaluation_levels
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/util/__init__.py", line 8, in <module>
+    from kinetix.util.learning import general_eval, no_op_and_random_rollout, sample_trajectories_and_learn
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/util/learning.py", line 14, in <module>
+    from kinetix.models.actor_critic import ScannedRNN
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/models/__init__.py", line 1, in <module>
+    from kinetix.models.utils import make_network_from_config
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/models/utils.py", line 2, in <module>
+    from kinetix.models.actor_critic import (
+    ...<3 lines>...
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/models/actor_critic.py", line 4, in <module>
+    import distrax
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/distrax/__init__.py", line 18, in <module>
+    from distrax._src.bijectors.bijector import Bijector
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/distrax/_src/bijectors/bijector.py", line 27, in <module>
+    tfb = tfp.bijectors
+          ^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/tensorflow_probability/python/internal/lazy_loader.py", line 56, in __getattr__
+    module = self._load()
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/tensorflow_probability/python/internal/lazy_loader.py", line 43, in _load
+    module = importlib.import_module(self.__name__)
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/importlib/__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/tensorflow_probability/substrates/jax/__init__.py", line 42, in <module>
+    from tensorflow_probability.substrates.jax import bijectors
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/tensorflow_probability/substrates/jax/bijectors/__init__.py", line 19, in <module>
+    from tensorflow_probability.substrates.jax.bijectors.absolute_value import AbsoluteValue
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/tensorflow_probability/substrates/jax/bijectors/absolute_value.py", line 17, in <module>
+    from tensorflow_probability.python.internal.backend.jax.compat import v2 as tf
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/tensorflow_probability/python/internal/backend/jax/__init__.py", line 19, in <module>
+    from tensorflow_probability.python.internal.backend.jax import compat
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/tensorflow_probability/python/internal/backend/jax/compat.py", line 17, in <module>
+    from tensorflow_probability.python.internal.backend.jax import v1
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/tensorflow_probability/python/internal/backend/jax/v1.py", line 23, in <module>
+    from tensorflow_probability.python.internal.backend.jax import linalg_impl
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/tensorflow_probability/python/internal/backend/jax/linalg_impl.py", line 23, in <module>
+    from tensorflow_probability.python.internal.backend.jax import ops
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/tensorflow_probability/python/internal/backend/jax/ops.py", line 681, in <module>
+    jax.interpreters.xla.pytype_aval_mappings[onp.ndarray])
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'jax.interpreters.xla' has no attribute 'pytype_aval_mappings'
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 9, in <module>
+    import jax
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/__init__.py", line 25, in <module>
+    from jax._src.cloud_tpu_init import cloud_tpu_init as _cloud_tpu_init
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/cloud_tpu_init.py", line 17, in <module>
+    from jax._src import config
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/config.py", line 27, in <module>
+    from jax._src import lib
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/lib/__init__.py", line 156, in <module>
+    cuda_path = _cuda_path()
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/lib/__init__.py", line 151, in _cuda_path
+    elif (path := _try_cuda_nvcc_import()) is not None:
+                  ~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/lib/__init__.py", line 146, in _try_cuda_nvcc_import
+    cuda_nvcc_path = pathlib.Path(cuda_nvcc.__file__).parent
+                     ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py", line 503, in __init__
+    super().__init__(*args)
+    ~~~~~~~~~~~~~~~~^^^^^^^
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/pathlib/_local.py", line 132, in __init__
+    raise TypeError(
+    ...<2 lines>...
+        f"not {type(path).__name__!r}")
+TypeError: argument should be a str or an os.PathLike object where __fspath__ returns a str, not 'NoneType'
+Could not override 'project_dir'.
+To append to your config use +project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix
+Key 'project_dir' is not in struct
+    full_key: project_dir
+    object_type=dict
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run lojkce48
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/wandb/run-20260213_120832-lojkce48
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0
+wandb:  View project at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla
+wandb:  View run at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/lojkce48
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/moviepy/config_defaults.py:47: SyntaxWarning: invalid escape sequence '\P'
+  IMAGEMAGICK_BINARY = r"C:\Program Files\ImageMagick-6.8.8-Q16\magick.exe"
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+
+=== Kinetix PPO Training ===
+  Variant: vanilla
+  Environment: h0_unicycle
+  Trial: 1
+  Seed: 0
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/train.log
+==============================
+
+Starting training...
+16
+50.0
+Number of parameters 2243265 size of obs:  46876
+load_from_checkpoint None
+
+Training complete! Time: 336.3s
+Parameters of model saved in checkpoints/kinetix/Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0-965240520-0B/full_model.pbz2
+
+=== Saving outputs ===
+  Saved checkpoint: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/vanilla_h0_unicycle_best.pkl
+  Saved metrics: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/training_metrics.json
+
+  Generating 10 eval trajectory GIFs...
+Error executing job with overrides: ['env=pixels', 'train_levels=m', 'train_levels.train_levels_list=["m/h0_unicycle.json"]', 'env_size=m', 'learning.monitor_dormant=False', 'learning.use_redo=False', 'learning.use_trac=False', 'misc.wandb_project=Kinetix-noncontinual-vanilla', 'seed=0', 'misc.project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix', 'misc.trial_idx=1']
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 727, in main
+    reset_fn=make_reset_fn_from_config(config),
+             ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+TypeError: make_reset_fn_from_config() missing 2 required positional arguments: 'env_params' and 'static_env_params'
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mKinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0[0m at: [34mhttps://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/lojkce48[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260213_120832-lojkce48/logs[0m
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run 43mkaq49
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/wandb/run-20260213_122316-43mkaq49
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0
+wandb:  View project at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla
+wandb:  View run at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/43mkaq49
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+
+=== Kinetix PPO Training ===
+  Variant: vanilla
+  Environment: h0_unicycle
+  Trial: 1
+  Seed: 0
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/train.log
+==============================
+
+Starting training...
+16
+50.0
+Number of parameters 2243265 size of obs:  46876
+load_from_checkpoint None
+
+Training complete! Time: 337.2s
+Parameters of model saved in checkpoints/kinetix/Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0-236280826-0B/full_model.pbz2
+
+=== Saving outputs ===
+  Saved checkpoint: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/vanilla_h0_unicycle_best.pkl
+  Saved metrics: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/training_metrics.json
+
+  Generating 10 eval trajectory GIFs...
+Error executing job with overrides: ['env=pixels', 'train_levels=m', 'train_levels.train_levels_list=["m/h0_unicycle.json"]', 'env_size=m', 'learning.monitor_dormant=False', 'learning.use_redo=False', 'learning.use_trac=False', 'misc.wandb_project=Kinetix-noncontinual-vanilla', 'seed=0', 'misc.project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix', 'misc.trial_idx=1']
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 727, in main
+    reset_fn=make_reset_fn_from_config(config),
+             ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+TypeError: make_reset_fn_from_config() missing 2 required positional arguments: 'env_params' and 'static_env_params'
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mKinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0[0m at: [34mhttps://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/43mkaq49[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260213_122316-43mkaq49/logs[0m
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run 5ropy0ah
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/wandb/run-20260213_123627-5ropy0ah
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0
+wandb:  View project at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla
+wandb:  View run at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/5ropy0ah
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+
+=== Kinetix PPO Training ===
+  Variant: vanilla
+  Environment: h0_unicycle
+  Trial: 1
+  Seed: 0
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/train.log
+==============================
+
+Starting training...
+16
+50.0
+Number of parameters 2243265 size of obs:  46876
+load_from_checkpoint None
+
+Training complete! Time: 336.0s
+Parameters of model saved in checkpoints/kinetix/Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0-1843930875-0B/full_model.pbz2
+
+=== Saving outputs ===
+  Saved checkpoint: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/vanilla_h0_unicycle_best.pkl
+  Saved metrics: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/training_metrics.json
+
+  Generating 10 eval trajectory GIFs...
+Error executing job with overrides: ['env=pixels', 'train_levels=m', 'train_levels.train_levels_list=["m/h0_unicycle.json"]', 'env_size=m', 'learning.monitor_dormant=False', 'learning.use_redo=False', 'learning.use_trac=False', 'misc.wandb_project=Kinetix-noncontinual-vanilla', 'seed=0', 'misc.project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix', 'misc.trial_idx=1']
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 724, in main
+    eval_env = make_kinetix_env(
+        obs_type=config["observation_type"],
+    ...<2 lines>...
+        static_env_params=static_env_params_loaded,
+    )
+TypeError: make_kinetix_env() got an unexpected keyword argument 'obs_type'
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mKinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0[0m at: [34mhttps://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/5ropy0ah[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260213_123627-5ropy0ah/logs[0m
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 2758, in _cached_compilation
+    xla_executable = compiler.compile_or_get_cached(
+        backend, computation, dev, compile_options, host_callbacks,
+        pgle_profiler)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/compiler.py", line 470, in compile_or_get_cached
+    return _compile_and_write_cache(
+        backend,
+    ...<4 lines>...
+        cache_key,
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/compiler.py", line 687, in _compile_and_write_cache
+    executable = backend_compile(
+        backend, computation, compile_options, host_callbacks
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/profiler.py", line 334, in wrapper
+    return func(*args, **kwargs)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/compiler.py", line 327, in backend_compile
+    raise e
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/compiler.py", line 321, in backend_compile
+    return backend.compile(built_c, compile_options=options)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+jaxlib.xla_extension.XlaRuntimeError: INTERNAL: ptxas exited with non-zero error code 2, output: 
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 35, in <module>
+    from trac_optimizer.experimental.jax.trac import start_trac
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/trac_optimizer/experimental/jax/trac.py", line 51, in <module>
+    csi = erfi(1.0 / jnp.sqrt(2.0))
+               ~~~~^~~~~~~~~~~~~~~
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/numpy/array_methods.py", line 579, in deferring_binary_op
+    return binary_op(*args)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/traceback_util.py", line 180, in reraise_with_filtered_traceback
+    return fun(*args, **kwargs)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 339, in cache_miss
+    pgle_profiler) = _python_pjit_helper(fun, jit_info, *args, **kwargs)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 194, in _python_pjit_helper
+    out_flat, compiled, profiler = _pjit_call_impl_python(*args_flat, **p.params)
+                                   ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 1659, in _pjit_call_impl_python
+    ).compile()
+      ~~~~~~~^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 2448, in compile
+    executable = UnloadedMeshExecutable.from_hlo(
+        self._name, self._hlo, **self.compile_args,
+        compiler_options_kvs=compiler_options_kvs)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 2967, in from_hlo
+    xla_executable = _cached_compilation(
+        hlo, name, mesh, spmd_lowering,
+        tuple_args, auto_spmd_lowering, allow_prop_to_inputs,
+        allow_prop_to_outputs, tuple(host_callbacks), backend, da, pmap_nreps,
+        compiler_options_kvs, pgle_profiler)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 2755, in _cached_compilation
+    with dispatch.log_elapsed_time(
+         ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        "Finished XLA compilation of {fun_name} in {elapsed_time:.9f} sec",
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        fun_name=name, event=dispatch.BACKEND_COMPILE_EVENT):
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/dispatch.py", line 182, in __exit__
+    def __exit__(self, exc_type, exc_value, traceback):
+    
+KeyboardInterrupt
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run trhk64r4
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/wandb/run-20260213_124546-trhk64r4
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0
+wandb:  View project at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla
+wandb:  View run at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/trhk64r4
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+
+=== Kinetix PPO Training ===
+  Variant: vanilla
+  Environment: h0_unicycle
+  Trial: 1
+  Seed: 0
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/train.log
+==============================
+
+Starting training...
+16
+50.0
+Number of parameters 2243265 size of obs:  46876
+load_from_checkpoint None
+
+Training complete! Time: 335.5s
+Parameters of model saved in checkpoints/kinetix/Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0-783725810-0B/full_model.pbz2
+
+=== Saving outputs ===
+  Saved checkpoint: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/vanilla_h0_unicycle_best.pkl
+  Saved metrics: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/training_metrics.json
+
+  Generating 10 eval trajectory GIFs...
+Error executing job with overrides: ['env=pixels', 'train_levels=m', 'train_levels.train_levels_list=["m/h0_unicycle.json"]', 'env_size=m', 'learning.monitor_dormant=False', 'learning.use_redo=False', 'learning.use_trac=False', 'misc.wandb_project=Kinetix-noncontinual-vanilla', 'seed=0', 'misc.project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix', 'misc.trial_idx=1']
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 736, in main
+    network = make_network_from_config(config)
+TypeError: make_network_from_config() missing 2 required positional arguments: 'env_params' and 'config'
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mKinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0[0m at: [34mhttps://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/trhk64r4[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260213_124546-trhk64r4/logs[0m
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run k27sqeuu
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/wandb/run-20260213_125250-k27sqeuu
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0
+wandb:  View project at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla
+wandb:  View run at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/k27sqeuu
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+
+=== Kinetix PPO Training ===
+  Variant: vanilla
+  Environment: h0_unicycle
+  Trial: 1
+  Seed: 0
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/train.log
+==============================
+
+Starting training...
+16
+50.0
+Number of parameters 2243265 size of obs:  46876
+load_from_checkpoint None
+
+Training complete! Time: 335.1s
+Parameters of model saved in checkpoints/kinetix/Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0-866457814-0B/full_model.pbz2
+
+=== Saving outputs ===
+  Saved checkpoint: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/vanilla_h0_unicycle_best.pkl
+  Saved metrics: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/training_metrics.json
+
+  Generating 10 eval trajectory GIFs...
+    Eval trajectory 0...Error executing job with overrides: ['env=pixels', 'train_levels=m', 'train_levels.train_levels_list=["m/h0_unicycle.json"]', 'env_size=m', 'learning.monitor_dormant=False', 'learning.use_redo=False', 'learning.use_trac=False', 'misc.wandb_project=Kinetix-noncontinual-vanilla', 'seed=0', 'misc.project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix', 'misc.trial_idx=1']
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 769, in main
+    action = get_action(train_state.params, obs)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 740, in get_action
+    action_dist, _ = network.apply(params, obs[None, :])
+                                           ~~~^^^^^^^^^
+TypeError: 'PixelsObservation' object is not subscriptable
+--------------------
+For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mKinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0[0m at: [34mhttps://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/k27sqeuu[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260213_125250-k27sqeuu/logs[0m
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run 526dl0nv
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/wandb/run-20260213_130139-526dl0nv
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Kinetix-Pixels-MultiDiscrete-PPO-1M-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0
+wandb:  View project at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla
+wandb:  View run at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/526dl0nv
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+
+=== Kinetix PPO Training ===
+  Variant: vanilla
+  Environment: h0_unicycle
+  Trial: 1
+  Seed: 0
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/train.log
+==============================
+
+Starting training...
+16
+50.0
+Number of parameters 2243265 size of obs:  46876
+load_from_checkpoint None
+
+Training complete! Time: 337.1s
+Parameters of model saved in checkpoints/kinetix/Kinetix-Pixels-MultiDiscrete-PPO-1M-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0-1874499873-0B/full_model.pbz2
+
+=== Saving outputs ===
+  Saved checkpoint: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/vanilla_h0_unicycle_best.pkl
+  Saved metrics: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/training_metrics.json
+
+  Generating 10 eval trajectory GIFs...
+    Eval trajectory 0... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/gifs/eval_00_reward1.gif
+    Eval trajectory 1... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/gifs/eval_01_reward1.gif
+    Eval trajectory 2... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/gifs/eval_02_reward1.gif
+    Eval trajectory 3... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/gifs/eval_03_reward1.gif
+    Eval trajectory 4... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/gifs/eval_04_reward1.gif
+    Eval trajectory 5... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/gifs/eval_05_reward1.gif
+    Eval trajectory 6... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/gifs/eval_06_reward1.gif
+    Eval trajectory 7... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/gifs/eval_07_reward1.gif
+    Eval trajectory 8... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/gifs/eval_08_reward1.gif
+    Eval trajectory 9... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla_h0_unicycle/trial_1/gifs/eval_09_reward1.gif
+
+=== Project saving complete! ===
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mKinetix-Pixels-MultiDiscrete-PPO-1M-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0[0m at: [34mhttps://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/526dl0nv[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260213_130139-526dl0nv/logs[0m
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run wo4wmuio
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/wandb/run-20260213_132352-wo4wmuio
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0
+wandb:  View project at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla
+wandb:  View run at https://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/wo4wmuio
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+
+=== Kinetix PPO Training ===
+  Mode: vanilla
+  Variant: ppo
+  Environment: h0_unicycle
+  Trial: 1
+  Seed: 0
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/train.log
+==============================
+
+Starting training...
+16
+50.0
+Number of parameters 2243265 size of obs:  46876
+load_from_checkpoint None
+
+Training complete! Time: 334.7s
+Parameters of model saved in checkpoints/kinetix/Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0-1698482842-0B/full_model.pbz2
+
+=== Saving outputs ===
+  Saved checkpoint: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/vanilla_h0_unicycle_best.pkl
+  Saved metrics: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/training_metrics.json
+
+  Generating 10 eval trajectory GIFs...
+    Eval trajectory 0... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/gifs/eval_00_reward1.gif
+    Eval trajectory 1... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/gifs/eval_01_reward1.gif
+    Eval trajectory 2... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/gifs/eval_02_reward1.gif
+    Eval trajectory 3... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/gifs/eval_03_reward1.gif
+    Eval trajectory 4... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/gifs/eval_04_reward1.gif
+    Eval trajectory 5... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/gifs/eval_05_reward1.gif
+    Eval trajectory 6... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/gifs/eval_06_reward1.gif
+    Eval trajectory 7... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/gifs/eval_07_reward1.gif
+    Eval trajectory 8... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/gifs/eval_08_reward1.gif
+    Eval trajectory 9... reward=1.3, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/ppo/h0_unicycle/trial_1/gifs/eval_09_reward1.gif
+
+=== Project saving complete! ===
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mKinetix-Pixels-MultiDiscrete-PPO-1B-16_h0_unicycle_continual_False_trial1_seed0_trac0_redo0[0m at: [34mhttps://wandb.ai/eleni/Kinetix-noncontinual-vanilla/runs/wo4wmuio[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260213_132352-wo4wmuio/logs[0m

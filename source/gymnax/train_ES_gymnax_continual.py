@@ -140,7 +140,7 @@ ENV_CONFIGS = {
         "num_generations": 2000,
         "pop_size": 512,
         "hidden_dims": (32, 32),
-        "episode_length": 200,
+        "episode_length": 500,
         "num_evals": 1,
         "sigma": 0.5,
         "learning_rate": 0.01,
@@ -563,7 +563,7 @@ def main():
                     plt.close(fig)
                     
                     gif_path = os.path.join(task_gif_dir, f"task{current_task}_rollout_{gif_idx:02d}_reward{total_reward:.0f}.gif")
-                    imageio.mimsave(gif_path, frames, fps=30)
+                    imageio.mimsave(gif_path, frames, fps=30, loop=0)
                 
                 print(f"  Saved 10 GIFs for task {current_task} in {task_gif_dir}")
             except Exception as e:
@@ -633,7 +633,7 @@ def main():
             plt.close(fig)
             
             gif_path = os.path.join(task_gif_dir, f"task{current_task}_rollout_{gif_idx:02d}_reward{total_reward:.0f}.gif")
-            imageio.mimsave(gif_path, frames, fps=30)
+            imageio.mimsave(gif_path, frames, fps=30, loop=0)
         
         print(f"Saved 10 GIFs for final task {current_task} in {task_gif_dir}")
     except Exception as e:
