@@ -1,0 +1,53 @@
+# Project outputs (experiments, logs, checkpoints)
+projects/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Wandb
+wandb/
+
+# Kinetix generated folders
+source/kinetix/artifacts/
+source/kinetix/checkpoints/
+source/kinetix/images/
+source/kinetix/data/
+source/kinetix/outputs/
