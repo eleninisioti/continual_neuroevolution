@@ -424,8 +424,6 @@ def train_ga_continual(
         config_t, env_t, init_es_t, static_ep_t, ep_t = envs_data[task_idx]
         eval_pop_fn, _ = make_rollout_and_eval(env_t, ep_t, init_es_t)
 
-        task_best_fitness = -jnp.inf
-        task_best_params = None
         bare = env_name.split("/")[-1] if "/" in env_name else env_name
 
         print(f"\n{'='*60}")
@@ -458,9 +456,9 @@ def train_ga_continual(
             pop_mean = float(np.mean(report_np))
             mean_ep_len = float(np.mean(np.array(mean_ep_lengths)))
 
-            if rep_best_mean > task_best_fitness:
-                task_best_fitness = rep_best_mean
-                task_best_params = flat_pop[best_report_idx]
+            # Always use the best from the current generation
+            task_best_fitness = rep_best_mean
+            task_best_params = flat_pop[best_report_idx]
 
             if rep_best_mean > best_fitness_ever:
                 best_fitness_ever = rep_best_mean

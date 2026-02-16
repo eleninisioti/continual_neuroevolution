@@ -381,10 +381,10 @@ def train_es(
         pop_mean = float(np.mean(report_np))
         mean_ep_len = float(np.mean(np.array(mean_ep_lengths)))
 
-        if rep_best_mean > best_fitness_ever:
-            best_fitness_ever = rep_best_mean
-            # For OpenES the best solution is the distribution mean
-            best_mean_params = np.array(es_state.mean)
+        # Always use the best from the current generation
+        best_fitness_ever = rep_best_mean
+        # For OpenES the best solution is the distribution mean
+        best_mean_params = np.array(es_state.mean)
 
         elapsed = time.time() - start_time
         print(

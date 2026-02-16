@@ -417,9 +417,9 @@ def train_ga(
         pop_mean  = float(np.mean(report_np))
         mean_ep_len = float(np.mean(np.array(mean_ep_lengths)))
 
-        if rep_best_mean > best_fitness_ever:
-            best_fitness_ever = rep_best_mean
-            best_params_ever = flat_pop[best_report_idx]
+        # Always use the best from the current generation
+        best_fitness_ever = rep_best_mean
+        best_params_ever = flat_pop[best_report_idx]
 
         elapsed = time.time() - start_time
         print(
