@@ -549,8 +549,6 @@ def train_dns_continual(
         config_t, env_t, init_es_t, static_ep_t, ep_t = envs_data[task_idx]
         eval_pop_fn, _ = make_rollout_and_eval(env_t, ep_t, init_es_t)
 
-        task_best_fitness = -float("inf")
-        task_best_params = None
         bare = env_name.split("/")[-1] if "/" in env_name else env_name
 
         print(f"\n{'='*60}")
@@ -593,9 +591,9 @@ def train_dns_continual(
             gen_mean = float(np.mean(fit_np))
             best_idx = int(np.argmax(fit_np))
 
-            if gen_best > task_best_fitness:
-                task_best_fitness = gen_best
-                task_best_params = pop_host[best_idx].copy()
+            # Always keep the best from the current generation's population
+            task_best_fitness = gen_best
+            task_best_params = pop_host[best_idx].copy()
 
             if gen_best > best_fitness_ever:
                 best_fitness_ever = gen_best
@@ -635,8 +633,9 @@ def train_dns_continual(
             global_gen += 1
 
         # -- end of task: save GIFs -------------------------------------------
+        # Use the best individual from the final generation
         if task_best_params is not None:
-            print(f"  Task {task_idx} ({bare}) finished.  task_best={task_best_fitness:.2f}")
+            print(f"  Task {task_idx} ({bare}) finished.  last_gen_best={task_best_fitness:.2f}")
             save_task_gifs(
                 task_idx, bare, config_t, env_t, ep_t, static_ep_t,
                 init_es_t, jnp.array(task_best_params),

@@ -474,7 +474,6 @@ def train_dns(
     print(f"  Initial best (mean {num_evals} rollouts): {float(jnp.max(fitnesses)):.2f}")
 
     # -- training loop --------------------------------------------------------
-    best_overall_fitness = -float("inf")
     best_params = None
     start_time = time.time()
 
@@ -507,9 +506,9 @@ def train_dns(
         best_idx = int(np.argmax(fit_np))
         mean_ep_len = 0.0  # ep lengths not tracked after selection
 
-        if gen_best > best_overall_fitness:
-            best_overall_fitness = gen_best
-            best_params = pop_host[best_idx].copy()
+        # Always use the best from the current generation's population
+        best_overall_fitness = gen_best
+        best_params = pop_host[best_idx].copy()
 
         # Diversity metrics
         fitness_div = compute_fitness_diversity(fitnesses)

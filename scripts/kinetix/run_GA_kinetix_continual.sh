@@ -16,14 +16,14 @@ set -e
 # Default settings
 GPU=2
 NUM_TRIALS=1
-POPSIZE=256
+POPSIZE=512
 GENERATIONS_PER_TASK=200
 SIGMA_INIT=0.001
 SEED=0
 WANDB_PROJECT="Kinetix-continual-ga"
 NO_WANDB=""
-EVAL_REPS=10
-EVOLVE_REPS=1
+EVAL_REPS=3
+EVOLVE_REPS=3
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
