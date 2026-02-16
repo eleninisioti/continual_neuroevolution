@@ -692,6 +692,7 @@ def main():
     
     # Create environment
     env, env_params = gymnax.make(env_name)
+    env_params = env_params.replace(max_steps_in_episode=hp['episode_length'])
     obs_dim = env.observation_space(env_params).shape[0]
     action_dim = env.action_space(env_params).n
     

@@ -286,7 +286,11 @@ def save_dict(dict, timesteps, config, name, save_to_wandb: bool = True):
 
     # upload this to wandb as an artifact
     if save_to_wandb:
-        artifact = wandb.Artifact(f"{run_name}-checkpoint", type="checkpoint")
+        artifact_name = f"{run_name}-checkpoint"
+        # wandb artifact names must be <= 128 characters
+        if len(artifact_name) > 128:
+            artifact_name = artifact_name[:128]
+        artifact = wandb.Artifact(artifact_name, type="checkpoint")
         artifact.add_file(f"{save_dir}/{name}.pbz2")
         artifact.save()
     print(f"Parameters of model saved in {save_dir}/{name}.pbz2")

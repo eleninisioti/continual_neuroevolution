@@ -15,7 +15,8 @@
 #   ./run_kinetix_continual.sh --variant all     # Run all 3 variants sequentially
 #   ./run_kinetix_continual.sh --num_trials 10   # Run 10 trials per variant
 
-set -e
+# NOTE: We do NOT use 'set -e' here so that a failure on one
+# environment does not kill the entire script (and skip remaining envs/variants).
 
 # Default settings
 GPU=3
@@ -158,10 +159,13 @@ run_continual_variant() {
         # Use trial_idx as the seed for reproducibility
         seed=${trial_idx}
         
+        # Track failures per trial
+        failed_envs=()
+        
         # Run the first environment without checkpoint
         echo "Running first environment: ${ENVIRONMENTS[0]}"
         
-        CUDA_VISIBLE_DEVICES=$GPU python3 experiments/ppo.py \
+        if CUDA_VISIBLE_DEVICES=$GPU python3 experiments/ppo.py \
             --config-name=$CONFIG_NAME \
             env=$ENV_CONFIG \
             train_levels=m \
@@ -175,9 +179,12 @@ run_continual_variant() {
             seed=$seed \
             misc.project_dir="$PROJECT_DIR" \
             misc.trial_idx=$trial_idx \
-            >> "${output_dir}/trial${trial_idx}_env01_${ENVIRONMENTS[0]}.txt" 2>&1
-        
-        echo "First environment completed. Checking for checkpoint..."
+            >> "${output_dir}/trial${trial_idx}_env01_${ENVIRONMENTS[0]}.txt" 2>&1; then
+            echo "First environment completed. Checking for checkpoint..."
+        else
+            echo "WARNING: First environment ${ENVIRONMENTS[0]} FAILED (exit code $?). Continuing..."
+            failed_envs+=("${ENVIRONMENTS[0]}")
+        fi
         
         # Run subsequent environments using checkpoints from previous runs
         for i in $(seq 1 $((${#ENVIRONMENTS[@]} - 1))); do
@@ -195,51 +202,43 @@ run_continual_variant() {
             # Extract checkpoint path from previous run's log
             checkpoint_path=$(extract_checkpoint_from_log "$prev_log")
             
+            # Build the training command
+            local train_cmd="CUDA_VISIBLE_DEVICES=$GPU python3 experiments/ppo.py"
+            train_cmd="$train_cmd --config-name=$CONFIG_NAME"
+            train_cmd="$train_cmd env=$ENV_CONFIG"
+            train_cmd="$train_cmd train_levels=m"
+            train_cmd="$train_cmd \"train_levels.train_levels_list=[\\\"m/${curr_env}.json\\\"]\""
+            train_cmd="$train_cmd env_size=m"
+            train_cmd="$train_cmd +continual=True"
+            train_cmd="$train_cmd learning.monitor_dormant=$monitor_dormant"
+            train_cmd="$train_cmd learning.use_redo=$use_redo"
+            train_cmd="$train_cmd learning.use_trac=$use_trac"
+            train_cmd="$train_cmd misc.wandb_project=$wandb_project"
+            train_cmd="$train_cmd seed=$seed"
+            train_cmd="$train_cmd misc.project_dir=$PROJECT_DIR"
+            train_cmd="$train_cmd misc.trial_idx=$trial_idx"
+            
             if [ -n "$checkpoint_path" ]; then
-                # Convert to wandb artifact path
                 wandb_checkpoint=$(convert_to_wandb_path "$checkpoint_path" "$wandb_project")
                 echo "Using checkpoint: $wandb_checkpoint"
-                
-                CUDA_VISIBLE_DEVICES=$GPU python3 experiments/ppo.py \
-                    --config-name=$CONFIG_NAME \
-                    env=$ENV_CONFIG \
-                    train_levels=m \
-                    "train_levels.train_levels_list=[\"m/${curr_env}.json\"]" \
-                    env_size=m \
-                    misc.load_from_checkpoint="$wandb_checkpoint" \
-                    +continual=True \
-                    learning.monitor_dormant=$monitor_dormant \
-                    learning.use_redo=$use_redo \
-                    learning.use_trac=$use_trac \
-                    misc.wandb_project="$wandb_project" \
-                    seed=$seed \
-                    misc.project_dir="$PROJECT_DIR" \
-                    misc.trial_idx=$trial_idx \
-                    >> "${output_dir}/trial${trial_idx}_env${env_num_padded}_${curr_env}.txt" 2>&1
+                train_cmd="$train_cmd misc.load_from_checkpoint=$wandb_checkpoint"
             else
                 echo "Warning: Could not find checkpoint from previous run. Running without checkpoint."
-                
-                CUDA_VISIBLE_DEVICES=$GPU python3 experiments/ppo.py \
-                    --config-name=$CONFIG_NAME \
-                    env=$ENV_CONFIG \
-                    train_levels=m \
-                    "train_levels.train_levels_list=[\"m/${curr_env}.json\"]" \
-                    env_size=m \
-                    +continual=True \
-                    learning.monitor_dormant=$monitor_dormant \
-                    learning.use_redo=$use_redo \
-                    learning.use_trac=$use_trac \
-                    misc.wandb_project="$wandb_project" \
-                    seed=$seed \
-                    misc.project_dir="$PROJECT_DIR" \
-                    misc.trial_idx=$trial_idx \
-                    >> "${output_dir}/trial${trial_idx}_env${env_num_padded}_${curr_env}.txt" 2>&1
             fi
             
-            echo "Completed environment ${env_num}/20: $curr_env"
+            if eval $train_cmd >> "${output_dir}/trial${trial_idx}_env${env_num_padded}_${curr_env}.txt" 2>&1; then
+                echo "Completed environment ${env_num}/20: $curr_env"
+            else
+                echo "WARNING: Environment ${env_num}/20 $curr_env FAILED (exit code $?). Continuing..."
+                failed_envs+=("$curr_env")
+            fi
         done
         
-        echo "Trial $trial_idx completed!"
+        if [ ${#failed_envs[@]} -gt 0 ]; then
+            echo "WARNING: Trial $trial_idx had ${#failed_envs[@]} failed env(s): ${failed_envs[*]}"
+        else
+            echo "Trial $trial_idx completed successfully!"
+        fi
     done
     
     echo ""
@@ -251,17 +250,17 @@ run_continual_variant() {
 }
 
 # Run the requested variant(s)
-# Order: trac first, then vanilla, then redo
+# Order: redo first, then trac, then vanilla
+if [[ "$VARIANT" == "all" || "$VARIANT" == "redo" ]]; then
+    run_continual_variant "redo" "True" "True" "False"
+fi
+
 if [[ "$VARIANT" == "all" || "$VARIANT" == "trac" ]]; then
     run_continual_variant "trac" "False" "False" "True"
 fi
 
 if [[ "$VARIANT" == "all" || "$VARIANT" == "vanilla" ]]; then
     run_continual_variant "vanilla" "False" "False" "False"
-fi
-
-if [[ "$VARIANT" == "all" || "$VARIANT" == "redo" ]]; then
-    run_continual_variant "redo" "True" "True" "False"
 fi
 
 echo ""

@@ -1,0 +1,169 @@
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run d9vtx2y7
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/wandb/run-20260216_204301-d9vtx2y7
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h19_thrust_left_very_easy_continual_False_trial1_seed0_trac1_redo0
+wandb:  View project at https://wandb.ai/eleni/Kinetix-noncontinual-trac
+wandb:  View run at https://wandb.ai/eleni/Kinetix-noncontinual-trac/runs/d9vtx2y7
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+E0216 20:45:44.033806  961056 pjrt_stream_executor_client.cc:3077] Execution of replica 0 failed: INTERNAL: CustomCall failed: CpuCallback error: Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 817, in <module>
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/main.py", line 94, in decorated_main
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/hydra.py", line 119, in run
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/core/utils.py", line 186, in run_job
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 650, in main
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/traceback_util.py", line 180, in reraise_with_filtered_traceback
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 339, in cache_miss
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 194, in _python_pjit_helper
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 1681, in _pjit_call_impl_python
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/profiler.py", line 334, in wrapper
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 1288, in __call__
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/callback.py", line 777, in _wrapped_callback
+KeyboardInterrupt: 
+
+=== Kinetix PPO Training ===
+  Mode: vanilla
+  Variant: trac
+  Environment: h19_thrust_left_very_easy
+  Trial: 1
+  Seed: 0
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/trac/h19_thrust_left_very_easy/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/vanilla/trac/h19_thrust_left_very_easy/trial_1/train.log
+==============================
+
+Starting training...
+16
+50.0
+Number of parameters 2243265 size of obs:  46876
+Using TRAC optimizer wrapper
+load_from_checkpoint None
+Error executing job with overrides: ['env=pixels', 'train_levels=m', 'train_levels.train_levels_list=["m/h19_thrust_left_very_easy.json"]', 'env_size=m', 'learning.monitor_dormant=False', 'learning.use_redo=False', 'learning.use_trac=True', 'misc.wandb_project=Kinetix-noncontinual-trac', 'seed=0', 'misc.project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix', 'misc.trial_idx=1']
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 650, in main
+    out = train_jit(_rng)
+jaxlib.xla_extension.XlaRuntimeError: INTERNAL: CustomCall failed: CpuCallback error: Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 817, in <module>
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/main.py", line 94, in decorated_main
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/hydra.py", line 119, in run
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/core/utils.py", line 186, in run_job
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 650, in main
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/traceback_util.py", line 180, in reraise_with_filtered_traceback
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 339, in cache_miss
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 194, in _python_pjit_helper
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 1681, in _pjit_call_impl_python
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/profiler.py", line 334, in wrapper
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 1288, in __call__
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/callback.py", line 777, in _wrapped_callback
+KeyboardInterrupt: 
+--------------------
+For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+Set the environment variable HYDRA_FULL_ERROR=1 for a complete stack trace.
+Exception ignored in atexit callback <function _start_and_connect_service.<locals>.teardown_atexit at 0x7f00ac475a80>:
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/service/service_connection.py", line 312, in teardown
+    return self._proc.join()
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/service/service_process.py", line 57, in join
+[2026-02-16 20:45:44,583][asyncio][WARNING] - socket.send() raised exception.
+    return self._process.wait()
+[2026-02-16 20:45:44,584][asyncio][WARNING] - socket.send() raised exception.
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/subprocess.py", line 1293, in wait
+[2026-02-16 20:45:44,584][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,584][asyncio][WARNING] - socket.send() raised exception.
+    self._wait(timeout=sigint_timeout)
+[2026-02-16 20:45:44,585][asyncio][WARNING] - socket.send() raised exception.
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/subprocess.py", line 2060, in _wait
+[2026-02-16 20:45:44,585][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,585][asyncio][WARNING] - socket.send() raised exception.
+    time.sleep(delay)
+[2026-02-16 20:45:44,586][asyncio][WARNING] - socket.send() raised exception.
+KeyboardInterrupt: 
+[2026-02-16 20:45:44,587][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,587][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,588][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,588][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,588][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,588][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,588][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,588][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,588][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,588][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,589][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:44,610][asyncio][WARNING] - socket.send() raised exception.
+Exception ignored in: <function WeakKeyDictionary.__init__.<locals>.remove at 0x7f033f5b7740>
+Traceback (most recent call last):
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/weakref.py", line 369, in remove
+    def remove(k, selfref=ref(self)):
+KeyboardInterrupt: 
+Exception ignored in: <function WeakKeyDictionary.__init__.<locals>.remove at 0x7f033f5b7740>
+Traceback (most recent call last):
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/weakref.py", line 369, in remove
+    def remove(k, selfref=ref(self)):
+KeyboardInterrupt: 
+Exception ignored in: <function WeakKeyDictionary.__init__.<locals>.remove at 0x7f033f5b7740>
+Traceback (most recent call last):
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/weakref.py", line 369, in remove
+KeyboardInterrupt: 
+Exception ignored in: <function WeakKeyDictionary.__init__.<locals>.remove at 0x7f033f5b7740>
+Traceback (most recent call last):
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/weakref.py", line 369, in remove
+    def remove(k, selfref=ref(self)):
+[2026-02-16 20:45:45,185][asyncio][WARNING] - socket.send() raised exception.
+KeyboardInterrupt: 
+[2026-02-16 20:45:45,191][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:45,203][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:45,288][asyncio][WARNING] - socket.send() raised exception.
+Exception ignored in atexit callback <function clean_up at 0x7f033f5ca7a0>:
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/api.py", line 2892, in clean_up
+[2026-02-16 20:45:45,289][asyncio][WARNING] - socket.send() raised exception.
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mKinetix-Pixels-MultiDiscrete-PPO-1B-16_h19_thrust_left_very_easy_continual_False_trial1_seed0_trac1_redo0[0m at: [34mhttps://wandb.ai/eleni/Kinetix-noncontinual-trac/runs/d9vtx2y7[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260216_204301-d9vtx2y7/logs[0m
+[2026-02-16 20:45:45,308][asyncio][WARNING] - socket.send() raised exception.
+    clear_backends()
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/api.py", line 2882, in clear_backends
+[2026-02-16 20:45:45,308][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-16 20:45:45,309][asyncio][WARNING] - socket.send() raised exception.
+    pjit._infer_params_cached.cache_clear()
+KeyboardInterrupt: 
+[2026-02-16 20:45:45,309][asyncio][WARNING] - socket.send() raised exception.
+Exception ignored in atexit callback <function shutdown at 0x7f03524ed760>:
+[2026-02-16 20:45:45,337][asyncio][WARNING] - socket.send() raised exception.
+Traceback (most recent call last):
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/logging/__init__.py", line 2237, in shutdown
+[2026-02-16 20:45:45,337][asyncio][WARNING] - socket.send() raised exception.
+    def shutdown(handlerList=_handlerList):
+[2026-02-16 20:45:45,338][asyncio][WARNING] - socket.send() raised exception.
+KeyboardInterrupt: 

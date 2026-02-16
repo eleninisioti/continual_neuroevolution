@@ -1,8 +1,11 @@
-"""Simple Genetic Algorithm with (μ+λ) Elitist Archive (Such et al., 2017).
+"""Simple Genetic Algorithm with (μ+λ) Elitism (Such et al., 2017).
 
-Like evosax v2 SimpleGA but maintains a persistent elite archive across
-generations. New candidates compete with the archive, and only improvements
-survive — good solutions are never lost.
+Like the evosax v1 SimpleGA: the stored population includes the elite.
+Each generation, ``popsize`` offspring are produced from the top
+``elite_ratio`` fraction (parents).  In ``tell``, offspring and the
+current population are merged and only the top ``popsize`` survive.
+Good solutions are never lost, and total stored memory is a single
+(popsize × num_dims) array — same as vanilla SimpleGA.
 
 [1] https://arxiv.org/abs/1712.06567
 """
@@ -26,25 +29,26 @@ from evosax.algorithms.population_based.base import (
 
 
 @struct.dataclass
-class ElitistState(BaseState):
-    population: Population      # full population (popsize) — used by base class init
-    fitness: Fitness             # full population fitness
-    archive: Population          # elite archive (num_elites x num_dims)
-    archive_fitness: Fitness     # elite archive fitness (num_elites,)
+class State(BaseState):
+    population: Population      # (popsize, num_dims) — elites live at the top
+    fitness: Fitness             # (popsize,)
     std: jax.Array
 
 
 @struct.dataclass
-class ElitistParams(BaseParams):
+class Params(BaseParams):
     crossover_rate: float
 
 
 class SimpleGA_Elitist(PopulationBasedAlgorithm):
-    """Simple GA with (μ+λ) elitist archive selection.
-    
-    Maintains a persistent archive of elite solutions. Each generation,
-    new offspring are combined with the archive and only the top elite_ratio
-    fraction survives. This ensures good solutions are never lost.
+    """Simple GA with (μ+λ) elitist selection.
+
+    The stored population *is* the archive. The top ``num_elites``
+    individuals (sorted by fitness) act as parents for the next
+    generation.  After evaluation, offspring compete with the current
+    population and only the best ``popsize`` survive.  Memory usage
+    is identical to vanilla SimpleGA — a single (popsize × num_dims)
+    array.
     """
 
     def __init__(
@@ -64,61 +68,39 @@ class SimpleGA_Elitist(PopulationBasedAlgorithm):
         self.std_schedule = std_schedule
 
     @property
-    def _default_params(self) -> ElitistParams:
-        return ElitistParams(crossover_rate=0.0)
+    def _default_params(self) -> Params:
+        return Params(crossover_rate=0.0)
 
-    def _init(self, key: jax.Array, params: ElitistParams) -> ElitistState:
-        state = ElitistState(
-            # population/fitness are required by PopulationBasedAlgorithm.init()
+    def _init(self, key: jax.Array, params: Params) -> State:
+        return State(
             population=jnp.full((self.population_size, self.num_dims), jnp.nan),
             fitness=jnp.full((self.population_size,), jnp.inf),
-            # The elite archive — sized to num_elites
-            archive=jnp.full((self.num_elites, self.num_dims), jnp.nan),
-            archive_fitness=jnp.full((self.num_elites,), jnp.inf),
             std=self.std_schedule(0),
             best_solution=jnp.full((self.num_dims,), jnp.nan),
             best_fitness=jnp.inf,
             generation_counter=0,
         )
-        return state
-
-    @partial(jax.jit, static_argnames=("self",))
-    def init(
-        self,
-        key: jax.Array,
-        population: Population,
-        fitness: Fitness,
-        params: ElitistParams,
-    ) -> ElitistState:
-        """Initialize and seed the elite archive from the initial population."""
-        # Call parent init (sets population & fitness on state)
-        state = super().init(key, population, fitness, params)
-        # Seed archive with the top num_elites from the initial population
-        idx = jnp.argsort(state.fitness)[:self.num_elites]
-        archive = state.population[idx]
-        archive_fitness = state.fitness[idx]
-        state = state.replace(archive=archive, archive_fitness=archive_fitness)
-        return state
 
     def _ask(
         self,
         key: jax.Array,
-        state: ElitistState,
-        params: ElitistParams,
-    ) -> tuple[Population, ElitistState]:
-        # Parents are selected uniformly from the elite archive
-        archive = state.archive
+        state: State,
+        params: Params,
+    ) -> tuple[Population, State]:
+        # Sort population by fitness — top num_elites are the parents
+        idx = jnp.argsort(state.fitness)
+        sorted_pop = state.population[idx]
         elite_ids = jnp.arange(self.num_elites)
 
         key_crossover, key_mutation, key_a, key_b = jax.random.split(key, 4)
         key_crossover = jax.random.split(key_crossover, self.population_size)
         key_mutation = jax.random.split(key_mutation, self.population_size)
 
-        # Select parents uniformly from archive
+        # Select two parents uniformly from the elite portion
         idx_a = jax.random.choice(key_a, elite_ids, (self.population_size,))
         idx_b = jax.random.choice(key_b, elite_ids, (self.population_size,))
-        parents_1 = archive[idx_a]
-        parents_2 = archive[idx_b]
+        parents_1 = sorted_pop[idx_a]
+        parents_2 = sorted_pop[idx_b]
 
         # Crossover
         population = jax.vmap(crossover, in_axes=(0, 0, 0, None))(
@@ -137,23 +119,21 @@ class SimpleGA_Elitist(PopulationBasedAlgorithm):
         key: jax.Array,
         population: Population,
         fitness: Fitness,
-        state: ElitistState,
-        params: ElitistParams,
-    ) -> ElitistState:
-        # (μ+λ) selection: combine new population with archive, keep top
-        combined_pop = jnp.concatenate([population, state.archive], axis=0)
-        combined_fit = jnp.concatenate([fitness, state.archive_fitness], axis=0)
+        state: State,
+        params: Params,
+    ) -> State:
+        # (μ+λ) selection: merge offspring with current population, keep top popsize
+        combined_pop = jnp.concatenate([population, state.population], axis=0)
+        combined_fit = jnp.concatenate([fitness, state.fitness], axis=0)
 
-        # Select top num_elites
-        idx = jnp.argsort(combined_fit)[:self.num_elites]
-        new_archive = combined_pop[idx]
-        new_archive_fitness = combined_fit[idx]
+        # Select top popsize
+        idx = jnp.argsort(combined_fit)[:self.population_size]
+        new_pop = combined_pop[idx]
+        new_fit = combined_fit[idx]
 
         return state.replace(
-            population=population,
-            fitness=fitness,
-            archive=new_archive,
-            archive_fitness=new_archive_fitness,
+            population=new_pop,
+            fitness=new_fit,
             std=self.std_schedule(state.generation_counter),
         )
 

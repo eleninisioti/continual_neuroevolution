@@ -1,6 +1,6 @@
 # Continual Reinforcement Learning through Neuroevolution
 
-Benchmarking continual learning algorithms on MuJoCo Playground environments using JAX.
+Benchmarking continual learning algorithms on MuJoCo Playground, Kinetix, and Gymnax environments using JAX.
 
 This repository compares evolutionary strategies (SimpleGA, OpenES) against reinforcement learning methods (PPO and variants) on continual learning tasks where the environment changes over time.
 
@@ -31,6 +31,14 @@ We have implemented RL algorithms by modifying the PPO implementation of brax to
 - **Task variation**: Different leg is damaged (locked in bent position) each task
 - **20 tasks** per trial (first task = healthy baseline)
 - **Continual setting**: Network weights preserved, random leg selection avoiding consecutive same leg
+
+### Kinetix - Sequential 2D Physics Tasks
+- **Environment**: Kinetix (JAX-based 2D physics engine with pixel observations)
+- **20 medium-difficulty tasks**: h0_unicycle through h19_thrust_left_very_easy, covering locomotion (unicycle, car), jumping, balancing, pushing, and thrust control
+- **Pixel-based observations** with recurrent network (ActorOnlyPixelsRNN with ScannedRNN)
+- **Task variation**: Agent trains sequentially on each of the 20 tasks
+- **Continual setting**: Population/weights carry over between tasks (no reset), agent must retain skills while learning new ones
+- **Non-continual setting**: Each task trained independently
 
 ### Gymnax Classic Control - Observation Noise Continual Learning
 - **Environments**: CartPole-v1, Acrobot-v1, MountainCar-v0 (JAX-based gymnax)
@@ -92,6 +100,28 @@ All experiment scripts are located in `scripts/mujoco/`. Each script runs 10 tri
 ./scripts/mujoco/run_ES_quadruped_continual.sh [GPU_ID]
 ```
 
+### Kinetix 2D Physics Tasks
+
+```bash
+# PPO, ReDo-PPO, TRAC-PPO continual
+./scripts/kinetix/run_kinetix_continual.sh
+
+# PPO, ReDo-PPO, TRAC-PPO non-continual
+./scripts/kinetix/run_kinetix_noncontinual.sh
+
+# SimpleGA continual / non-continual
+./scripts/kinetix/run_GA_kinetix_continual.sh
+./scripts/kinetix/run_GA_kinetix_noncontinual.sh
+
+# OpenES continual / non-continual
+./scripts/kinetix/run_ES_kinetix_continual.sh
+./scripts/kinetix/run_ES_kinetix_noncontinual.sh
+
+# DNS continual / non-continual
+./scripts/kinetix/run_DNS_kinetix_continual.sh
+./scripts/kinetix/run_DNS_kinetix_noncontinual.sh
+```
+
 ### Gymnax Classic Control - Observation Noise
 
 ```bash
@@ -111,7 +141,7 @@ All experiment scripts are located in `scripts/mujoco/`. Each script runs 10 tri
 
 ## Output Structure
 
-Results are saved under `projects/mujoco/` and `projects/gymnax/`:
+Results are saved under `projects/mujoco/`, `projects/gymnax/`, and `projects/kinetix/`:
 
 ```
 projects/mujoco/
@@ -131,6 +161,16 @@ projects/gymnax/
 │   │   └── *.pkl
 │   ├── trial_2/
 │   └── ...
+
+projects/kinetix/
+├── dns_continual/
+│   ├── trial_0/
+│   │   ├── gifs/
+│   │   └── *.pkl
+│   └── ...
+├── ga_continual/
+├── es_continual/
+└── ppo_continual/
 ```
 
 ## Monitoring
@@ -164,6 +204,13 @@ tail -f projects/mujoco/ppo_CheetahRun_continual_friction/trial_1/train.log
 - Generations per task: 100 (CheetahRun), 50 (Quadruped)
 - Sigma: 0.04
 - Learning rate: 0.01
+
+### Kinetix (2D Physics)
+- 20 sequential medium-difficulty tasks
+- Pixel observations with recurrent network (ActorOnlyPixelsRNN)
+- Population size (GA/ES/DNS): 256
+- Generations per task: 50 (continual), 200 (non-continual)
+- DNS: iso_sigma=0.05, line_sigma=0.5, k=3
 
 ### Gymnax (Classic Control)
 - Task interval: 200 updates (new noise vector sampled)

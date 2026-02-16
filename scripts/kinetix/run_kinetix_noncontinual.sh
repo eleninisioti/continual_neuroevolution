@@ -11,7 +11,8 @@
 #   ./run_kinetix_noncontinual.sh --seed 42        # Single seed instead of 0-9
 #   ./run_kinetix_noncontinual.sh --variant vanilla  # Run only vanilla PPO
 
-set -e
+# NOTE: We do NOT use 'set -e' here so that a failure on one
+# environment does not kill the entire script (and skip remaining envs/variants).
 
 # Default settings
 GPU=4
@@ -122,6 +123,8 @@ run_variant() {
     echo "# monitor_dormant=$monitor_dormant, use_redo=$use_redo, use_trac=$use_trac"
     echo "########################################"
     
+    local failed_envs=()
+    
     for env_name in "${ENVIRONMENTS[@]}"; do
         echo ""
         echo "========================================" 
@@ -133,7 +136,7 @@ run_variant() {
         for seed in $SEEDS; do
             echo "  Seed: $seed (trial $trial_idx)"
             
-            CUDA_VISIBLE_DEVICES=$GPU python3 experiments/ppo.py \
+            if CUDA_VISIBLE_DEVICES=$GPU python3 experiments/ppo.py \
                 --config-name=$CONFIG_NAME \
                 env=$ENV_CONFIG \
                 train_levels=m \
@@ -146,15 +149,22 @@ run_variant() {
                 seed=$seed \
                 misc.project_dir="$PROJECT_DIR" \
                 misc.trial_idx=$trial_idx \
-                >> "${output_dir}/${env_name}_seed${seed}.txt" 2>&1
-            
-            echo "    Done (see ${output_dir}/${env_name}_seed${seed}.txt)"
+                >> "${output_dir}/${env_name}_seed${seed}.txt" 2>&1; then
+                echo "    Done (see ${output_dir}/${env_name}_seed${seed}.txt)"
+            else
+                echo "    WARNING: $env_name seed=$seed FAILED (exit code $?). Continuing..."
+                failed_envs+=("${env_name}_seed${seed}")
+            fi
             ((trial_idx++))
         done
     done
     
     echo ""
-    echo "[$variant_name] All environments completed!"
+    if [ ${#failed_envs[@]} -gt 0 ]; then
+        echo "[$variant_name] Completed with ${#failed_envs[@]} failure(s): ${failed_envs[*]}"
+    else
+        echo "[$variant_name] All environments completed successfully!"
+    fi
 }
 
 # Run the requested variant(s)

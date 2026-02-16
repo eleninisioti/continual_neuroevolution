@@ -1,0 +1,72 @@
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run 492zc56n
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/wandb/run-20260216_201707-492zc56n
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h15_thrustshoot_continual_True_trial1_seed1_trac0_redo1
+wandb:  View project at https://wandb.ai/eleni/Kinetix-continual-redo
+wandb:  View run at https://wandb.ai/eleni/Kinetix-continual-redo/runs/492zc56n
+wandb:   1 of 1 files downloaded.  
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+wandb: WARNING `format` argument was not provided, defaulting to `gif`. This parameter will be required in v0.20.0, please specify the format explicitly.
+wandb: Encoding video...
+
+=== Kinetix PPO Training ===
+  Mode: continual
+  Variant: redo
+  Environment: h15_thrustshoot
+  Trial: 1
+  Seed: 1
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/train.log
+==============================
+
+Starting training...
+16
+50.0
+Number of parameters 2243265 size of obs:  46876
+load_from_checkpoint eleni/Kinetix-continual-redo/Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h14_thrustblock_continual_True_trial1_seed1_trac0_redo1-1772618630-0B-checkpoint:v0
+LOADING from eleni/Kinetix-continual-redo/Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h14_thrustblock_continual_True_trial1_seed1_trac0_redo1-1772618630-0B-checkpoint:v0 with only params = True
+loaded optimizer
+
+Training complete! Time: 331.3s
+Parameters of model saved in checkpoints/kinetix/Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h15_thrustshoot_continual_True_trial1_seed1_trac0_redo1-1449731578-0B/full_model.pbz2
+
+=== Saving outputs ===
+  Saved checkpoint: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/redo_h15_thrustshoot_best.pkl
+  Saved metrics: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/training_metrics.json
+
+  Generating 10 eval trajectory GIFs...
+    Eval trajectory 0... reward=1.4, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/gifs/eval_00_reward1.gif
+    Eval trajectory 1... reward=1.4, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/gifs/eval_01_reward1.gif
+    Eval trajectory 2... reward=1.4, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/gifs/eval_02_reward1.gif
+    Eval trajectory 3... reward=1.4, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/gifs/eval_03_reward1.gif
+    Eval trajectory 4... reward=1.4, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/gifs/eval_04_reward1.gif
+    Eval trajectory 5... reward=1.4, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/gifs/eval_05_reward1.gif
+    Eval trajectory 6... reward=1.4, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/gifs/eval_06_reward1.gif
+    Eval trajectory 7... reward=1.4, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/gifs/eval_07_reward1.gif
+    Eval trajectory 8... reward=1.4, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/gifs/eval_08_reward1.gif
+    Eval trajectory 9... reward=1.4, saved to /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/redo/h15_thrustshoot/trial_1/gifs/eval_09_reward1.gif
+
+=== Project saving complete! ===
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mKinetix-Pixels-MultiDiscrete-PPO-1B-16_h15_thrustshoot_continual_True_trial1_seed1_trac0_redo1[0m at: [34mhttps://wandb.ai/eleni/Kinetix-continual-redo/runs/492zc56n[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260216_201707-492zc56n/logs[0m
