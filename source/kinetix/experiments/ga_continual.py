@@ -137,7 +137,9 @@ def load_base_config():
 
 def load_env(env_name, base_yaml_config):
     """Build env objects for a single task name (e.g. 'h0_unicycle')."""
-    config = normalise_config({**base_yaml_config}, name="PPO")
+    config = {**base_yaml_config}
+    config.setdefault("seed", 0)
+    config = normalise_config(config, name="PPO")
 
     qualified = env_name if env_name.startswith(("m/", "s/", "l/")) else f"m/{env_name}"
     env_state, static_ep, ep = load_from_json_file(qualified)

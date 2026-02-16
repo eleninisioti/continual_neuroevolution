@@ -152,6 +152,7 @@ def build_config_for_env(env_name):
 
     with open(yaml_path, "r") as f:
         config = yaml.load(f, Loader=yaml.SafeLoader)
+    config.setdefault("seed", 0)
     config = normalise_config(config, name="PPO")
 
     # Prepend m/ for medium difficulty if needed
