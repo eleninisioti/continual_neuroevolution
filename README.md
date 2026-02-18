@@ -33,18 +33,22 @@ We have implemented RL algorithms by modifying the PPO implementation of brax to
 - **Continual setting**: Network weights preserved, random leg selection avoiding consecutive same leg
 
 ### Kinetix - Sequential 2D Physics Tasks
+### Kinetix (2D Physics)
 - **Environment**: Kinetix (JAX-based 2D physics engine with pixel observations)
 - **20 medium-difficulty tasks**: h0_unicycle through h19_thrust_left_very_easy, covering locomotion (unicycle, car), jumping, balancing, pushing, and thrust control
 - **Pixel-based observations** with recurrent network (ActorOnlyPixelsRNN with ScannedRNN)
 - **Task variation**: Agent trains sequentially on each of the 20 tasks
 - **Continual setting**: Population/weights carry over between tasks (no reset), agent must retain skills while learning new ones
 - **Non-continual setting**: Each task trained independently
+- **Notes (GA / DNS changes)**: The Kinetix GA and DNS runners were updated to support averaged-evaluation across multiple rollouts (`num_evals`) and chunked evaluation (`eval_batch_size`) to control memory. The SimpleGA defaults have been adjusted for large-scale runs (see Hyperparameters below). The DNS implementation now uses the repo-local QDax DominatedNoveltySearch (dependencies/qdax) with a MixingEmitter and Pareto-based novelty/fitness selection.
 
-### Gymnax Classic Control - Observation Noise Continual Learning
-- **Environments**: CartPole-v1, Acrobot-v1, MountainCar-v0 (JAX-based gymnax)
-- **3 environments** with discrete action spaces
-- **Task variation**: Observation noise vector sampled from N(0, noise_range) and added to all observations
-- **Task switching**: Every `task_interval` updates (default=200), a new noise vector is sampled
+### Kinetix (2D Physics)
+- 20 sequential medium-difficulty tasks
+- Pixel observations with recurrent network (ActorOnlyPixelsRNN)
+- Population size (GA/ES/DNS): 1024 (GA default)
+- Generations per task: 50 (continual), 200 (non-continual)
+- DNS: uses QDax DominatedNoveltySearch (repo-local `dependencies/qdax`) with a MixingEmitter and Pareto novelty/fitness selection. DNS evaluation supports averaging across `num_evals` rollouts and chunking via `eval_batch_size`.
+- SimpleGA (selected defaults): `popsize=1024`, `sigma_init=0.001`, `elite_ratio=0.5`, `init_min=-1.0`, `crossover_rate=0.2`. GA evaluations are averaged across multiple trials (default `num_evals=10` when enabled) to reduce variance.
 - **First task (Task 0)**: Zero noise (baseline), subsequent tasks have random observation perturbations
 - **Continual setting**: Network weights preserved across tasks, agent must adapt to changing observation distributions
 

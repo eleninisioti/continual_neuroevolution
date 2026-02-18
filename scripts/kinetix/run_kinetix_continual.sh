@@ -19,7 +19,7 @@
 # environment does not kill the entire script (and skip remaining envs/variants).
 
 # Default settings
-GPU=3
+GPU=2
 CONFIG_NAME="ppo"
 ENV_CONFIG="pixels"  # Default to pixels
 NUM_TRIALS=1
@@ -141,8 +141,11 @@ run_continual_variant() {
     local use_trac="$4"
     local wandb_project="${WANDB_PROJECT_BASE}-${variant_name}"
     local output_dir="data/outputs_continual_${variant_name}"
+    # Ensure pipelines return failure if any stage fails
+    set -o pipefail
     
     mkdir -p "$output_dir"
+    mkdir -p "$PROJECT_DIR/continual_logs"
     
     echo ""
     echo "########################################"
@@ -164,22 +167,29 @@ run_continual_variant() {
         
         # Run the first environment without checkpoint
         echo "Running first environment: ${ENVIRONMENTS[0]}"
-        
-        if CUDA_VISIBLE_DEVICES=$GPU python3 experiments/ppo.py \
-            --config-name=$CONFIG_NAME \
-            env=$ENV_CONFIG \
-            train_levels=m \
-            "train_levels.train_levels_list=[\"m/${ENVIRONMENTS[0]}.json\"]" \
-            env_size=m \
-            +continual=True \
-            learning.monitor_dormant=$monitor_dormant \
-            learning.use_redo=$use_redo \
-            learning.use_trac=$use_trac \
-            misc.wandb_project="$wandb_project" \
-            seed=$seed \
-            misc.project_dir="$PROJECT_DIR" \
-            misc.trial_idx=$trial_idx \
-            >> "${output_dir}/trial${trial_idx}_env01_${ENVIRONMENTS[0]}.txt" 2>&1; then
+
+        # Build command for first environment so we can print it before running
+        train_cmd="CUDA_VISIBLE_DEVICES=$GPU python3 experiments/ppo.py"
+        train_cmd="$train_cmd --config-name=$CONFIG_NAME"
+        train_cmd="$train_cmd env=$ENV_CONFIG"
+        train_cmd="$train_cmd train_levels=m"
+        train_cmd="$train_cmd \"train_levels.train_levels_list=[\\\"m/${ENVIRONMENTS[0]}.json\\\"]\""
+        train_cmd="$train_cmd env_size=m"
+        train_cmd="$train_cmd +continual=True"
+        train_cmd="$train_cmd learning.monitor_dormant=$monitor_dormant"
+        train_cmd="$train_cmd learning.use_redo=$use_redo"
+        train_cmd="$train_cmd learning.use_trac=$use_trac"
+        train_cmd="$train_cmd misc.wandb_project=$wandb_project"
+        train_cmd="$train_cmd seed=$seed"
+        train_cmd="$train_cmd misc.project_dir=$PROJECT_DIR"
+        train_cmd="$train_cmd misc.trial_idx=$trial_idx"
+
+        echo "Running command: $train_cmd"
+        # Also append the command to the per-trial log for easier debugging
+        echo "COMMAND: $train_cmd" >> "${output_dir}/trial${trial_idx}_env01_${ENVIRONMENTS[0]}.txt" 2>&1
+
+        # Run and write output to both the per-variant output file and project logs
+        if eval $train_cmd 2>&1 | tee -a "${output_dir}/trial${trial_idx}_env01_${ENVIRONMENTS[0]}.txt" "${PROJECT_DIR}/continual_logs/trial${trial_idx}_env01_${ENVIRONMENTS[0]}_redo${use_redo}_trac${use_trac}.txt" >/dev/null; then
             echo "First environment completed. Checking for checkpoint..."
         else
             echo "WARNING: First environment ${ENVIRONMENTS[0]} FAILED (exit code $?). Continuing..."
@@ -226,7 +236,7 @@ run_continual_variant() {
                 echo "Warning: Could not find checkpoint from previous run. Running without checkpoint."
             fi
             
-            if eval $train_cmd >> "${output_dir}/trial${trial_idx}_env${env_num_padded}_${curr_env}.txt" 2>&1; then
+            if eval $train_cmd 2>&1 | tee -a "${output_dir}/trial${trial_idx}_env${env_num_padded}_${curr_env}.txt" "${PROJECT_DIR}/continual_logs/trial${trial_idx}_env${env_num_padded}_${curr_env}_redo${use_redo}_trac${use_trac}.txt" >/dev/null; then
                 echo "Completed environment ${env_num}/20: $curr_env"
             else
                 echo "WARNING: Environment ${env_num}/20 $curr_env FAILED (exit code $?). Continuing..."

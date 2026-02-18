@@ -14,16 +14,16 @@
 set -e
 
 # Default settings
-GPU=2
-NUM_TRIALS=1
-POPSIZE=512
+GPU=1
+NUM_TRIALS=10
+POPSIZE=256
 GENERATIONS_PER_TASK=200
 SIGMA_INIT=0.001
 SEED=0
 WANDB_PROJECT="Kinetix-continual-ga"
 NO_WANDB=""
-EVAL_REPS=3
-EVOLVE_REPS=3
+EVAL_REPS=10
+EVOLVE_REPS=10
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -102,8 +102,11 @@ mkdir -p "$PROJECT_DIR"
 
 cd "$KINETIX_DIR"
 
-# Activate venv if it exists
-if [ -f "$REPO_ROOT/.venv/bin/activate" ]; then
+# Activate virtualenv: prefer `uv` if present, else fall back to `.venv`
+if [ -f "$REPO_ROOT/uv/bin/activate" ]; then
+    source "$REPO_ROOT/uv/bin/activate"
+    echo "Using virtualenv: $REPO_ROOT/uv"
+elif [ -f "$REPO_ROOT/.venv/bin/activate" ]; then
     source "$REPO_ROOT/.venv/bin/activate"
     echo "Using venv: $REPO_ROOT/.venv"
 fi

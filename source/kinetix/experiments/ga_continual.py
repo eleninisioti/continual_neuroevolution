@@ -317,9 +317,8 @@ def train_ga_continual(
             return jnp.sum(rewards), first_done
 
         @jax.jit
-        def _eval_batch(flat_batch, rng_key):
+        def _eval_batch(flat_batch, rep_keys):
             params_batch = reshaper.reshape(flat_batch)
-            rep_keys = jr.split(rng_key, total_reps)
 
             def _eval_one_rep(rep_key):
                 return jax.vmap(rollout_single, in_axes=(0, None))(params_batch, rep_key)
@@ -328,13 +327,20 @@ def train_ga_continual(
             return jnp.transpose(all_fit), jnp.transpose(all_len)
 
         def eval_population(flat_pop, rng_key):
-            """Evaluate population in chunks of eval_batch_size to avoid OOM."""
+            """Evaluate population in chunks of eval_batch_size to avoid OOM.
+
+            Use the same set of per-repetition RNG keys across all agents so
+            that each agent's rollouts are evaluated under the same stochastic
+            conditions.  `rng_key` is used to produce `rep_keys` (one per
+            repetition) once and those keys are reused for every batch.
+            """
             n = flat_pop.shape[0]
             fit_parts, len_parts = [], []
+            # derive the per-repetition keys once and reuse for all batches
+            rep_keys = jr.split(rng_key, total_reps)
             for start in range(0, n, eval_batch_size):
                 batch = flat_pop[start : start + eval_batch_size]
-                rng_key, batch_key = jr.split(rng_key)
-                f, l = _eval_batch(batch, batch_key)
+                f, l = _eval_batch(batch, rep_keys)
                 jax.block_until_ready(f)
                 fit_parts.append(f)
                 len_parts.append(l)
@@ -574,7 +580,7 @@ def parse_args():
     parser.add_argument("--generations_per_task", type=int, default=200)
     parser.add_argument("--sigma_init", type=float, default=0.001)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--num_trials", type=int, default=1)
+    parser.add_argument("--num_trials", type=int, default=10)
     parser.add_argument("--episode_length", type=int, default=1000)
     parser.add_argument(
         "--eval_batch_size", type=int, default=128,

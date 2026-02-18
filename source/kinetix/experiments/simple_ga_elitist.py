@@ -58,11 +58,12 @@ class SimpleGA_Elitist(PopulationBasedAlgorithm):
         std_schedule: Callable = optax.constant_schedule(1.0),
         fitness_shaping_fn: Callable = identity_fitness_shaping_fn,
         metrics_fn: Callable = metrics_fn,
+        elite_ratio: float = 0.5,
     ):
         """Initialize Simple GA with Elitism."""
         super().__init__(population_size, solution, fitness_shaping_fn, metrics_fn)
 
-        self.elite_ratio = 0.5
+        self.elite_ratio = elite_ratio
 
         # std schedule
         self.std_schedule = std_schedule

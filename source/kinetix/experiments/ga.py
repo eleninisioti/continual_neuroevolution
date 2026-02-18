@@ -351,10 +351,9 @@ def train_ga(
 
     # ── batched multi-rollout evaluation for the whole population ─
     @jax.jit
-    def _eval_batch(flat_batch, rng_key):
+    def _eval_batch(flat_batch, rep_keys):
         """Evaluate a batch of individuals over *total_reps* rollouts."""
         params_batch = reshaper.reshape(flat_batch)
-        rep_keys = jr.split(rng_key, total_reps)
 
         def _eval_one_rep(rep_key):
             return jax.vmap(rollout_single, in_axes=(0, None))(params_batch, rep_key)
@@ -371,10 +370,11 @@ def train_ga(
         """
         n = flat_pop.shape[0]
         fit_parts, len_parts = [], []
+        # derive the per-repetition keys once and reuse for all batches
+        rep_keys = jr.split(rng_key, total_reps)
         for start in range(0, n, eval_batch_size):
             batch = flat_pop[start : start + eval_batch_size]
-            rng_key, batch_key = jr.split(rng_key)
-            f, l = _eval_batch(batch, batch_key)
+            f, l = _eval_batch(batch, rep_keys)
             jax.block_until_ready(f)
             fit_parts.append(f)
             len_parts.append(l)
