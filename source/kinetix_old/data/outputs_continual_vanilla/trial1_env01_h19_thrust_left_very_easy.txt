@@ -1,0 +1,390 @@
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 35, in <module>
+    from trac_optimizer.experimental.jax.trac import start_trac
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/trac_optimizer/__init__.py", line 1, in <module>
+    from .trac import start_trac
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/trac_optimizer/trac.py", line 2, in <module>
+    import torch
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/__init__.py", line 2276, in <module>
+    from torch import quantization as quantization  # usort: skip
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/quantization/__init__.py", line 2, in <module>
+    from .fake_quantize import *  # noqa: F403
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/quantization/fake_quantize.py", line 10, in <module>
+    from torch.ao.quantization.fake_quantize import (
+    ...<21 lines>...
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/ao/quantization/__init__.py", line 13, in <module>
+    from .pt2e._numeric_debugger import (  # noqa: F401
+    ...<6 lines>...
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/ao/quantization/pt2e/_numeric_debugger.py", line 9, in <module>
+    from torch.ao.quantization.pt2e.graph_utils import bfs_trace_with_node_process
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/ao/quantization/pt2e/graph_utils.py", line 9, in <module>
+    from torch.export import ExportedProgram
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/export/__init__.py", line 42, in <module>
+    from .decomp_utils import CustomDecompTable
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/export/decomp_utils.py", line 5, in <module>
+    from torch._export.utils import (
+    ...<4 lines>...
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/_export/__init__.py", line 48, in <module>
+    from .wrappers import _wrap_submodules
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/_export/wrappers.py", line 10, in <module>
+    from torch._higher_order_ops.flat_apply import (
+    ...<3 lines>...
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/_higher_order_ops/__init__.py", line 17, in <module>
+    from torch._higher_order_ops.flex_attention import (
+    ...<2 lines>...
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/_higher_order_ops/flex_attention.py", line 31, in <module>
+    from torch.utils.checkpoint import _CachedTorchDispatchMode, _CachingTorchDispatchMode
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/torch/utils/checkpoint.py", line 12, in <module>
+    import torch
+  File "<frozen importlib._bootstrap>", line 463, in _lock_unlock_module
+KeyboardInterrupt
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run a59x4imy
+wandb: Tracking run with wandb version 0.24.0
+wandb: Run data is saved locally in /home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/wandb/run-20260218_114303-a59x4imy
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run Kinetix-Pixels-MultiDiscrete-PPO-1B-16_h19_thrust_left_very_easy_continual_True_trial1_seed1_trac0_redo0
+wandb:  View project at https://wandb.ai/eleni/Kinetix-continual-vanilla
+wandb:  View run at https://wandb.ai/eleni/Kinetix-continual-vanilla/runs/a59x4imy
+
+=== Kinetix PPO Training ===
+  Mode: continual
+  Variant: ppo
+  Environment: h19_thrust_left_very_easy
+  Trial: 1
+  Seed: 1
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/ppo/h19_thrust_left_very_easy/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/ppo/h19_thrust_left_very_easy/trial_1/train.log
+==============================
+
+Starting training...
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 817, in <module>
+    main()
+    ~~~~^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+    ~~~~~~~~~~^
+        args=args,
+        ^^^^^^^^^^
+    ...<3 lines>...
+        config_name=config_name,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+    ~~~~~~~~^
+        run=args.run,
+        ^^^^^^^^^^^^^
+    ...<5 lines>...
+        overrides=overrides,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+    ~~~~~~~~~~~~~~^
+        lambda: hydra.run(
+        ^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        )
+        ^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ~~~~~~~~~^
+        config_name=config_name,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+        task_function=task_function,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        overrides=overrides,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/hydra.py", line 119, in run
+    ret = run_job(
+        hydra_context=HydraContext(
+    ...<6 lines>...
+        configure_logging=with_log_configuration,
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ~~~~~~~~~~~~~^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 647, in main
+    rng, _rng = jax.random.split(rng)
+                ~~~~~~~~~~~~~~~~^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/random.py", line 291, in split
+    return _return_prng_keys(wrapped, _split(typed_key, num))
+                                      ~~~~~~^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/random.py", line 277, in _split
+    return prng.random_split(key, shape=shape)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/prng.py", line 568, in random_split
+    return random_split_p.bind(keys, shape=shape)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/core.py", line 502, in bind
+    return self._true_bind(*args, **params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/core.py", line 520, in _true_bind
+    return self.bind_with_trace(prev_trace, args, params)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/core.py", line 525, in bind_with_trace
+    return trace.process_primitive(self, args, params)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/core.py", line 1029, in process_primitive
+    return primitive.impl(*args, **params)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/prng.py", line 584, in random_split_impl
+    base_arr = random_split_impl_base(
+        keys._impl, keys._base_array, keys.ndim, shape=shape)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/prng.py", line 590, in random_split_impl_base
+    return split(base_arr)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/prng.py", line 589, in <lambda>
+    split = iterated_vmap_unary(keys_ndim, lambda k: impl.split(k, shape))
+                                                     ~~~~~~~~~~^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/prng.py", line 1109, in threefry_split
+    return _threefry_split(key, shape)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/traceback_util.py", line 180, in reraise_with_filtered_traceback
+    return fun(*args, **kwargs)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 339, in cache_miss
+    pgle_profiler) = _python_pjit_helper(fun, jit_info, *args, **kwargs)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 194, in _python_pjit_helper
+    out_flat, compiled, profiler = _pjit_call_impl_python(*args_flat, **p.params)
+                                   ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 1659, in _pjit_call_impl_python
+    ).compile()
+      ~~~~~~~^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 2448, in compile
+    executable = UnloadedMeshExecutable.from_hlo(
+        self._name, self._hlo, **self.compile_args,
+        compiler_options_kvs=compiler_options_kvs)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 2967, in from_hlo
+    xla_executable = _cached_compilation(
+        hlo, name, mesh, spmd_lowering,
+        tuple_args, auto_spmd_lowering, allow_prop_to_inputs,
+        allow_prop_to_outputs, tuple(host_callbacks), backend, da, pmap_nreps,
+        compiler_options_kvs, pgle_profiler)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 2758, in _cached_compilation
+    xla_executable = compiler.compile_or_get_cached(
+        backend, computation, dev, compile_options, host_callbacks,
+        pgle_profiler)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/compiler.py", line 470, in compile_or_get_cached
+    return _compile_and_write_cache(
+        backend,
+    ...<4 lines>...
+        cache_key,
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/compiler.py", line 687, in _compile_and_write_cache
+    executable = backend_compile(
+        backend, computation, compile_options, host_callbacks
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/profiler.py", line 334, in wrapper
+    return func(*args, **kwargs)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/compiler.py", line 321, in backend_compile
+    return backend.compile(built_c, compile_options=options)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+Exception ignored in atexit callback <function _start_and_connect_service.<locals>.teardown_atexit at 0x7f76c02918a0>:
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/service/service_connection.py", line 312, in teardown
+    return self._proc.join()
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/service/service_process.py", line 57, in join
+    return self._process.wait()
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/subprocess.py", line 1280, in wait
+    return self._wait(timeout=timeout)
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/subprocess.py", line 2066, in _wait
+[2026-02-18 11:43:05,177][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,178][asyncio][WARNING] - socket.send() raised exception.
+    (pid, sts) = self._try_wait(0)
+[2026-02-18 11:43:05,178][asyncio][WARNING] - socket.send() raised exception.
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/subprocess.py", line 2024, in _try_wait
+[2026-02-18 11:43:05,179][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,179][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,179][asyncio][WARNING] - socket.send() raised exception.
+    (pid, sts) = os.waitpid(self.pid, wait_flags)
+KeyboardInterrupt: 
+[2026-02-18 11:43:05,180][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,180][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,180][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,180][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,180][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,180][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,180][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,181][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,181][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,181][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,181][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,193][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,204][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,233][asyncio][WARNING] - socket.send() raised exception.
+[2026-02-18 11:43:05,272][asyncio][WARNING] - socket.send() raised exception.
+[1;34mwandb[0m: 
+[1;34mwandb[0m: 🚀 View run [33mKinetix-Pixels-MultiDiscrete-PPO-1B-16_h19_thrust_left_very_easy_continual_True_trial1_seed1_trac0_redo0[0m at: [34mhttps://wandb.ai/eleni/Kinetix-continual-vanilla/runs/a59x4imy[0m
+[1;34mwandb[0m: Find logs at: [1;35mwandb/run-20260218_114303-a59x4imy/logs[0m
+COMMAND: CUDA_VISIBLE_DEVICES=2 python3 experiments/ppo.py --config-name=ppo env=pixels train_levels=m "train_levels.train_levels_list=[\"m/h19_thrust_left_very_easy.json\"]" env_size=m +continual=True learning.monitor_dormant=False learning.use_redo=False learning.use_trac=False misc.wandb_project=Kinetix-continual-vanilla seed=1 misc.project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix misc.trial_idx=1
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+wandb: Currently logged in as: eleni to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+
+=== Kinetix PPO Training ===
+  Mode: continual
+  Variant: ppo
+  Environment: h19_thrust_left_very_easy
+  Trial: 1
+  Seed: 1
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/ppo/h19_thrust_left_very_easy/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/ppo/h19_thrust_left_very_easy/trial_1/train.log
+==============================
+
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 817, in <module>
+    main()
+    ~~~~^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+    ~~~~~~~~~~^
+        args=args,
+        ^^^^^^^^^^
+    ...<3 lines>...
+        config_name=config_name,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+    ~~~~~~~~^
+        run=args.run,
+        ^^^^^^^^^^^^^
+    ...<5 lines>...
+        overrides=overrides,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+    ~~~~~~~~~~~~~~^
+        lambda: hydra.run(
+        ^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        )
+        ^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ~~~~~~~~~^
+        config_name=config_name,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+        task_function=task_function,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        overrides=overrides,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/hydra.py", line 119, in run
+    ret = run_job(
+        hydra_context=HydraContext(
+    ...<6 lines>...
+        configure_logging=with_log_configuration,
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ~~~~~~~~~~~~~^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 641, in main
+    run = init_wandb(config, "PPO")
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/util/config.py", line 157, in init_wandb
+    run = wandb.init(
+        config=config,
+    ...<5 lines>...
+        tags=get_tags(config, name),
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/wandb_init.py", line 1580, in init
+    run = wi.init(run_settings, run_config, run_printer)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/wandb_init.py", line 1008, in init
+    result = wait_with_progress(
+        run_init_handle,
+    ...<5 lines>...
+        ),
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/mailbox/wait_with_progress.py", line 23, in wait_with_progress
+    return wait_all_with_progress(
+           ~~~~~~~~~~~~~~~~~~~~~~^
+        [handle],
+        ^^^^^^^^^
+        timeout=timeout,
+        ^^^^^^^^^^^^^^^^
+        display_progress=display_progress,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )[0]
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/mailbox/wait_with_progress.py", line 77, in wait_all_with_progress
+    return asyncer.run(progress_loop_with_timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/asyncio_manager.py", line 136, in run
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/concurrent/futures/_base.py", line 451, in result
+    self._condition.wait(timeout)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/threading.py", line 359, in wait
+    waiter.acquire()
+    ~~~~~~~~~~~~~~^^
+KeyboardInterrupt
+Exception ignored in atexit callback <function _start_and_connect_service.<locals>.teardown_atexit at 0x7f10a86998a0>:
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/service/service_connection.py", line 65, in teardown_atexit
+    conn.teardown(hooks.exit_code)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/service/service_connection.py", line 312, in teardown
+    return self._proc.join()
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/service/service_process.py", line 57, in join
+    return self._process.wait()
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/subprocess.py", line 1293, in wait
+    self._wait(timeout=sigint_timeout)
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/subprocess.py", line 2060, in _wait
+    time.sleep(delay)
+KeyboardInterrupt: 
+COMMAND: CUDA_VISIBLE_DEVICES=2 python3 experiments/ppo.py --config-name=ppo env=pixels train_levels=m "train_levels.train_levels_list=[\"m/h19_thrust_left_very_easy.json\"]" env_size=m +continual=True learning.monitor_dormant=False learning.use_redo=False learning.use_trac=False misc.wandb_project=Kinetix-continual-vanilla seed=1 misc.project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix misc.trial_idx=1
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 11, in <module>
+    from kinetix.environment import make_reset_fn_from_config
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/environment/__init__.py", line 1, in <module>
+    from kinetix.environment.env import make_kinetix_env
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/environment/env.py", line 7, in <module>
+    from gymnax.environments.environment import Environment, TEnvParams
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/gymnax/__init__.py", line 3, in <module>
+    from gymnax import environments, registration
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/gymnax/environments/__init__.py", line 3, in <module>
+    from gymnax.environments import bsuite, classic_control, environment, minatar, misc
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/gymnax/environments/misc/__init__.py", line 18, in <module>
+    from .pong import Pong
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/gymnax/environments/misc/pong.py", line 14, in <module>
+    import seaborn as sns
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/seaborn/__init__.py", line 5, in <module>
+    from .relational import *  # noqa: F401,F403
+    ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/seaborn/relational.py", line 21, in <module>
+    from ._statistics import EstimateAggregator, WeightedAggregator
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/seaborn/_statistics.py", line 32, in <module>
+    from scipy.stats import gaussian_kde
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/scipy/stats/__init__.py", line 656, in <module>
+    from ._new_distributions import Normal, Logistic, Uniform, Binomial
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 911, in _load_unlocked
+KeyboardInterrupt

@@ -13,15 +13,17 @@
 set -e
 
 # Default settings
-GPU=3
-NUM_TRIALS=1
-POPSIZE=512
+GPU=0
+NUM_TRIALS=10
+POPSIZE=1024
 GENERATIONS=200
 SIGMA_INIT=0.001
 SEED=0
 ENV=""
 WANDB_PROJECT="Kinetix-noncontinual-ga"
 NO_WANDB=""
+EVAL_REPS=10
+EVOLVE_REPS=10
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -58,13 +60,21 @@ while [[ $# -gt 0 ]]; do
             WANDB_PROJECT="$2"
             shift 2
             ;;
+        --eval_reps)
+            EVAL_REPS="$2"
+            shift 2
+            ;;
+        --evolve_reps)
+            EVOLVE_REPS="$2"
+            shift 2
+            ;;
         --no_wandb)
             NO_WANDB="--no_wandb"
             shift
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--cuda GPU] [--num_trials N] [--env ENV] [--popsize N] [--generations N] [--sigma_init F] [--seed S] [--no_wandb]"
+            echo "Usage: $0 [--cuda GPU] [--num_trials N] [--env ENV] [--popsize N] [--generations N] [--sigma_init F] [--seed S] [--eval_reps N] [--evolve_reps N] [--no_wandb]"
             exit 1
             ;;
     esac
@@ -85,6 +95,8 @@ echo "Population size: $POPSIZE"
 echo "Generations: $GENERATIONS"
 echo "Sigma init: $SIGMA_INIT"
 echo "Seed: $SEED"
+echo "Eval reps: $EVAL_REPS"
+echo "Evolve reps: $EVOLVE_REPS"
 if [ -n "$ENV" ]; then
     echo "Environment: $ENV"
 else
@@ -99,8 +111,11 @@ mkdir -p "$PROJECT_DIR"
 
 cd "$KINETIX_DIR"
 
-# Activate venv if it exists
-if [ -f "$REPO_ROOT/.venv/bin/activate" ]; then
+# Activate virtualenv: prefer `uv` if present, else fall back to `.venv`
+if [ -f "$REPO_ROOT/uv/bin/activate" ]; then
+    source "$REPO_ROOT/uv/bin/activate"
+    echo "Using virtualenv: $REPO_ROOT/uv"
+elif [ -f "$REPO_ROOT/.venv/bin/activate" ]; then
     source "$REPO_ROOT/.venv/bin/activate"
     echo "Using venv: $REPO_ROOT/.venv"
 fi
@@ -115,6 +130,8 @@ CMD="$CMD --seed $SEED"
 CMD="$CMD --num_trials $NUM_TRIALS"
 CMD="$CMD --wandb_project $WANDB_PROJECT"
 CMD="$CMD --project_dir $PROJECT_DIR"
+CMD="$CMD --eval_reps $EVAL_REPS"
+CMD="$CMD --evolve_reps $EVOLVE_REPS"
 if [ -n "$ENV" ]; then
     CMD="$CMD --env $ENV"
 fi

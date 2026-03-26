@@ -1,0 +1,115 @@
+COMMAND: CUDA_VISIBLE_DEVICES=2 python3 experiments/ppo.py --config-name=ppo env=pixels train_levels=m "train_levels.train_levels_list=[\"m/h16_thrustcontrol_right,.json\"]" env_size=m +continual=True learning.monitor_dormant=False learning.use_redo=False learning.use_trac=False misc.wandb_project=Kinetix-continual-vanilla seed=1 misc.project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix misc.trial_idx=1
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /home/eleni/.netrc.
+
+=== Kinetix PPO Training ===
+  Mode: continual
+  Variant: ppo
+  Environment: h16_thrustcontrol_right,
+  Trial: 1
+  Seed: 1
+  Output directory: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/ppo/h16_thrustcontrol_right,/trial_1
+  Log file: /home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix/continual/ppo/h16_thrustcontrol_right,/trial_1/train.log
+==============================
+
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 817, in <module>
+    main()
+    ~~~~^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+    ~~~~~~~~~~^
+        args=args,
+        ^^^^^^^^^^
+    ...<3 lines>...
+        config_name=config_name,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+    ~~~~~~~~^
+        run=args.run,
+        ^^^^^^^^^^^^^
+    ...<5 lines>...
+        overrides=overrides,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+    ~~~~~~~~~~~~~~^
+        lambda: hydra.run(
+        ^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        )
+        ^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+            ~~~~~~~~~^
+        config_name=config_name,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+        task_function=task_function,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        overrides=overrides,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/_internal/hydra.py", line 119, in run
+    ret = run_job(
+        hydra_context=HydraContext(
+    ...<6 lines>...
+        configure_logging=with_log_configuration,
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+                       ~~~~~~~~~~~~~^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 641, in main
+    run = init_wandb(config, "PPO")
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/util/config.py", line 157, in init_wandb
+    run = wandb.init(
+        config=config,
+    ...<5 lines>...
+        tags=get_tags(config, name),
+    )
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/wandb_init.py", line 1518, in init
+    wi.maybe_login(init_settings)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/wandb_init.py", line 196, in maybe_login
+    wandb_login._login(
+    ~~~~~~~~~~~~~~~~~~^
+        host=run_settings.base_url,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<3 lines>...
+        update_api_key=explicit_key is None,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/wandb_login.py", line 204, in _login
+    _print_logged_in_message(settings, host=str(host_url))
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/wandb_login.py", line 319, in _print_logged_in_message
+    username = singleton._get_username()
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/wandb_setup.py", line 314, in _get_username
+    return self.viewer.get("username")
+           ^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/wandb_setup.py", line 329, in viewer
+    return self._server.viewer
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/server.py", line 57, in viewer
+    self.query_with_timeout()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/sdk/lib/server.py", line 32, in query_with_timeout
+    viewer_tuple, viewer_thread = async_viewer()
+                                  ~~~~~~~~~~~~^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/wandb/util.py", line 1286, in wrapper
+    result = q.get(True, timeout)
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/queue.py", line 213, in get
+    self.not_empty.wait(remaining)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "/home/eleni/.local/share/uv/python/cpython-3.13.5-linux-x86_64-gnu/lib/python3.13/threading.py", line 363, in wait
+    gotit = waiter.acquire(True, timeout)
+KeyboardInterrupt

@@ -14,16 +14,19 @@
 set -e
 
 # Default settings
-GPU=1
+GPU=2
 NUM_TRIALS=10
-POPSIZE=256
+POPSIZE=704  # Closest to 700 that is divisible by 32
 GENERATIONS_PER_TASK=200
-SIGMA_INIT=0.001
+SIGMA_INIT=0.001  # Matches reference inspiration code
+CROSSOVER_RATE=0.0  # Matches reference (no crossover)
 SEED=0
 WANDB_PROJECT="Kinetix-continual-ga"
 NO_WANDB=""
-EVAL_REPS=10
-EVOLVE_REPS=10
+EVAL_REPS=20  # Matches inspiration code (hardcoded to 20)
+EVOLVE_REPS=20  # Matches inspiration code
+EPISODE_LENGTH=256  # Matches inspiration code
+EVAL_BATCH_SIZE=32  # Batch size for evaluation
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -48,6 +51,10 @@ while [[ $# -gt 0 ]]; do
             SIGMA_INIT="$2"
             shift 2
             ;;
+        --crossover_rate)
+            CROSSOVER_RATE="$2"
+            shift 2
+            ;;
         --seed)
             SEED="$2"
             shift 2
@@ -62,6 +69,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --evolve_reps)
             EVOLVE_REPS="$2"
+            shift 2
+            ;;
+        --episode_length)
+            EPISODE_LENGTH="$2"
             shift 2
             ;;
         --no_wandb)
@@ -80,19 +91,22 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 KINETIX_DIR="$REPO_ROOT/source/kinetix"
-PROJECT_DIR="$REPO_ROOT/projects/kinetix"
+PROJECT_DIR="$REPO_ROOT/projects/kinetix/continual/GA"
 
 echo "========================================"
 echo "Kinetix SimpleGA Continual Training"
 echo "========================================"
+echo "Hyperparams matched to inspiration/for_GA"
 echo "GPU: $GPU"
 echo "Num trials: $NUM_TRIALS"
 echo "Population size: $POPSIZE"
 echo "Generations per task: $GENERATIONS_PER_TASK"
 echo "Sigma init: $SIGMA_INIT"
+echo "Crossover rate: $CROSSOVER_RATE"
 echo "Seed: $SEED"
 echo "Eval reps: $EVAL_REPS"
 echo "Evolve reps: $EVOLVE_REPS"
+echo "Episode length: $EPISODE_LENGTH"
 echo "Working directory: $KINETIX_DIR"
 echo "Project directory: $PROJECT_DIR"
 echo "========================================"
@@ -117,12 +131,15 @@ CMD="$CMD --gpu $GPU"
 CMD="$CMD --popsize $POPSIZE"
 CMD="$CMD --generations_per_task $GENERATIONS_PER_TASK"
 CMD="$CMD --sigma_init $SIGMA_INIT"
+CMD="$CMD --crossover_rate $CROSSOVER_RATE"
 CMD="$CMD --seed $SEED"
 CMD="$CMD --num_trials $NUM_TRIALS"
 CMD="$CMD --wandb_project $WANDB_PROJECT"
 CMD="$CMD --project_dir $PROJECT_DIR"
 CMD="$CMD --eval_reps $EVAL_REPS"
 CMD="$CMD --evolve_reps $EVOLVE_REPS"
+CMD="$CMD --episode_length $EPISODE_LENGTH"
+CMD="$CMD --eval_batch_size $EVAL_BATCH_SIZE"
 if [ -n "$NO_WANDB" ]; then
     CMD="$CMD --no_wandb"
 fi

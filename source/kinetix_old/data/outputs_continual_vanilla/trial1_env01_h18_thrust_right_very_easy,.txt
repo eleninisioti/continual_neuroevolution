@@ -1,0 +1,86 @@
+COMMAND: CUDA_VISIBLE_DEVICES=2 python3 experiments/ppo.py --config-name=ppo env=pixels train_levels=m "train_levels.train_levels_list=[\"m/h18_thrust_right_very_easy,.json\"]" env_size=m +continual=True learning.monitor_dormant=False learning.use_redo=False learning.use_trac=False misc.wandb_project=Kinetix-continual-vanilla seed=1 misc.project_dir=/home/eleni/workspace/icml_playground/continual_neuroevolution/projects/kinetix misc.trial_idx=1
+Traceback (most recent call last):
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/experiments/ppo.py", line 11, in <module>
+    from kinetix.environment import make_reset_fn_from_config
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/environment/__init__.py", line 1, in <module>
+    from kinetix.environment.env import make_kinetix_env
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/environment/env.py", line 13, in <module>
+    from kinetix.environment.ued.ued import make_reset_fn_from_config
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/environment/ued/ued.py", line 11, in <module>
+    from kinetix.environment.ued.distributions import create_vmapped_filtered_distribution, sample_kinetix_level
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/environment/ued/distributions.py", line 16, in <module>
+    from kinetix.environment.utils import create_empty_env, permute_state
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/environment/utils.py", line 17, in <module>
+    from kinetix.render.renderer_pixels import make_render_pixels_rl
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/render/__init__.py", line 1, in <module>
+    from kinetix.render.renderer_pixels import make_render_pixels
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/render/renderer_pixels.py", line 16, in <module>
+    from kinetix.render.textures import FJOINT_TEXTURE_6_RGBA, RJOINT_TEXTURE_6_RGBA, THRUSTER_TEXTURE_16_RGBA
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/render/textures.py", line 26, in <module>
+    EDIT_TEXTURE_RGBA = load_texture("edit.png", 64)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/source/kinetix/kinetix/render/textures.py", line 13, in load_texture
+    jnp_img = jnp.array(img).astype(jnp.int32)
+              ~~~~~~~~~^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/numpy/lax_numpy.py", line 5555, in array
+    out_array: Array = lax_internal._convert_element_type(
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        out, dtype, weak_type=weak_type, sharding=sharding)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/lax/lax.py", line 1614, in _convert_element_type
+    return convert_element_type_p.bind(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        operand, new_dtype=new_dtype, weak_type=bool(weak_type),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        sharding=sharding)
+        ^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/core.py", line 502, in bind
+    return self._true_bind(*args, **params)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/core.py", line 520, in _true_bind
+    return self.bind_with_trace(prev_trace, args, params)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/lax/lax.py", line 4701, in _convert_element_type_bind_with_trace
+    operand = core.Primitive.bind_with_trace(convert_element_type_p, trace, args, params)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/core.py", line 525, in bind_with_trace
+    return trace.process_primitive(self, args, params)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/core.py", line 1029, in process_primitive
+    return primitive.impl(*args, **params)
+           ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/dispatch.py", line 88, in apply_primitive
+    outs = fun(*args)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/traceback_util.py", line 180, in reraise_with_filtered_traceback
+    return fun(*args, **kwargs)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 339, in cache_miss
+    pgle_profiler) = _python_pjit_helper(fun, jit_info, *args, **kwargs)
+                     ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 194, in _python_pjit_helper
+    out_flat, compiled, profiler = _pjit_call_impl_python(*args_flat, **p.params)
+                                   ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/pjit.py", line 1681, in _pjit_call_impl_python
+    return compiled.unsafe_call(*args), compiled, pgle_profiler
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/profiler.py", line 334, in wrapper
+    return func(*args, **kwargs)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 1283, in __call__
+    input_bufs = self.in_handler(args)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 1170, in __call__
+    return self.handler(input_buffers)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/profiler.py", line 334, in wrapper
+    return func(*args, **kwargs)
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 134, in shard_args
+    return shard_arg_handlers[type(arg)]([arg], shardings, layouts,
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                                         xc_copy_semantics)
+                                         ^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 216, in _shard_np_array
+    results.append(batched_device_put(aval, sharding, shards, devices))
+                   ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/interpreters/pxla.py", line 243, in batched_device_put
+    return xc.batched_device_put(aval, sharding, xs, list(devices), committed)
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/eleni/workspace/icml_playground/continual_neuroevolution/.venv/lib/python3.13/site-packages/jax/_src/sharding_impls.py", line 183, in _to_xla_hlo_sharding
+    def _to_xla_hlo_sharding(self, num_dimensions: int) -> xc.HloSharding:
+    
+KeyboardInterrupt
