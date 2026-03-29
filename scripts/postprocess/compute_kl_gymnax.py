@@ -219,7 +219,7 @@ def main():
     )
     parser.add_argument("--project_dir", type=str, required=True,
                         help="Path to trial directory containing checkpoints/ folder")
-    parser.add_argument("--method", type=str, required=True, choices=["pbt", "ga"],
+    parser.add_argument("--method", type=str, required=True, choices=["pbt", "ga", "dns"],
                         help="Method that produced the checkpoints")
     parser.add_argument("--env", type=str, required=True,
                         choices=["CartPole-v1", "Acrobot-v1", "MountainCar-v0"])
@@ -261,7 +261,7 @@ def main():
 
     # Set up policy template (needed for GA param unflattening)
     hidden_dims = ecfg["hidden_dims"]
-    if method == "ga":
+    if method in ("ga", "dns"):
         policy = MLPPolicy(hidden_dims=hidden_dims, action_dim=action_dim)
         dummy_obs = jnp.zeros((obs_dim,))
         param_template = policy.init(random.key(0), dummy_obs)
@@ -274,7 +274,7 @@ def main():
         path = os.path.join(ckpt_dir, fname)
         if method == "pbt":
             params, noise_vec, meta = load_pbt_checkpoint(path)
-        else:
+        else:  # ga or dns
             params, noise_vec, meta = load_ga_checkpoint(path)
         all_ckpts.append({
             "params": params, "noise_vector": noise_vec, "meta": meta, "file": fname
@@ -301,7 +301,7 @@ def main():
         if method == "pbt":
             apply_i = make_pbt_apply(policy_network, ckpt_i["params"])
             apply_j = make_pbt_apply(policy_network, ckpt_j["params"])
-        else:
+        else:  # ga or dns
             apply_i = make_ga_apply(policy, ckpt_i["params"], param_template)
             apply_j = make_ga_apply(policy, ckpt_j["params"], param_template)
 

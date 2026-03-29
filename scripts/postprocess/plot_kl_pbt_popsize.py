@@ -1,14 +1,16 @@
 """
-Barplot of KL divergence vs population size for PBT continual experiments.
+Barplot of KL divergence vs population size for PBT, GA, DNS continual experiments.
 
 Reads kl_divergence.json files produced by compute_kl_gymnax.py from:
   projects/gymnax/pbt_weights_only_{env}_continual/pop_{N}/trial_{t}/kl_divergence.json
+  projects/gymnax/ga_continual_pop_sweep/{env}/pop_{N}/trial_{t}/kl_divergence.json
+  projects/gymnax/dns_continual_pop_sweep/{env}/pop_{N}/trial_{t}/kl_divergence.json
 
-For each pop size, averages KL across all task pairs and trials.
+Grouped barplots: x-axis = pop size, one bar per method (PBT, GA, DNS).
 
 Usage:
-    python scripts/postprocess/plot_kl_pbt_popsize.py --env Acrobot-v1
     python scripts/postprocess/plot_kl_pbt_popsize.py --env all
+    python scripts/postprocess/plot_kl_pbt_popsize.py --env Acrobot-v1
 """
 
 import argparse
@@ -21,32 +23,44 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
-ENV_DIR_PATTERNS = {
+PBT_DIR_PATTERNS = {
     "CartPole-v1": "pbt_weights_only_CartPole_v1_continual",
     "MountainCar-v0": "pbt_weights_only_MountainCar_v0_continual",
     "Acrobot-v1": "pbt_weights_only_Acrobot_v1_continual",
 }
 
 ALL_ENVS = ["CartPole-v1", "MountainCar-v0", "Acrobot-v1"]
+METHODS = ["PBT", "GA", "DNS"]
+COLORS = {"PBT": "orchid", "GA": "steelblue", "DNS": "mediumseagreen"}
 
 
-def collect_kl_for_env(data_dir, env):
-    """Collect KL data for one env. Returns (pop_sizes, kl_means, kl_stds, trial_counts)."""
-    env_dir = os.path.join(data_dir, ENV_DIR_PATTERNS[env])
-    if not os.path.isdir(env_dir):
-        print(f"  Skipping {env}: {env_dir} not found")
-        return [], [], [], []
+def get_method_env_dir(data_dir, method, env):
+    """Return the base directory for a method/env combination."""
+    if method == "PBT":
+        return os.path.join(data_dir, PBT_DIR_PATTERNS[env])
+    elif method == "GA":
+        return os.path.join(data_dir, "ga_continual_pop_sweep", env)
+    else:  # DNS
+        return os.path.join(data_dir, "dns_continual_pop_sweep", env)
+
+
+def collect_kl_from_dir(base_dir):
+    """
+    Collect KL data from a method/env directory.
+    Returns dict: {pop_size: {"mean": float, "std": float, "n": int}}
+    """
+    if not os.path.isdir(base_dir):
+        return {}
 
     pop_dirs = sorted(
-        [d for d in os.listdir(env_dir) if d.startswith("pop_")],
+        [d for d in os.listdir(base_dir) if d.startswith("pop_")],
         key=lambda d: int(d.replace("pop_", ""))
     )
 
-    pop_sizes, kl_means, kl_stds, trial_counts = [], [], [], []
-
+    result = {}
     for pop_dir_name in pop_dirs:
         pop_size = int(pop_dir_name.replace("pop_", ""))
-        pop_path = os.path.join(env_dir, pop_dir_name)
+        pop_path = os.path.join(base_dir, pop_dir_name)
 
         trial_avg_kls = []
         kl_files = glob.glob(os.path.join(pop_path, "trial_*", "kl_divergence.json"))
@@ -55,12 +69,11 @@ def collect_kl_for_env(data_dir, env):
             try:
                 with open(kl_file, 'r') as f:
                     data = json.load(f)
-            except Exception as e:
-                print(f"  Warning: failed to load {kl_file}: {e}")
+            except Exception:
                 continue
 
             pair_kls = []
-            for pair_key, pair_data in data.items():
+            for pair_data in data.values():
                 kl_info = pair_data.get("task_i_noise", {})
                 if "mean" in kl_info:
                     pair_kls.append(kl_info["mean"])
@@ -69,90 +82,94 @@ def collect_kl_for_env(data_dir, env):
                 trial_avg_kls.append(np.mean(pair_kls))
 
         if trial_avg_kls:
-            pop_sizes.append(pop_size)
-            kl_means.append(np.mean(trial_avg_kls))
-            kl_stds.append(np.std(trial_avg_kls))
-            trial_counts.append(len(trial_avg_kls))
-            print(f"  {env} pop_{pop_size}: {len(trial_avg_kls)} trials, "
-                  f"mean KL = {np.mean(trial_avg_kls):.6f} ± {np.std(trial_avg_kls):.6f}")
-        else:
-            print(f"  {env} pop_{pop_size}: no kl_divergence.json files found")
+            result[pop_size] = {
+                "mean": np.mean(trial_avg_kls),
+                "std": np.std(trial_avg_kls),
+                "n": len(trial_avg_kls),
+            }
 
-    return pop_sizes, kl_means, kl_stds, trial_counts
+    return result
 
 
-def plot_single_env(data_dir, env, output_dir):
-    pop_sizes, kl_means, kl_stds, trial_counts = collect_kl_for_env(data_dir, env)
-    if not pop_sizes:
-        print(f"No KL data for {env}.")
+def plot_env(ax, data_dir, env):
+    """Plot grouped bars for one env on a given axis."""
+    # Collect data for all methods
+    method_data = {}
+    all_pop_sizes = set()
+    for method in METHODS:
+        base_dir = get_method_env_dir(data_dir, method, env)
+        kl_data = collect_kl_from_dir(base_dir)
+        method_data[method] = kl_data
+        all_pop_sizes.update(kl_data.keys())
+        for pop, d in sorted(kl_data.items()):
+            print(f"  {method} {env} pop_{pop}: n={d['n']}, KL={d['mean']:.6f}±{d['std']:.6f}")
+
+    if not all_pop_sizes:
+        ax.set_title(env)
+        ax.text(0.5, 0.5, "No data", ha='center', va='center', transform=ax.transAxes)
         return
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    pop_sizes = sorted(all_pop_sizes)
+    n_methods = len(METHODS)
+    bar_width = 0.25
     x = np.arange(len(pop_sizes))
-    bars = ax.bar(x, kl_means, yerr=kl_stds, capsize=5,
-                  color='orchid', edgecolor='black', alpha=0.85)
 
-    for i, (bar, n) in enumerate(zip(bars, trial_counts)):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + kl_stds[i] + 0.002,
-                f'n={n}', ha='center', va='bottom', fontsize=9)
+    for i, method in enumerate(METHODS):
+        means = []
+        stds = []
+        for pop in pop_sizes:
+            d = method_data[method].get(pop)
+            if d:
+                means.append(d["mean"])
+                stds.append(d["std"])
+            else:
+                means.append(np.nan)
+                stds.append(np.nan)
 
-    ax.set_xlabel("Population Size", fontsize=12)
-    ax.set_ylabel("Mean KL Divergence", fontsize=12)
-    ax.set_title(f"PBT KL Divergence vs Population Size — {env}", fontsize=13)
+        offset = (i - (n_methods - 1) / 2) * bar_width
+        ax.bar(x + offset, means, bar_width, yerr=stds, capsize=3,
+               color=COLORS[method], edgecolor='black', label=method, alpha=0.85)
+
+    ax.set_xlabel("Population Size", fontsize=11)
+    ax.set_ylabel("Mean KL Divergence", fontsize=11)
+    ax.set_title(env, fontsize=12)
     ax.set_xticks(x)
-    ax.set_xticklabels([str(p) for p in pop_sizes], fontsize=11)
+    ax.set_xticklabels([str(p) for p in pop_sizes], fontsize=10)
+    ax.legend(fontsize=9)
     ax.grid(axis='y', alpha=0.3)
-    plt.tight_layout()
-
-    output_path = os.path.join(output_dir, f"kl_pbt_popsize_{env.replace('-', '_')}.png")
-    plt.savefig(output_path, dpi=150, bbox_inches='tight')
-    print(f"Saved: {output_path}")
-    plt.close()
 
 
 def plot_all_envs(data_dir, output_dir):
-    env_data = {}
-    for env in ALL_ENVS:
-        pop_sizes, kl_means, kl_stds, trial_counts = collect_kl_for_env(data_dir, env)
-        if pop_sizes:
-            env_data[env] = (pop_sizes, kl_means, kl_stds, trial_counts)
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
-    if not env_data:
-        print("No KL data found for any environment.")
-        return
+    for col, env in enumerate(ALL_ENVS):
+        print(f"\n{env}:")
+        plot_env(axes[col], data_dir, env)
 
-    n_envs = len(env_data)
-    fig, axes = plt.subplots(1, n_envs, figsize=(7 * n_envs, 5), squeeze=False)
-
-    for col, (env, (pop_sizes, kl_means, kl_stds, trial_counts)) in enumerate(env_data.items()):
-        ax = axes[0, col]
-        x = np.arange(len(pop_sizes))
-        bars = ax.bar(x, kl_means, yerr=kl_stds, capsize=5,
-                      color='orchid', edgecolor='black', alpha=0.85)
-
-        for i, (bar, n) in enumerate(zip(bars, trial_counts)):
-            ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + kl_stds[i] + 0.002,
-                    f'n={n}', ha='center', va='bottom', fontsize=9)
-
-        ax.set_xlabel("Population Size", fontsize=12)
-        if col == 0:
-            ax.set_ylabel("Mean KL Divergence", fontsize=12)
-        ax.set_title(env, fontsize=13)
-        ax.set_xticks(x)
-        ax.set_xticklabels([str(p) for p in pop_sizes], fontsize=11)
-        ax.grid(axis='y', alpha=0.3)
-
-    fig.suptitle("PBT KL Divergence vs Population Size", fontsize=14, fontweight='bold', y=1.01)
+    fig.suptitle("KL Divergence vs Population Size — PBT / GA / DNS",
+                 fontsize=14, fontweight='bold', y=1.01)
     plt.tight_layout()
 
-    output_path = os.path.join(output_dir, "kl_pbt_popsize_all_envs.png")
+    output_path = os.path.join(output_dir, "kl_all_methods_popsize.png")
+    plt.savefig(output_path, dpi=150, bbox_inches='tight')
+    print(f"\nSaved: {output_path}")
+    plt.close()
+
+
+def plot_single_env(data_dir, env, output_dir):
+    fig, ax = plt.subplots(figsize=(8, 5))
+    print(f"\n{env}:")
+    plot_env(ax, data_dir, env)
+    plt.tight_layout()
+
+    output_path = os.path.join(output_dir, f"kl_all_methods_{env.replace('-', '_')}.png")
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
     print(f"\nSaved: {output_path}")
     plt.close()
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Plot KL divergence vs pop size for PBT")
+    parser = argparse.ArgumentParser(description="Plot KL divergence vs pop size (PBT/GA/DNS)")
     parser.add_argument("--env", type=str, required=True,
                         choices=["CartPole-v1", "MountainCar-v0", "Acrobot-v1", "all"])
     parser.add_argument("--data_dir", type=str, default="projects/gymnax")
