@@ -56,7 +56,7 @@ import imageio
 # Configuration
 # ============================================================================
 
-POLICY_HIDDEN_LAYER_SIZES = (64, 64)
+POLICY_HIDDEN_LAYER_SIZES = (128, 128)
 
 
 # ============================================================================
@@ -65,7 +65,7 @@ POLICY_HIDDEN_LAYER_SIZES = (64, 64)
 
 class MLPPolicy(nn.Module):
     """Simple MLP policy network."""
-    hidden_dims: tuple = (64, 64)
+    hidden_dims: tuple = (128, 128)
     action_dim: int = 6
     
     @nn.compact
@@ -94,106 +94,105 @@ def unflatten_params(flat_params, param_template):
 # DNS Algorithm Implementation
 # ============================================================================
 
-def compute_novelty(descriptors: jnp.ndarray, k: int = 3) -> jnp.ndarray:
-    """Compute novelty scores as average distance to k nearest neighbors."""
-    # Handle NaN descriptors by replacing with zeros (will get low novelty)
-    descriptors = jnp.nan_to_num(descriptors, nan=0.0, posinf=0.0, neginf=0.0)
+def _compute_dominated_novelty(fitness, descriptor, k):
+    """Compute dominated novelty — exact port of QDax dns_repertoire.py.
     
-    # Compute pairwise distances
-    diffs = descriptors[:, None, :] - descriptors[None, :, :]
-    distances = jnp.linalg.norm(diffs, axis=-1)
-    
-    # Set self-distances to inf so they're not selected as neighbors
-    distances = distances + jnp.eye(distances.shape[0]) * 1e10
-    
-    # Get k smallest distances for each individual
-    k_nearest_distances = jnp.sort(distances, axis=1)[:, :k]
-    
-    # Novelty is average of k nearest neighbor distances
-    novelty = jnp.mean(k_nearest_distances, axis=1)
-    
-    # Replace any remaining NaN with 0 (low novelty score)
-    novelty = jnp.nan_to_num(novelty, nan=0.0, posinf=0.0, neginf=0.0)
-    
-    return novelty
+    For each individual, dominated novelty is the mean distance in descriptor
+    space to the k nearest neighbors that have fitness >= its own.
+    Returns NaN for the fittest individuals (no fitter neighbors exist).
+    NaN sorts highest in descending argsort, so they are always kept.
+    """
+    n = fitness.shape[0]
+    if n <= 1:
+        return jnp.full(n, jnp.nan)
+    k = min(k, n - 1)
+    valid = fitness != -jnp.inf
+
+    # Neighbor mask excluding self
+    neighbor = valid[:, None] & valid[None, :]
+    neighbor = neighbor & ~jnp.eye(n, dtype=bool)
+
+    # Fitter-or-equal mask: fitter[i,j] = True if fitness[j] >= fitness[i]
+    fitter = fitness[:, None] <= fitness[None, :]
+    fitter = jnp.where(neighbor, fitter, False)
+
+    # Pairwise distances
+    distance = jnp.linalg.norm(
+        descriptor[:, None, :] - descriptor[None, :, :], axis=-1
+    )
+    distance = jnp.where(neighbor, distance, jnp.inf)
+
+    # Distances to fitter neighbors only
+    distance_fitter = jnp.where(fitter, distance, jnp.inf)
+
+    # Dominated novelty: mean distance to k nearest fitter neighbors
+    values_fit, indices_fit = jax.vmap(
+        lambda x: jax.lax.top_k(-x, k)
+    )(distance_fitter)
+    dominated_novelty = jnp.mean(
+        -values_fit,
+        axis=-1,
+        where=jnp.take_along_axis(fitter, indices_fit, axis=-1),
+    )
+
+    return dominated_novelty
 
 
 def dns_selection(
-    genotypes: jnp.ndarray,
-    fitnesses: jnp.ndarray,
-    descriptors: jnp.ndarray,
-    new_genotypes: jnp.ndarray,
-    new_fitnesses: jnp.ndarray,
-    new_descriptors: jnp.ndarray,
-    population_size: int,
-    k: int,
-) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
-    """DNS selection: combine parent and offspring, select based on combined fitness+novelty score."""
+    genotypes, fitnesses, descriptors,
+    new_genotypes, new_fitnesses, new_descriptors,
+    population_size, k,
+):
+    """DNS selection — follows QDax DominatedNoveltyRepertoire.add().
     
-    # Combine parents and offspring
+    Combines parents and offspring, computes dominated novelty on the combined
+    pool, and keeps the top population_size individuals by dominated novelty.
+    """
+    # Combine candidates
     combined_genotypes = jnp.concatenate([genotypes, new_genotypes], axis=0)
     combined_fitnesses = jnp.concatenate([fitnesses, new_fitnesses], axis=0)
     combined_descriptors = jnp.concatenate([descriptors, new_descriptors], axis=0)
-    
-    # Compute novelty for combined population
-    combined_novelties = compute_novelty(combined_descriptors, k)
-    
-    # Handle NaN fitnesses (assign very low fitness)
-    combined_fitnesses = jnp.nan_to_num(combined_fitnesses, nan=-1e6, posinf=1e6, neginf=-1e6)
-    
-    # Normalize fitness to [0, 1]
-    f_min, f_max = jnp.min(combined_fitnesses), jnp.max(combined_fitnesses)
-    f_range = jnp.maximum(f_max - f_min, 1e-8)
-    norm_fitness = (combined_fitnesses - f_min) / f_range
-    
-    # Normalize novelty to [0, 1]
-    n_min, n_max = jnp.min(combined_novelties), jnp.max(combined_novelties)
-    n_range = jnp.maximum(n_max - n_min, 1e-8)
-    norm_novelty = (combined_novelties - n_min) / n_range
-    
-    # Combined score for selection (equal weight to fitness and novelty)
-    # Handle any remaining NaN in scores
-    combined_scores = jnp.nan_to_num(norm_fitness + norm_novelty, nan=-1e6)
-    
-    # Select top population_size individuals by combined score
-    selected_indices = jnp.argsort(combined_scores)[-population_size:]
-    
-    # Extract selected individuals
-    selected_genotypes = combined_genotypes[selected_indices]
-    selected_fitnesses = combined_fitnesses[selected_indices]
-    selected_descriptors = combined_descriptors[selected_indices]
-    selected_novelties = combined_novelties[selected_indices]
-    
-    return selected_genotypes, selected_fitnesses, selected_descriptors, selected_novelties
+
+    # Compute dominated novelty on combined pool
+    dominated_novelty = _compute_dominated_novelty(
+        combined_fitnesses, combined_descriptors, k
+    )
+
+    # Use dominated novelty as meta-fitness, invalid individuals get -inf
+    valid = combined_fitnesses != -jnp.inf
+    meta_fitness = jnp.where(valid, dominated_novelty, -jnp.inf)
+
+    # Select survivors (NaN from fittest individuals sorts highest in descending order)
+    indices = jnp.argsort(meta_fitness)[::-1]
+    survivor_indices = indices[:population_size]
+
+    return (
+        combined_genotypes[survivor_indices],
+        combined_fitnesses[survivor_indices],
+        combined_descriptors[survivor_indices],
+        dominated_novelty[survivor_indices],
+    )
 
 
-def isoline_variation(
-    genotypes: jnp.ndarray,
-    key: jnp.ndarray,
-    iso_sigma: float = 0.05,
-    line_sigma: float = 0.5,
-    batch_size: int = 256,
-) -> jnp.ndarray:
-    """Isoline variation operator for generating offspring."""
+def isoline_variation(genotypes, key, iso_sigma=0.05, line_sigma=0.5, batch_size=256):
+    """Iso+Line-DD variation operator — exact port of QDax mutation_operators.py."""
     pop_size = genotypes.shape[0]
     param_dim = genotypes.shape[1]
     
-    # Sample parent indices
     key, k1, k2, k3, k4 = random.split(key, 5)
     parent1_indices = random.randint(k1, (batch_size,), 0, pop_size)
     parent2_indices = random.randint(k2, (batch_size,), 0, pop_size)
     
-    # Get parent genotypes
-    parent1 = genotypes[parent1_indices]
-    parent2 = genotypes[parent2_indices]
+    x1 = genotypes[parent1_indices]
+    x2 = genotypes[parent2_indices]
     
-    # Isoline crossover
-    alpha = random.uniform(k3, (batch_size, param_dim), minval=-line_sigma, maxval=1.0 + line_sigma)
-    offspring = parent1 + alpha * (parent2 - parent1)
+    # QDax: line_noise is a scalar per individual from normal distribution
+    line_noise = random.normal(k3, (batch_size,)) * line_sigma
+    # QDax: iso_noise is per-parameter from normal distribution
+    iso_noise = random.normal(k4, (batch_size, param_dim)) * iso_sigma
     
-    # Gaussian mutation
-    noise = random.normal(k4, (batch_size, param_dim)) * iso_sigma
-    offspring = offspring + noise
+    # QDax formula: offspring = (x1 + iso_noise) + (x2 - x1) * line_noise
+    offspring = (x1 + iso_noise) + (x2 - x1) * line_noise[:, None]
     
     return offspring
 
@@ -301,27 +300,32 @@ def save_task_gifs(env, policy, best_params, task_idx, task_label,
         task_gifs_dir = os.path.join(output_dir, "gifs", f"task_{task_idx:02d}_{task_label}")
         os.makedirs(task_gifs_dir, exist_ok=True)
         
-        jit_reset = jax.jit(env.reset)
-        jit_step = jax.jit(env.step)
-        jit_policy = jax.jit(policy.apply)
+        # JIT-compiled trajectory rollout using scan (much faster than Python loop)
+        @jax.jit
+        def rollout_trajectory(key):
+            state = env.reset(key)
+            def step_fn(carry, _):
+                state, total_reward, done_flag = carry
+                action = policy.apply(best_params, state.obs)
+                next_state = env.step(state, action)
+                total_reward = total_reward + next_state.reward * (1.0 - done_flag)
+                done_flag = jnp.maximum(done_flag, next_state.done)
+                return (next_state, total_reward, done_flag), state
+            (final_state, total_reward, _), trajectory_states = jax.lax.scan(
+                step_fn, (state, 0.0, 0.0), None, length=episode_length
+            )
+            return total_reward, trajectory_states
         
         for gif_idx in range(num_gifs):
             key = jax.random.key(seed + task_idx * 1000 + gif_idx * 37)
-            state = jit_reset(key)
-            trajectory = [state]
-            total_reward = 0.0
+            total_reward, trajectory_states = rollout_trajectory(key)
+            total_reward = float(total_reward)
             
-            for _ in range(episode_length):
-                obs = state.obs
-                action = jit_policy(best_params, obs)
-                state = jit_step(state, action)
-                trajectory.append(state)
-                total_reward += float(state.reward)
-                if state.done:
-                    break
+            # Convert stacked states to list for rendering (every 2nd frame)
+            trajectory_list = [jax.tree.map(lambda x: x[i], trajectory_states)
+                               for i in range(0, episode_length, 2)]
             
-            # Render every 2nd frame
-            images = env.render(trajectory[::2], height=240, width=320, camera="side")
+            images = env.render(trajectory_list, height=240, width=320, camera="side")
             gif_path = os.path.join(task_gifs_dir, f"trial{gif_idx}_reward{total_reward:.0f}.gif")
             imageio.mimsave(gif_path, images, fps=30, loop=0)
         
@@ -382,7 +386,7 @@ def parse_args():
     parser.add_argument('--num_tasks', type=int, default=30)
     parser.add_argument('--episodes_per_task', type=int, default=200)
     parser.add_argument('--pop_size', type=int, default=512)
-    parser.add_argument('--batch_size', type=int, default=256)
+    parser.add_argument('--batch_size', type=int, default=None)
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--episode_length', type=int, default=1000)
     parser.add_argument('--num_evals', type=int, default=3,
@@ -414,7 +418,8 @@ def main():
     
     env_name = args.env
     pop_size = args.pop_size
-    batch_size = args.batch_size
+    batch_size = args.batch_size if args.batch_size is not None else max(1, pop_size // 2)
+    batch_size = min(batch_size, pop_size)
     episodes_per_task = args.episodes_per_task
     num_tasks = args.num_tasks
     episode_length = args.episode_length
@@ -532,7 +537,7 @@ def main():
     print(f"\nEvaluating initial population (JIT compiling, may take a moment)...")
     key, eval_key = jax.random.split(key)
     fitnesses, descriptors = current_scoring_fn(population, eval_key)
-    novelties = compute_novelty(descriptors, k)
+    novelties = _compute_dominated_novelty(fitnesses, descriptors, k)
     
     print(f"  Initial best fitness: {float(jnp.max(fitnesses)):.2f}")
     
@@ -552,7 +557,7 @@ def main():
             print(f"  Re-evaluating population for {task_mod}={current_multiplier}...")
             key, eval_key = jax.random.split(key)
             fitnesses, descriptors = current_scoring_fn(population, eval_key)
-            novelties = compute_novelty(descriptors, k)
+            novelties = _compute_dominated_novelty(fitnesses, descriptors, k)
         
         task_best_fitness = float(jnp.max(fitnesses))
         task_best_idx = int(jnp.argmax(fitnesses))

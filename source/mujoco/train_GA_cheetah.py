@@ -161,7 +161,7 @@ def parse_args():
                         help='Number of evaluations per individual (default 1)')
     parser.add_argument('--gpus', type=str, default=None)
     parser.add_argument('--output_dir', type=str, default=None)
-    parser.add_argument('--wandb_project', type=str, default='continual_neuroevolution_ga')
+    parser.add_argument('--wandb_project', type=str, default='GA_popsize_study')
     parser.add_argument('--log_interval', type=int, default=10)
     return parser.parse_args()
 
@@ -217,7 +217,7 @@ def main():
         'pop_size': pop_size, 'seed': seed, 'trial': trial, 'num_evals': args.num_evals,
     }
     wandb.init(project=args.wandb_project, config=config,
-               name=f"ga_{env_name}_{friction_label}_trial{trial}", reinit=True)
+               name=f"ga_{env_name}_{friction_label}_pop{pop_size}_trial{trial}", reinit=True)
     
     # Initialize GA
     devices = jax.devices()

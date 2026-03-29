@@ -540,7 +540,7 @@ ENV_CONFIGS = {
         "num_timesteps": 512 * 500 * 50,  # 204,800,000
         "num_envs": 2048,
         "num_steps": 20,  # unroll_length
-        "num_epochs": 8,  # num_updates_per_batch
+        "num_epochs": 10,  # num_updates_per_batch
         "num_minibatches": 32,
         "gamma": 0.95,  # discounting
         "learning_rate": 3e-4,
@@ -570,9 +570,9 @@ ENV_CONFIGS = {
         "num_steps": 50,  # unroll_length
         "num_epochs": 10,  # num_updates_per_batch
         "num_minibatches": 32,
-        "gamma": 0.99,  # discounting
-        "learning_rate": 1e-4,
-        "ent_coef": 5e-2,  # Higher entropy for exploration
+        "gamma": 0.95,  # discounting
+        "learning_rate": 3e-4,
+        "ent_coef": 1e-2,
         "normalize_observations": True,
         "policy_hidden_dims": (16, 16),
         "value_hidden_dims": (128, 128, 128),

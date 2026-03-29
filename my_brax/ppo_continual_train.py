@@ -268,6 +268,8 @@ def _apply_redo(
     local_key,
     local_devices_to_use: int,
     redo_tau: float = 0.01,
+    policy_hidden_sizes: tuple = (256, 256),
+    value_hidden_sizes: tuple = (256, 256),
 ) -> TrainingState:
     """
     Apply ReDo (Reinitializing Dormant Neurons) to the policy and value networks.
@@ -302,9 +304,9 @@ def _apply_redo(
     # Split keys for policy and value
     local_key, policy_rng, value_rng = jax.random.split(local_key, 3)
     
-    # Get default hidden layer sizes (matches GA MLPPolicy for fair comparison)
-    policy_hidden_sizes = [512, 256, 128]
-    value_hidden_sizes = [512, 256, 128]
+    # Convert hidden sizes to list for apply_redo_to_params
+    policy_hidden_list = list(policy_hidden_sizes)
+    value_hidden_list = list(value_hidden_sizes)
     
     # Apply ReDo to policy network if it supports dormant detection
     policy_network = ppo_network.policy_network
@@ -318,7 +320,7 @@ def _apply_redo(
             # Apply ReDo to policy params
             new_policy_params = my_brax_networks.apply_redo_to_params(
                 params.policy,
-                policy_hidden_sizes,
+                policy_hidden_list,
                 policy_dormant_indices,
                 rng=policy_rng,
             )
@@ -346,7 +348,7 @@ def _apply_redo(
             # Apply ReDo to value params
             new_value_params = my_brax_networks.apply_redo_to_params(
                 params.value,
-                value_hidden_sizes,
+                value_hidden_list,
                 value_dormant_indices,
                 rng=value_rng,
             )
@@ -478,13 +480,17 @@ def train_continual(
     
     # Steps per training iteration
     env_step_per_training_step = batch_size * unroll_length * num_minibatches * action_repeat
-    # We want num_evals_per_task training epochs per task (each epoch = 1 generation equivalent)
-    # The initial eval is just for logging before training starts, doesn't consume budget
-    num_training_steps_per_epoch = np.ceil(
-        timesteps_per_task / (num_evals_per_task * env_step_per_training_step)
-    ).astype(int)
-    # Do all num_evals_per_task as training epochs (initial eval is extra, before training)
-    num_training_epochs = num_evals_per_task
+    # Calculate number of training epochs to achieve timesteps_per_task
+    # Each epoch does exactly env_step_per_training_step environment steps
+    num_training_epochs = int(np.ceil(timesteps_per_task / env_step_per_training_step))
+    # For backwards compatibility, num_training_steps_per_epoch is 1 (one SGD update per epoch)
+    num_training_steps_per_epoch = 1
+    
+    actual_steps_per_task = num_training_epochs * env_step_per_training_step
+    logging.info(
+        f'Continual PPO: {num_tasks} tasks, {timesteps_per_task:,} requested steps/task, '
+        f'{actual_steps_per_task:,} actual steps/task ({num_training_epochs} epochs x {env_step_per_training_step:,} steps/epoch)'
+    )
     
     # Random keys
     key = jax.random.PRNGKey(seed)
@@ -889,6 +895,8 @@ def train_continual(
                         local_key,
                         local_devices_to_use,
                         redo_tau,
+                        policy_hidden_sizes=policy_hidden_sizes,
+                        value_hidden_sizes=value_hidden_sizes,
                     )
         
         # Save checkpoint at end of task

@@ -37,7 +37,7 @@ import jax.numpy as jnp
 from jax import random, flatten_util
 from jax.sharding import Mesh, NamedSharding, PartitionSpec
 import flax.linen as nn
-from evosax.algorithms import SimpleGA
+# SimpleGA imported dynamically based on --ga_version flag
 import gymnax
 import time
 import pickle
@@ -117,21 +117,21 @@ ENV_CONFIGS = {
         "pop_size": 512,
         "hidden_dims": (16, 16),
         "episode_length": 500,
-        "num_evals": 1,
+        "num_evals": 10,
     },
     "Acrobot-v1": {
         "num_generations": 1000,
         "pop_size": 512,
-        "hidden_dims": (32, 32),
+        "hidden_dims": (16, 16),
         "episode_length": 500,
-        "num_evals": 1,
+        "num_evals": 10,
     },
     "MountainCar-v0": {
         "num_generations": 2000,
         "pop_size": 512,
-        "hidden_dims": (32, 32),
+        "hidden_dims": (16, 16),
         "episode_length": 500,
-        "num_evals": 1,
+        "num_evals": 10,
     },
 }
 
@@ -368,8 +368,11 @@ def parse_args():
     parser.add_argument('--trial', type=int, default=1)
     parser.add_argument('--gpus', type=str, default=None)
     parser.add_argument('--output_dir', type=str, default=None)
-    parser.add_argument('--wandb_project', type=str, default='continual_neuroevolution_gymnax')
+    parser.add_argument('--wandb_project', type=str, default='GA_popsize_study')
     parser.add_argument('--log_interval', type=int, default=10)
+    parser.add_argument('--ga_version', type=str, default='evosax',
+                        choices=['kinetix', 'evosax'],
+                        help='GA implementation: kinetix (local) or evosax (pip)')
     return parser.parse_args()
 
 
@@ -404,7 +407,8 @@ def main():
     
     # Create environment
     env, env_params = gymnax.make(env_name)
-    
+    env_params = env_params.replace(max_steps_in_episode=episode_length)
+
     # Get dimensions
     key, reset_key = random.split(key)
     obs, _ = env.reset(reset_key, env_params)
@@ -431,7 +435,7 @@ def main():
         'num_evals': num_evals, 'hidden_dims': hidden_dims,
     }
     wandb.init(project=args.wandb_project, config=config,
-               name=f"ga_{env_name}_trial{trial}", reinit=True)
+               name=f"ga_{env_name}_pop{pop_size}_trial{trial}", reinit=True)
     
     # Initialize GA with multi-GPU sharding
     devices = jax.devices()
@@ -445,35 +449,63 @@ def main():
         pop_size = (pop_size // num_devices + 1) * num_devices
         print(f"  Warning: Adjusted pop_size from {old_pop_size} to {pop_size}")
     
-    std_schedule = lambda gen: args.mutation_std
+    # Select GA implementation based on flag
+    ga_version = args.ga_version
+    print(f"  Using GA version: {ga_version}")
     
-    ga = SimpleGA(
-        population_size=pop_size,
-        solution=jnp.zeros(num_params),
-        std_schedule=std_schedule,
-    )
-    ga.elite_ratio = args.elite_ratio
-    ga_params = jax.device_put(ga.default_params, replicate_sharding)
-    
-    key, init_key = random.split(key)
-    init_population = random.normal(init_key, (pop_size, num_params)) * 0.1
-    init_fitness = jnp.full(pop_size, jnp.inf)
-    
-    key, state_init_key = random.split(key)
-    ga_state = jax.jit(ga.init, out_shardings=replicate_sharding)(
-        state_init_key, init_population, init_fitness, ga_params
-    )
-    
-    # JIT compile ask/tell
-    @jax.jit
-    def jit_ask(key, state, params):
-        population, new_state = ga.ask(key, state, params)
-        population = jax.device_put(population, parallel_sharding)
-        return population, new_state
-    
-    @jax.jit
-    def jit_tell(key, population, fitness, state, params):
-        return ga.tell(key, population, fitness, state, params)
+    if ga_version == 'kinetix':
+        from simple_ga import SimpleGA
+        ga = SimpleGA(
+            popsize=pop_size,
+            num_dims=num_params,
+            elite_ratio=args.elite_ratio,
+            sigma_init=args.mutation_std,
+            init_min=-0.1,
+            init_max=0.1,
+        )
+        ga_params = ga.default_params
+        
+        key, state_init_key = random.split(key)
+        ga_state = ga.initialize(state_init_key, ga_params)
+        
+        @jax.jit
+        def jit_ask(key, state, params):
+            population, new_state = ga.ask(key, state, params)
+            population = jax.device_put(population, parallel_sharding)
+            return population, new_state
+        
+        @jax.jit
+        def jit_tell(population, fitness, state, params):
+            return ga.tell(population, fitness, state, params)
+    else:  # evosax
+        from evosax.algorithms import SimpleGA
+        std_schedule = lambda gen: args.mutation_std
+        ga = SimpleGA(
+            population_size=pop_size,
+            solution=jnp.zeros(num_params),
+            std_schedule=std_schedule,
+        )
+        ga.elite_ratio = args.elite_ratio
+        ga_params = jax.device_put(ga.default_params, replicate_sharding)
+        
+        key, init_key = random.split(key)
+        init_population = random.normal(init_key, (pop_size, num_params)) * 0.1
+        init_fitness = jnp.full(pop_size, jnp.inf)
+        
+        key, state_init_key = random.split(key)
+        ga_state = jax.jit(ga.init, out_shardings=replicate_sharding)(
+            state_init_key, init_population, init_fitness, ga_params
+        )
+        
+        @jax.jit
+        def jit_ask(key, state, params):
+            population, new_state = ga.ask(key, state, params)
+            population = jax.device_put(population, parallel_sharding)
+            return population, new_state
+        
+        @jax.jit
+        def jit_tell_evosax(key, population, fitness, state, params):
+            return ga.tell(key, population, fitness, state, params)
     
     # Warmup JIT
     print("\nJIT compiling...")
@@ -498,7 +530,10 @@ def main():
         population_host = jax.device_get(population)
         
         # evosax SimpleGA MINIMIZES by default, so negate fitness (use single-trial for selection)
-        ga_state, _ = jit_tell(tell_key, population, -fitness, ga_state, ga_params)
+        if ga_version == 'kinetix':
+            ga_state = jit_tell(population, -fitness, ga_state, ga_params)
+        else:
+            ga_state, _ = jit_tell_evosax(tell_key, population, -fitness, ga_state, ga_params)
         
         # Track using mean-of-10 fitness
         gen_best = float(np.max(mean_fitness_host))
@@ -520,6 +555,10 @@ def main():
     total_time = time.time() - start_time
     print(f"\nTraining complete! Time: {total_time:.1f}s")
     print(f"  Best overall (training): {best_overall_fitness:.2f}")
+    
+    # Use best from final generation (not best across all generations)
+    best_params = population_host[int(np.argmax(mean_fitness_host))].copy()
+    print(f"  Best in final generation: {float(np.max(mean_fitness_host)):.2f}")
     
     # Final evaluation with 10 trials
     print(f"\nFinal evaluation (10 trials)...")

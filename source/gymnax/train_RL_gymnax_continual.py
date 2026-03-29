@@ -1,8 +1,12 @@
 """
 Train PPO on Gymnax environments (CONTINUAL).
 
-Task changes every `task_interval` updates by modifying the observation noise.
-Noise vector = normal(obs_size) * noise_range
+Task changes every `task_interval` updates by either:
+  - Adding observation noise (task_type=noise)
+  - Varying an environment parameter (task_type=param):
+      CartPole: gravity [0.98, 98.0] (default 9.8, factor of 10)
+      MountainCar: gravity [0.000833, 0.0075] (default 0.0025, factor of 3)
+      Acrobot: link_length_1 [0.5, 2.0] (default 1.0)
 
 Supports CartPole-v1, Acrobot-v1, MountainCar-v0.
 All are discrete action space environments.
@@ -28,6 +32,7 @@ import sys
 import time
 import pickle
 import json
+import yaml
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))
@@ -63,6 +68,13 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle, Circle, FancyBboxPatch
 from matplotlib.lines import Line2D
 
+
+# Solved thresholds for Speed-Up (SU) metric
+SOLVED_THRESHOLDS = {
+    'CartPole-v1': 475,
+    'Acrobot-v1': -70,
+    'MountainCar-v0': -110,
+}
 
 # ============================================================================
 # Logging Helper
@@ -517,30 +529,41 @@ def update_entropy_coef(ent_coef, target_entropy, current_entropy, lr=0.01):
 # ============================================================================
 
 def evaluate(key, policy_network, policy_params, env, env_params, noise_vector, num_episodes=10, max_steps=500):
-    """Evaluate policy on environment with noise."""
-    total_rewards = []
+    """Evaluate policy on environment with noise (vectorized with jax.lax.scan)."""
     
-    for ep in range(num_episodes):
-        key, reset_key = random.split(key)
-        obs, state = env.reset(reset_key, env_params)
-        episode_reward = 0.0
-        
-        for step in range(max_steps):
-            # Add noise to observation
-            noisy_obs = obs + noise_vector
-            logits = policy_network.apply(policy_params, noisy_obs[None])[0]
-            action = jnp.argmax(logits)  # Greedy action for eval
-            
-            key, step_key = random.split(key)
-            obs, state, reward, done, _ = env.step(step_key, state, action, env_params)
-            episode_reward += reward
-            
-            if bool(done):
-                break
-        
-        total_rewards.append(float(episode_reward))
+    # Reset all eval episodes in parallel
+    reset_keys = random.split(key, num_episodes + 1)
+    key = reset_keys[0]
+    episode_keys = reset_keys[1:]
+    obs_all, state_all = jax.vmap(lambda k: env.reset(k, env_params))(episode_keys)
     
-    return np.mean(total_rewards), np.std(total_rewards)
+    def eval_step(carry, _):
+        obs, state, key, rewards, dones_acc = carry
+        noisy_obs = obs + noise_vector
+        logits = policy_network.apply(policy_params, noisy_obs)
+        actions = jnp.argmax(logits, axis=-1)
+        
+        key, step_key = random.split(key)
+        step_keys = random.split(step_key, num_episodes)
+        next_obs, next_state, reward, done, _ = jax.vmap(
+            lambda k, s, a: env.step(k, s, a, env_params)
+        )(step_keys, state, actions)
+        
+        # Only accumulate reward if episode hasn't already ended
+        still_running = 1.0 - dones_acc
+        rewards = rewards + reward * still_running
+        dones_acc = jnp.maximum(dones_acc, done.astype(jnp.float32))
+        
+        return (next_obs, next_state, key, rewards, dones_acc), None
+    
+    init_rewards = jnp.zeros(num_episodes)
+    init_dones = jnp.zeros(num_episodes)
+    
+    (_, _, _, total_rewards, _), _ = jax.lax.scan(
+        eval_step, (obs_all, state_all, key, init_rewards, init_dones), None, length=max_steps
+    )
+    
+    return jnp.mean(total_rewards), jnp.std(total_rewards)
 
 
 # ============================================================================
@@ -548,12 +571,15 @@ def evaluate(key, policy_network, policy_params, env, env_params, noise_vector, 
 # ============================================================================
 
 ENV_CONFIGS = {
+    # Steps budget matched to GA: pop_size(512) * episode_length(500) * num_gens(200) * num_tasks(10) = 512M
+    # steps_per_update = num_envs(2048) * num_steps(50) = 102,400
+    # task_interval = steps_per_task(51.2M) / steps_per_update(102.4K) = 500
     "CartPole-v1": {
-        "num_timesteps": 512 * 200 * 500 * 10,  # 10 tasks, 512*200*500 per task
-        "task_interval": 1250,  # 512*200*500 / (2048*20) = 1250 updates per task
+        "num_timesteps": 512 * 200 * 500 * 10,  # 512M total env steps (matched to GA)
+        "task_interval": 500,  # 51.2M / (2048*50) = 500 updates per task
         "num_envs": 2048,
-        "num_steps": 20,  # unroll_length
-        "num_epochs": 8,  # num_updates_per_batch
+        "num_steps": 50,  # unroll_length
+        "num_epochs": 10,  # num_updates_per_batch (SGD passes, doesn't change env steps)
         "num_minibatches": 32,
         "gamma": 0.95,  # discounting
         "learning_rate": 3e-4,
@@ -564,11 +590,11 @@ ENV_CONFIGS = {
         "episode_length": 500,
     },
     "Acrobot-v1": {
-        "num_timesteps": 512 * 200 * 500 * 10,  # 10 tasks, 512*200*500 per task
-        "task_interval": 500,  # 512*200*500 / (2048*50) = 500 updates per task
+        "num_timesteps": 512 * 200 * 500 * 10,  # 512M total env steps (matched to GA)
+        "task_interval": 500,  # 51.2M / (2048*50) = 500 updates per task
         "num_envs": 2048,
         "num_steps": 50,  # unroll_length
-        "num_epochs": 10,  # num_updates_per_batch
+        "num_epochs": 10,  # num_updates_per_batch (SGD passes, doesn't change env steps)
         "num_minibatches": 32,
         "gamma": 0.99,  # discounting
         "learning_rate": 1e-4,
@@ -579,15 +605,15 @@ ENV_CONFIGS = {
         "episode_length": 500,
     },
     "MountainCar-v0": {
-        "num_timesteps": 512 * 200 * 500 * 10,  # 10 tasks, 512*200*500 per task
-        "task_interval": 500,  # 512*200*500 / (2048*50) = 500 updates per task
+        "num_timesteps": 512 * 200 * 500 * 10,  # 512M total env steps (matched to GA)
+        "task_interval": 500,  # 51.2M / (2048*50) = 500 updates per task
         "num_envs": 2048,
         "num_steps": 50,  # unroll_length
-        "num_epochs": 10,  # num_updates_per_batch
+        "num_epochs": 10,  # num_updates_per_batch (SGD passes, doesn't change env steps)
         "num_minibatches": 32,
-        "gamma": 0.99,  # discounting
-        "learning_rate": 1e-4,
-        "ent_coef": 5e-2,  # Higher entropy for exploration
+        "gamma": 0.95,  # discounting
+        "learning_rate": 3e-4,
+        "ent_coef": 1e-2,
         "normalize_observations": True,
         "policy_hidden_dims": (16, 16),
         "value_hidden_dims": (128, 128, 128),
@@ -617,6 +643,11 @@ def parse_args():
                         help='Change task every N updates (default: env-specific for 10 tasks)')
     parser.add_argument('--noise_range', type=float, default=1.0,
                         help='Scale for observation noise (task definition)')
+    parser.add_argument('--task_type', type=str, default='noise',
+                        choices=['noise', 'param'],
+                        help='Type of task variation: noise (obs noise) or param (vary env parameter)')
+    parser.add_argument('--param_range', type=float, nargs=2, default=None,
+                        help='Range [min, max] for param sampling (task_type=param). Default: env-specific.')
     
     # PPO hyperparameters (None = use env-specific default)
     parser.add_argument('--num_envs', type=int, default=None)
@@ -680,6 +711,17 @@ def main():
     seed = args.seed + args.trial  # Different seed per trial
     trial = args.trial
     noise_range = args.noise_range
+    task_type = args.task_type
+    
+    # Environment-specific parameter variation config
+    PARAM_CONFIGS = {
+        'CartPole-v1': {'param_name': 'gravity', 'default_val': 9.8, 'default_range': [0.098, 198.0]},
+        'MountainCar-v0': {'param_name': 'gravity', 'default_val': 0.0025, 'default_range': [0.00125, 0.005]},
+        'Acrobot-v1': {'param_name': 'link_length_1', 'default_val': 1.0, 'default_range': [0.5, 2.0]},
+    }
+    param_cfg = PARAM_CONFIGS[env_name]
+    param_name = param_cfg['param_name']
+    param_range = args.param_range if args.param_range is not None else param_cfg['default_range']
     
     # Get environment-specific hyperparameters
     hp = get_hyperparams(args)
@@ -701,7 +743,10 @@ def main():
     print(f"  Method: {method.upper()}")
     print(f"  Total timesteps: {num_timesteps:,}")
     print(f"  Task interval: {task_interval} updates")
-    print(f"  Noise range: {noise_range}")
+    if task_type == 'noise':
+        print(f"  Task type: noise, range: {noise_range}")
+    elif task_type == 'param':
+        print(f"  Task type: param ({param_name}), range: {param_range}")
     print(f"  Hyperparams: num_envs={hp['num_envs']}, num_steps={hp['num_steps']}, "
           f"lr={hp['learning_rate']}, gamma={hp['gamma']}, ent_coef={hp['ent_coef']}")
     
@@ -709,7 +754,7 @@ def main():
     if args.output_dir is None:
         output_dir = os.path.join(
             REPO_ROOT, "projects", "gymnax",
-            f"{method}_{env_name.replace('-', '_')}_continual",
+            f"{method}_{env_name.replace('-', '_')}_continual_{task_type}",
             f"trial_{trial}"
         )
     else:
@@ -722,9 +767,11 @@ def main():
     
     print(f"  Output: {output_dir}")
     
-    # Create gifs directory
+    # Create gifs and checkpoints directories
     gifs_dir = os.path.join(output_dir, "gifs")
     os.makedirs(gifs_dir, exist_ok=True)
+    checkpoints_dir = os.path.join(output_dir, "checkpoints")
+    os.makedirs(checkpoints_dir, exist_ok=True)
     
     # Initialize random key
     key = random.key(seed + trial * 1000)
@@ -766,10 +813,11 @@ def main():
         'gamma': hp['gamma'], 'ent_coef': hp['ent_coef'],
         'num_epochs': hp['num_epochs'], 'num_minibatches': hp['num_minibatches'],
         'policy_hidden_dims': hp['policy_hidden_dims'], 'value_hidden_dims': hp['value_hidden_dims'],
-        'task_interval': task_interval, 'noise_range': noise_range,
+        'task_interval': task_interval, 'task_type': task_type,
+        'noise_range': noise_range, 'param_name': param_name, 'param_range': param_range,
     }
     wandb.init(project=args.wandb_project, config=config,
-               name=f"{method}_{env_name}_continual_trial{trial}", reinit=True)
+               name=f"{method}_{env_name}_continual_{task_type}_epochs{hp['num_epochs']}_trial{trial}", reinit=True)
     
     # TRAC: Initialize entropy coefficient
     ent_coef = hp['ent_coef']
@@ -781,6 +829,7 @@ def main():
     
     # Training metrics
     best_reward = -float('inf')
+    task_best_reward = -float('inf')
     training_metrics = []
     start_time = time.time()
     
@@ -790,24 +839,64 @@ def main():
     
     print(f"\nStarting continual training ({num_updates} updates)...")
     
-    # JIT compile training step (static args first via partial)
-    jit_train_step = jax.jit(functools.partial(
-        train_step,
-        policy_network,  # Fixed arg 1
-        value_network,   # Fixed arg 2
-        hp['clip_eps'],  # Fixed arg 3
-        hp['vf_coef'],   # Fixed arg 4
-    ))
-    
-    # JIT compile rollout collection (includes noise_vector)
+    # JIT compile rollout collection (includes noise_vector and env_params)
     @jax.jit
-    def jit_collect_rollout_fn(key, policy_params, value_params, noise_vector):
+    def jit_collect_rollout_fn(key, policy_params, value_params, noise_vector, env_params):
         return collect_rollout(
             key, policy_network, policy_params,
             value_network, value_params,
             env, env_params, hp['num_envs'], hp['num_steps'],
             noise_vector
         )
+    
+    # JIT compile SGD epochs (replaces Python for-loops over epochs/minibatches)
+    num_minibatches = hp['num_minibatches']
+    num_epochs = hp['num_epochs']
+    batch_size = hp['num_steps'] * hp['num_envs']
+    minibatch_size = batch_size // num_minibatches
+    
+    @jax.jit
+    def jit_sgd_epochs(policy_state, value_state, flat_batch, ent_coef, key):
+        """Run num_epochs of SGD with num_minibatches each, fully compiled."""
+        
+        def single_epoch(carry, _):
+            policy_state, value_state, key = carry
+            key, shuffle_key = random.split(key)
+            perm = random.permutation(shuffle_key, batch_size)
+            shuffled = {k: v[perm] for k, v in flat_batch.items()}
+            
+            # Reshape into (num_minibatches, minibatch_size, ...)
+            mb_data = {
+                k: v.reshape(num_minibatches, minibatch_size, *v.shape[1:])
+                for k, v in shuffled.items()
+            }
+            
+            def single_minibatch(carry, minibatch):
+                policy_state, value_state = carry
+                policy_state, value_state, loss, metrics = train_step(
+                    policy_network, value_network,
+                    hp['clip_eps'], hp['vf_coef'],
+                    policy_state, value_state, minibatch, ent_coef,
+                )
+                return (policy_state, value_state), metrics
+            
+            (policy_state, value_state), all_metrics = jax.lax.scan(
+                single_minibatch, (policy_state, value_state), mb_data,
+                length=num_minibatches
+            )
+            
+            return (policy_state, value_state, key), all_metrics
+        
+        (policy_state, value_state, key), epoch_metrics = jax.lax.scan(
+            single_epoch, (policy_state, value_state, key), None,
+            length=num_epochs
+        )
+        
+        # Return last metrics (last epoch, last minibatch)
+        last_metrics = jax.tree_util.tree_map(lambda x: x[-1, -1], epoch_metrics)
+        last_loss = last_metrics.get('pg_loss', 0.0) + hp['vf_coef'] * last_metrics.get('vf_loss', 0.0)
+        
+        return policy_state, value_state, last_loss, last_metrics
     
     # JIT compile vectorized GAE computation
     @jax.jit
@@ -829,10 +918,44 @@ def main():
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
         return advantages, returns
     
-    # Initialize noise vector for Task 0 (zero noise = baseline task)
+    # JIT compile evaluation
+    @jax.jit
+    def jit_evaluate(key, policy_params, noise_vector, env_params):
+        return evaluate(
+            key, policy_network, policy_params,
+            env, env_params, noise_vector, args.num_eval_episodes, hp['episode_length']
+        )
+    
+    # Pre-generate deterministic task sequence (same across methods for same trial)
+    num_tasks = num_updates // task_interval
+    task_rng = jax.random.key(trial * 7919)  # Separate RNG, deterministic per trial
+    if task_type == 'noise':
+        task_noise_vectors = [jnp.zeros((obs_dim,))]  # Task 0 = no noise (identical to non-continual)
+        for t in range(1, num_tasks):
+            task_rng, noise_key = random.split(task_rng)
+            nv = random.normal(noise_key, (obs_dim,)) * noise_range
+            task_noise_vectors.append(nv)
+        print(f"  Pre-generated {num_tasks} noise vectors (task 0 = zero noise)")
+    elif task_type == 'param':
+        task_param_values = [param_cfg['default_val']]  # Task 0 = default
+        for t in range(1, num_tasks):
+            task_rng, param_key = random.split(task_rng)
+            pv = float(random.uniform(param_key, minval=param_range[0], maxval=param_range[1]))
+            task_param_values.append(pv)
+        print(f"  Pre-generated {num_tasks} param values: {task_param_values}")
+    
+    # Initialize noise vector for Task 0
     noise_vector = jnp.zeros((obs_dim,))
     current_task = 0
-    print(f"\n  Task 0 (baseline): no noise")
+    
+    if task_type == 'noise':
+        noise_vector = task_noise_vectors[0]
+        print(f"\n  Task 0 noise: {jax.device_get(noise_vector)}")
+        print(f"  Noise magnitude: {float(jnp.linalg.norm(noise_vector)):.4f}")
+    elif task_type == 'param':
+        param_val = task_param_values[0]
+        env_params = env_params.replace(**{param_name: param_val})
+        print(f"\n  Task 0 {param_name}: {param_val:.4f}")
     
     # Helper function to save GIFs for current task
     def save_task_gifs(task_idx, noise_vec, task_name):
@@ -845,7 +968,6 @@ def main():
                 return
             
             num_gifs = 10
-            noise_mag = float(jnp.linalg.norm(noise_vec))
             
             # Create task-specific subdirectory with task name
             task_gifs_dir = os.path.join(gifs_dir, f"task_{task_idx:02d}_{task_name}")
@@ -888,27 +1010,105 @@ def main():
         except Exception as e:
             print(f"  Warning: Failed to save GIFs for task {task_idx}: {e}")
     
+    # Metrics tracking
+    solved_threshold = SOLVED_THRESHOLDS.get(env_name)
+    task_start_update = 0
+    task_updates_to_threshold = None
+    all_metrics = []
+    
+    # Zero-shot eval for task 0: evaluate random init on task 0
+    key, zt_key = random.split(key)
+    task_zt_mean, task_zt_std = jit_evaluate(
+        zt_key, policy_state.params, noise_vector, env_params
+    )
+    task_zt_mean = float(task_zt_mean)
+    task_zt_std = float(task_zt_std)
+    print(f"  Task 0 zero-shot: {task_zt_mean:.2f} +/- {task_zt_std:.2f}")
+    
     for update in range(num_updates):
         timestep = (update + 1) * timesteps_per_update
         
         # Check for task switch
         if update > 0 and update % task_interval == 0:
             # Save GIFs for the ending task BEFORE switching
-            prev_noise_mag = float(jnp.linalg.norm(noise_vector))
-            prev_task_name = "baseline" if current_task == 0 else f"noise_{prev_noise_mag:.2f}"
+            if task_type == 'noise':
+                prev_noise_mag = float(jnp.linalg.norm(noise_vector))
+                prev_task_name = f"noise_{prev_noise_mag:.2f}"
+            elif task_type == 'param':
+                prev_task_name = f"{param_name}_{float(getattr(env_params, param_name)):.4f}"
             save_task_gifs(current_task, noise_vector, prev_task_name)
             
+            # Per-task evaluation (10 trials) and checkpoint
+            key, task_eval_key = random.split(key)
+            task_eval_mean, task_eval_std = jit_evaluate(
+                task_eval_key, policy_state.params, noise_vector, env_params
+            )
+            task_eval_mean = float(task_eval_mean)
+            task_eval_std = float(task_eval_std)
+            print(f"  Task {current_task} eval: {task_eval_mean:.2f} ± {task_eval_std:.2f}")
+            task_ckpt_path = os.path.join(checkpoints_dir, f"task_{current_task}.pkl")
+            ckpt_data = {
+                'policy_params': policy_state.params,
+                'value_params': value_state.params,
+                'task_idx': current_task,
+                'task_type': task_type,
+                'update': update,
+                'best_fitness': float(task_best_reward),
+                'eval_mean': task_eval_mean,
+                'eval_std': task_eval_std,
+                'zero_shot_eval_mean': task_zt_mean,
+                'zero_shot_eval_std': task_zt_std,
+                'updates_to_threshold': task_updates_to_threshold,
+            }
+            if task_type == 'noise':
+                ckpt_data['noise_vector'] = jax.device_get(noise_vector)
+            elif task_type == 'param':
+                ckpt_data['param_name'] = param_name
+                ckpt_data['param_value'] = float(getattr(env_params, param_name))
+            with open(task_ckpt_path, 'wb') as f:
+                pickle.dump(ckpt_data, f)
+            print(f"    Saved task checkpoint: {task_ckpt_path}")
+            
+            # Store per-task metrics
+            all_metrics.append({
+                'task_idx': current_task,
+                'eval_mean': task_eval_mean,
+                'eval_std': task_eval_std,
+                'zero_shot_eval_mean': task_zt_mean,
+                'zero_shot_eval_std': task_zt_std,
+                'updates_to_threshold': task_updates_to_threshold,
+            })
+            
+            task_best_reward = -float('inf')  # Reset for next task
             current_task += 1
-            key, noise_key = random.split(key)
-            noise_vector = random.normal(noise_key, (obs_dim,)) * noise_range
-            print(f"\n>>> Task {current_task} started at update {update}")
-            print(f"  Noise vector: {jax.device_get(noise_vector)}")
-            print(f"  Noise magnitude: {float(jnp.linalg.norm(noise_vector)):.4f}")
+            task_start_update = update
+            task_updates_to_threshold = None
+            if task_type == 'noise':
+                noise_vector = task_noise_vectors[current_task]
+                print(f"\n>>> Task {current_task} started at update {update}")
+                print(f"  Noise vector: {jax.device_get(noise_vector)}")
+                print(f"  Noise magnitude: {float(jnp.linalg.norm(noise_vector)):.4f}")
+            elif task_type == 'param':
+                param_val = task_param_values[current_task]
+                env_params = env_params.replace(**{param_name: param_val})
+                print(f"\n>>> Task {current_task} started at update {update}")
+                print(f"  {param_name}: {param_val:.4f}")
+            
+            # Zero-shot evaluation on new task (before training)
+            key, zt_key = random.split(key)
+            task_zt_mean, task_zt_std = jit_evaluate(
+                zt_key, policy_state.params, noise_vector, env_params
+            )
+            task_zt_mean = float(task_zt_mean)
+            task_zt_std = float(task_zt_std)
+            print(f"  Task {current_task} zero-shot: {task_zt_mean:.2f} +/- {task_zt_std:.2f}")
+            wandb.summary[f"task_{current_task}_zero_shot_mean"] = task_zt_mean
+            wandb.summary[f"task_{current_task}_zero_shot_std"] = task_zt_std
         
         # Collect rollout with current noise
         key, rollout_key = random.split(key)
         rollout = jit_collect_rollout_fn(
-            rollout_key, policy_state.params, value_state.params, noise_vector
+            rollout_key, policy_state.params, value_state.params, noise_vector, env_params
         )
         
         # Compute advantages and returns (JIT-compiled vectorized GAE)
@@ -926,23 +1126,11 @@ def main():
             'returns': all_returns.reshape(batch_size),
         }
         
-        # Training epochs
-        for epoch in range(hp['num_epochs']):
-            # Shuffle
-            key, shuffle_key = random.split(key)
-            perm = random.permutation(shuffle_key, batch_size)
-            shuffled_batch = {k: v[perm] for k, v in flat_batch.items()}
-            
-            # Minibatches
-            minibatch_size = batch_size // hp['num_minibatches']
-            for mb in range(hp['num_minibatches']):
-                start_idx = mb * minibatch_size
-                end_idx = start_idx + minibatch_size
-                minibatch = {k: v[start_idx:end_idx] for k, v in shuffled_batch.items()}
-                
-                policy_state, value_state, loss, metrics = jit_train_step(
-                    policy_state, value_state, minibatch, ent_coef
-                )
+        # Training epochs (compiled as jax.lax.scan for speed)
+        key, sgd_key = random.split(key)
+        policy_state, value_state, loss, metrics = jit_sgd_epochs(
+            policy_state, value_state, flat_batch, ent_coef, sgd_key
+        )
         
         # TRAC: Update entropy coefficient
         if method == 'trac':
@@ -960,13 +1148,22 @@ def main():
         # Evaluate
         if (update + 1) % args.eval_interval == 0 or update == num_updates - 1:
             key, eval_key = random.split(key)
-            mean_reward, std_reward = evaluate(
-                eval_key, policy_network, policy_state.params,
-                env, env_params, noise_vector, args.num_eval_episodes, hp['episode_length']
+            mean_reward, std_reward = jit_evaluate(
+                eval_key, policy_state.params, noise_vector, env_params
             )
+            mean_reward = float(mean_reward)
+            std_reward = float(std_reward)
             
             if mean_reward > best_reward:
                 best_reward = mean_reward
+            if mean_reward > task_best_reward:
+                task_best_reward = mean_reward
+            
+            # Track updates to threshold (SU metric)
+            if solved_threshold is not None and task_updates_to_threshold is None:
+                if mean_reward >= solved_threshold:
+                    task_updates_to_threshold = (update + 1) - task_start_update
+                    print(f"  Task {current_task} reached threshold {solved_threshold} at update {update+1} (updates_in_task={task_updates_to_threshold})")
             
             elapsed = time.time() - start_time
             
@@ -981,11 +1178,12 @@ def main():
                 'pg_loss': float(metrics['pg_loss']),
                 'vf_loss': float(metrics['vf_loss']),
                 'ent_coef': float(ent_coef) if method in ['trac'] else args.ent_coef,
-                'noise_magnitude': float(jnp.linalg.norm(noise_vector)),
+                'noise_magnitude': float(jnp.linalg.norm(noise_vector)) if task_type == 'noise' else 0.0,
+                'param_value': float(getattr(env_params, param_name)) if task_type == 'param' else None,
                 'elapsed_time': elapsed,
             })
             
-            wandb.log({
+            log_dict = {
                 'timestep': timestep,
                 'task': current_task,
                 'eval/mean_reward': mean_reward,
@@ -994,8 +1192,12 @@ def main():
                 'train/pg_loss': metrics['pg_loss'],
                 'train/vf_loss': metrics['vf_loss'],
                 'train/ent_coef': ent_coef if method == 'trac' else args.ent_coef,
-                'noise_magnitude': float(jnp.linalg.norm(noise_vector)),
-            })
+            }
+            if task_type == 'noise':
+                log_dict['noise_magnitude'] = float(jnp.linalg.norm(noise_vector))
+            elif task_type == 'param':
+                log_dict[param_name] = float(getattr(env_params, param_name))
+            wandb.log(log_dict)
             
             print(f"Update {update+1:5d} | Task {current_task} | Timestep {timestep:10,} | "
                   f"Reward: {mean_reward:8.2f} ± {std_reward:.2f} | Best: {best_reward:8.2f}")
@@ -1004,39 +1206,24 @@ def main():
     print(f"\nTraining complete! Time: {total_time:.1f}s, Best (training): {best_reward:.2f}")
     
     # Final evaluation with 10 trials
-    print(f"\nFinal evaluation (10 trials) on Task {current_task} with noise magnitude {float(jnp.linalg.norm(noise_vector)):.4f}...")
-    final_eval_rewards = []
-    for eval_trial in range(10):
-        key, eval_key = random.split(key)
-        obs, env_state = env.reset(eval_key, env_params)
-        trial_reward = 0.0
-        for step in range(hp['episode_length']):
-            noisy_obs = obs + noise_vector
-            logits = policy_network.apply(policy_state.params, noisy_obs)
-            action = jnp.argmax(logits)
-            eval_key, step_key = random.split(eval_key)
-            obs, env_state, reward, done, _ = env.step(step_key, env_state, action, env_params)
-            trial_reward += float(reward)
-            if bool(done):
-                break
-        final_eval_rewards.append(trial_reward)
-        print(f"  Trial {eval_trial + 1}: {trial_reward:.2f}")
-    
-    final_mean = float(np.mean(final_eval_rewards))
-    final_std = float(np.std(final_eval_rewards))
-    final_max = float(np.max(final_eval_rewards))
-    final_min = float(np.min(final_eval_rewards))
+    if task_type == 'noise':
+        print(f"\nFinal evaluation (10 trials) on Task {current_task} with noise magnitude {float(jnp.linalg.norm(noise_vector)):.4f}...")
+    elif task_type == 'param':
+        print(f"\nFinal evaluation (10 trials) on Task {current_task} with {param_name} {float(getattr(env_params, param_name)):.4f}...")
+    key, final_eval_key = random.split(key)
+    final_mean, final_std = jit_evaluate(
+        final_eval_key, policy_state.params, noise_vector, env_params
+    )
+    final_mean = float(final_mean)
+    final_std = float(final_std)
     
     print(f"\nFinal evaluation results:")
     print(f"  Mean: {final_mean:.2f} +/- {final_std:.2f}")
-    print(f"  Min: {final_min:.2f}, Max: {final_max:.2f}")
     print(f"  Training best: {best_reward:.2f}")
     
     wandb.log({
         "final_eval_mean": final_mean,
         "final_eval_std": final_std,
-        "final_eval_max": final_max,
-        "final_eval_min": final_min,
     })
     
     # Save checkpoint
@@ -1058,9 +1245,69 @@ def main():
         json.dump(training_metrics, f, indent=2)
     
     # Save GIFs for the final task
-    final_noise_mag = float(jnp.linalg.norm(noise_vector))
-    final_task_name = "baseline" if current_task == 0 else f"noise_{final_noise_mag:.2f}"
+    if task_type == 'noise':
+        final_noise_mag = float(jnp.linalg.norm(noise_vector))
+        final_task_name = f"noise_{final_noise_mag:.2f}"
+    elif task_type == 'param':
+        final_task_name = f"{param_name}_{float(getattr(env_params, param_name)):.4f}"
     save_task_gifs(current_task, noise_vector, final_task_name)
+    
+    # Save final task checkpoint
+    task_ckpt_path = os.path.join(checkpoints_dir, f"task_{current_task}.pkl")
+    final_ckpt_data = {
+        'policy_params': policy_state.params,
+        'value_params': value_state.params,
+        'task_idx': current_task,
+        'task_type': task_type,
+        'update': num_updates,
+        'best_fitness': float(task_best_reward),
+        'eval_mean': final_mean,
+        'eval_std': final_std,
+        'zero_shot_eval_mean': task_zt_mean,
+        'zero_shot_eval_std': task_zt_std,
+        'updates_to_threshold': task_updates_to_threshold,
+    }
+    if task_type == 'noise':
+        final_ckpt_data['noise_vector'] = jax.device_get(noise_vector)
+    elif task_type == 'param':
+        final_ckpt_data['param_name'] = param_name
+        final_ckpt_data['param_value'] = float(getattr(env_params, param_name))
+    with open(task_ckpt_path, 'wb') as f:
+        pickle.dump(final_ckpt_data, f)
+    print(f"Saved final task checkpoint: {task_ckpt_path}")
+    
+    # Store final task metrics
+    all_metrics.append({
+        'task_idx': current_task,
+        'eval_mean': final_mean,
+        'eval_std': final_std,
+        'zero_shot_eval_mean': task_zt_mean,
+        'zero_shot_eval_std': task_zt_std,
+        'updates_to_threshold': task_updates_to_threshold,
+    })
+    
+    # Compute aggregate metrics and save to YAML
+    num_tasks = len(all_metrics)
+    num_solved = sum(1 for m in all_metrics if solved_threshold is not None and m['eval_mean'] >= solved_threshold)
+    success_rate = num_solved / num_tasks if num_tasks > 0 else 0.0
+    zt_values = [m['zero_shot_eval_mean'] for m in all_metrics]
+    
+    summary_metrics = {
+        'method': method,
+        'env': env_name,
+        'task_type': task_type,
+        'num_tasks': num_tasks,
+        'solved_threshold': solved_threshold,
+        'success_rate': success_rate,
+        'num_solved': num_solved,
+        'zero_shot_transfer_mean': float(np.mean(zt_values)),
+        'zero_shot_transfer_std': float(np.std(zt_values)),
+        'per_task': all_metrics,
+    }
+    metrics_yaml_path = os.path.join(output_dir, "metrics.yaml")
+    with open(metrics_yaml_path, 'w') as f:
+        yaml.dump(summary_metrics, f, default_flow_style=False)
+    print(f"Saved metrics: {metrics_yaml_path}")
     
     wandb.finish()
     print("Done!")

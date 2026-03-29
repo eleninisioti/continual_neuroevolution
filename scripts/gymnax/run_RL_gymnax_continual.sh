@@ -9,14 +9,14 @@ set -e
 
 # Configuration
 NUM_TRIALS="${NUM_TRIALS:-1}"
-METHODS="${1:-ppo trac redo}"
+METHODS="${1:-ppo}"
 ENVS="${ENVS:- MountainCar-v0}"
 
 # Map methods to GPUs
 declare -A METHOD_GPU
-METHOD_GPU[ppo]=7
-METHOD_GPU[trac]=7
-METHOD_GPU[redo]=7
+METHOD_GPU[ppo]=3
+METHOD_GPU[trac]=1
+METHOD_GPU[redo]=1
 
 echo "=========================================="
 echo "PPO/TRAC/ReDo on Gymnax (Continual)"

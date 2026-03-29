@@ -1,8 +1,12 @@
 """
 Train DNS (Dominated Novelty Search) on Gymnax environments (CONTINUAL).
 
-Task changes every 200 generations by adding observation noise.
-Noise vector = normal(obs_size) * noise_range
+Task changes every 200 generations by either:
+  - Adding observation noise (task_type=noise)
+  - Varying an environment parameter (task_type=param):
+      CartPole: gravity [0.98, 98.0] (default 9.8, factor of 10)
+      MountainCar: gravity [0.000833, 0.0075] (default 0.0025, factor of 3)
+      Acrobot: link_length_1 [0.5, 2.0] (default 1.0)
 
 Custom DNS implementation matching the mujoco version.
 
@@ -10,7 +14,7 @@ Supports CartPole-v1, Acrobot-v1, MountainCar-v0.
 
 Usage:
     python train_DNS_gymnax_continual.py --env CartPole-v1 --gpus 0
-    python train_DNS_gymnax_continual.py --env Acrobot-v1 --gpus 0
+    python train_DNS_gymnax_continual.py --env CartPole-v1 --task_type param --gpus 0
 """
 
 import argparse
@@ -45,10 +49,18 @@ import pickle
 import wandb
 import numpy as np
 import imageio
+import yaml
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+
+# Solved thresholds for Speed-Up (SU) metric
+SOLVED_THRESHOLDS = {
+    'CartPole-v1': 475,
+    'Acrobot-v1': -70,
+    'MountainCar-v0': -110,
+}
 
 
 # ============================================================================
@@ -84,7 +96,7 @@ ENV_CONFIGS = {
         "batch_size": 256,
         "hidden_dims": (16, 16),
         "episode_length": 500,
-        "num_evals": 1,
+        "num_evals": 10,
         "k": 3,
         "iso_sigma": 0.05,
         "line_sigma": 0.5,
@@ -97,7 +109,7 @@ ENV_CONFIGS = {
         "batch_size": 256,
         "hidden_dims": (32, 32),
         "episode_length": 500,
-        "num_evals": 1,
+        "num_evals": 10,
         "k": 3,
         "iso_sigma": 0.05,
         "line_sigma": 0.5,
@@ -110,7 +122,7 @@ ENV_CONFIGS = {
         "batch_size": 256,
         "hidden_dims": (32, 32),
         "episode_length": 500,
-        "num_evals": 1,
+        "num_evals": 10,
         "k": 3,
         "iso_sigma": 0.05,
         "line_sigma": 0.5,
@@ -159,19 +171,48 @@ def create_policy_network(key, obs_dim, action_dim, hidden_dims=(16, 16)):
 # DNS Algorithm
 # ============================================================================
 
-def compute_novelty(descriptors: jnp.ndarray, k: int = 3) -> jnp.ndarray:
-    """Compute novelty scores as average distance to k nearest neighbors."""
-    descriptors = jnp.nan_to_num(descriptors, nan=0.0, posinf=0.0, neginf=0.0)
+def _compute_dominated_novelty(fitness, descriptor, k):
+    """Compute dominated novelty — exact port of QDax dns_repertoire.py.
     
-    diffs = descriptors[:, None, :] - descriptors[None, :, :]
-    distances = jnp.linalg.norm(diffs, axis=-1)
-    distances = distances + jnp.eye(distances.shape[0]) * 1e10
-    
-    k_nearest_distances = jnp.sort(distances, axis=1)[:, :k]
-    novelty = jnp.mean(k_nearest_distances, axis=1)
-    novelty = jnp.nan_to_num(novelty, nan=0.0, posinf=0.0, neginf=0.0)
-    
-    return novelty
+    For each individual, dominated novelty is the mean distance in descriptor
+    space to the k nearest neighbors that have fitness >= its own.
+    Returns NaN for the fittest individuals (no fitter neighbors exist).
+    NaN sorts highest in descending argsort, so they are always kept.
+    """
+    n = fitness.shape[0]
+    if n <= 1:
+        return jnp.full(n, jnp.nan)
+    k = min(k, n - 1)
+    valid = fitness != -jnp.inf
+
+    # Neighbor mask excluding self
+    neighbor = valid[:, None] & valid[None, :]
+    neighbor = neighbor & ~jnp.eye(n, dtype=bool)
+
+    # Fitter-or-equal mask: fitter[i,j] = True if fitness[j] >= fitness[i]
+    fitter = fitness[:, None] <= fitness[None, :]
+    fitter = jnp.where(neighbor, fitter, False)
+
+    # Pairwise distances
+    distance = jnp.linalg.norm(
+        descriptor[:, None, :] - descriptor[None, :, :], axis=-1
+    )
+    distance = jnp.where(neighbor, distance, jnp.inf)
+
+    # Distances to fitter neighbors only
+    distance_fitter = jnp.where(fitter, distance, jnp.inf)
+
+    # Dominated novelty: mean distance to k nearest fitter neighbors
+    values_fit, indices_fit = jax.vmap(
+        lambda x: jax.lax.top_k(-x, k)
+    )(distance_fitter)
+    dominated_novelty = jnp.mean(
+        -values_fit,
+        axis=-1,
+        where=jnp.take_along_axis(fitter, indices_fit, axis=-1),
+    )
+
+    return dominated_novelty
 
 
 def dns_selection(
@@ -179,37 +220,39 @@ def dns_selection(
     new_genotypes, new_fitnesses, new_descriptors,
     population_size, k,
 ):
-    """DNS selection: combine parent and offspring, select based on combined fitness+novelty score."""
+    """DNS selection — follows QDax DominatedNoveltyRepertoire.add().
+    
+    Combines parents and offspring, computes dominated novelty on the combined
+    pool, and keeps the top population_size individuals by dominated novelty.
+    """
+    # Combine candidates
     combined_genotypes = jnp.concatenate([genotypes, new_genotypes], axis=0)
     combined_fitnesses = jnp.concatenate([fitnesses, new_fitnesses], axis=0)
     combined_descriptors = jnp.concatenate([descriptors, new_descriptors], axis=0)
-    
-    combined_novelties = compute_novelty(combined_descriptors, k)
-    combined_fitnesses = jnp.nan_to_num(combined_fitnesses, nan=-1e6, posinf=1e6, neginf=-1e6)
-    
-    # Normalize fitness to [0, 1]
-    f_min, f_max = jnp.min(combined_fitnesses), jnp.max(combined_fitnesses)
-    f_range = jnp.maximum(f_max - f_min, 1e-8)
-    norm_fitness = (combined_fitnesses - f_min) / f_range
-    
-    # Normalize novelty to [0, 1]
-    n_min, n_max = jnp.min(combined_novelties), jnp.max(combined_novelties)
-    n_range = jnp.maximum(n_max - n_min, 1e-8)
-    norm_novelty = (combined_novelties - n_min) / n_range
-    
-    combined_scores = jnp.nan_to_num(norm_fitness + norm_novelty, nan=-1e6)
-    selected_indices = jnp.argsort(combined_scores)[-population_size:]
-    
+
+    # Compute dominated novelty on combined pool
+    dominated_novelty = _compute_dominated_novelty(
+        combined_fitnesses, combined_descriptors, k
+    )
+
+    # Use dominated novelty as meta-fitness, invalid individuals get -inf
+    valid = combined_fitnesses != -jnp.inf
+    meta_fitness = jnp.where(valid, dominated_novelty, -jnp.inf)
+
+    # Select survivors (NaN from fittest individuals sorts highest in descending order)
+    indices = jnp.argsort(meta_fitness)[::-1]
+    survivor_indices = indices[:population_size]
+
     return (
-        combined_genotypes[selected_indices],
-        combined_fitnesses[selected_indices],
-        combined_descriptors[selected_indices],
-        combined_novelties[selected_indices],
+        combined_genotypes[survivor_indices],
+        combined_fitnesses[survivor_indices],
+        combined_descriptors[survivor_indices],
+        dominated_novelty[survivor_indices],
     )
 
 
 def isoline_variation(genotypes, key, iso_sigma=0.05, line_sigma=0.5, batch_size=256):
-    """Isoline variation operator for generating offspring."""
+    """Iso+Line-DD variation operator — exact port of QDax mutation_operators.py."""
     pop_size = genotypes.shape[0]
     param_dim = genotypes.shape[1]
     
@@ -217,14 +260,16 @@ def isoline_variation(genotypes, key, iso_sigma=0.05, line_sigma=0.5, batch_size
     parent1_indices = random.randint(k1, (batch_size,), 0, pop_size)
     parent2_indices = random.randint(k2, (batch_size,), 0, pop_size)
     
-    parent1 = genotypes[parent1_indices]
-    parent2 = genotypes[parent2_indices]
+    x1 = genotypes[parent1_indices]
+    x2 = genotypes[parent2_indices]
     
-    alpha = random.uniform(k3, (batch_size, param_dim), minval=-line_sigma, maxval=1.0 + line_sigma)
-    offspring = parent1 + alpha * (parent2 - parent1)
+    # QDax: line_noise is a scalar per individual from normal distribution
+    line_noise = random.normal(k3, (batch_size,)) * line_sigma
+    # QDax: iso_noise is per-parameter from normal distribution
+    iso_noise = random.normal(k4, (batch_size, param_dim)) * iso_sigma
     
-    noise = random.normal(k4, (batch_size, param_dim)) * iso_sigma
-    offspring = offspring + noise
+    # QDax formula: offspring = (x1 + iso_noise) + (x2 - x1) * line_noise
+    offspring = (x1 + iso_noise) + (x2 - x1) * line_noise[:, None]
     
     return offspring
 
@@ -367,15 +412,17 @@ def get_render_fn(env_name):
 # Scoring Function with Observation Noise
 # ============================================================================
 
-def make_scoring_fn(env, env_params, policy, param_template, episode_length, env_name, num_evals=10):
+def make_scoring_fn(env, policy, param_template, episode_length, env_name, num_evals=10):
     """Create scoring function that returns fitness and behavioral descriptor with noise.
     
     Evaluates each individual with num_evals trials:
     - Returns fitness from FIRST trial only (for selection)
     - Returns mean fitness across all trials (for logging/tracking)
+    
+    env_params is passed as an argument (not closure-captured) so it can change per task.
     """
     
-    def evaluate_single(flat_params, eval_key, noise_vector):
+    def evaluate_single(flat_params, eval_key, noise_vector, env_params):
         """Evaluate a single individual and return fitness + descriptor."""
         params = unflatten_params(flat_params, param_template)
         obs, state = env.reset(eval_key, env_params)
@@ -412,17 +459,17 @@ def make_scoring_fn(env, env_params, policy, param_template, episode_length, env
         
         return total_reward, descriptor
     
-    vmapped_eval = jax.vmap(evaluate_single, in_axes=(0, 0, None))
+    vmapped_eval = jax.vmap(evaluate_single, in_axes=(0, 0, None, None))
     
     @jax.jit
-    def scoring_fn(flat_genotypes, key, noise_vector):
+    def scoring_fn(flat_genotypes, key, noise_vector, env_params):
         """Returns (fitness_for_selection, descriptors, mean_fitness_for_logging)."""
         pop_size = flat_genotypes.shape[0]
         
         # Always evaluate with num_evals trials per individual
         all_keys = random.split(key, pop_size * num_evals)
         flat_params_repeated = jnp.repeat(flat_genotypes, num_evals, axis=0)
-        all_fitnesses, all_descriptors = vmapped_eval(flat_params_repeated, all_keys, noise_vector)
+        all_fitnesses, all_descriptors = vmapped_eval(flat_params_repeated, all_keys, noise_vector, env_params)
         all_fitnesses = all_fitnesses.reshape(pop_size, num_evals)
         all_descriptors = all_descriptors.reshape(pop_size, num_evals, -1)
         
@@ -438,8 +485,10 @@ def make_scoring_fn(env, env_params, policy, param_template, episode_length, env
     return scoring_fn
 
 
-def rollout_for_gif(env, env_params, policy, flat_params, param_template, episode_length, key, noise_vector):
-    """Rollout for GIF generation with noise."""
+def rollout_for_gif(env, env_params, policy, flat_params, param_template, episode_length, key, noise_vector=None):
+    """Rollout for GIF generation."""
+    if noise_vector is None:
+        noise_vector = jnp.zeros(env.observation_space(env_params).shape)
     params = unflatten_params(flat_params, param_template)
     obs, state = env.reset(key, env_params)
     
@@ -513,6 +562,11 @@ def parse_args():
     parser.add_argument('--task_interval', type=int, default=200)
     parser.add_argument('--noise_range', type=float, default=1.0,
                         help='Scale for observation noise (task definition)')
+    parser.add_argument('--task_type', type=str, default='noise',
+                        choices=['noise', 'param'],
+                        help='Type of task variation: noise (obs noise) or param (vary env parameter)')
+    parser.add_argument('--param_range', type=float, nargs=2, default=None,
+                        help='Range [min, max] for param sampling (task_type=param). Default: env-specific.')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--trial', type=int, default=1)
     parser.add_argument('--gpus', type=str, default=None)
@@ -537,7 +591,8 @@ def main():
     cfg = ENV_CONFIGS[env_name]
     num_generations = args.num_generations or cfg["num_generations"]
     pop_size = args.pop_size or cfg["pop_size"]
-    batch_size = args.batch_size or cfg["batch_size"]
+    batch_size = args.batch_size if args.batch_size is not None else max(1, pop_size // 2)
+    batch_size = min(batch_size, pop_size)
     hidden_dims = cfg["hidden_dims"]
     episode_length = cfg["episode_length"]
     num_evals = args.num_evals or cfg["num_evals"]
@@ -546,11 +601,24 @@ def main():
     line_sigma = args.line_sigma or cfg["line_sigma"]
     task_interval = args.task_interval
     noise_range = args.noise_range
+    task_type = args.task_type
     
-    output_dir = args.output_dir or f"projects/gymnax/dns_{env_name}_continual/trial_{trial}"
+    # Environment-specific parameter variation config
+    PARAM_CONFIGS = {
+        'CartPole-v1': {'param_name': 'gravity', 'default_val': 9.8, 'default_range': [0.98, 98.0]},
+        'MountainCar-v0': {'param_name': 'gravity', 'default_val': 0.0025, 'default_range': [0.000833, 0.0075]},
+        'Acrobot-v1': {'param_name': 'link_length_1', 'default_val': 1.0, 'default_range': [0.5, 2.0]},
+    }
+    param_cfg = PARAM_CONFIGS[env_name]
+    param_name = param_cfg['param_name']
+    param_range = args.param_range if args.param_range is not None else param_cfg['default_range']
+    
+    output_dir = args.output_dir or f"projects/gymnax/dns_{env_name}_continual_{task_type}/trial_{trial}"
     os.makedirs(output_dir, exist_ok=True)
     gifs_dir = os.path.join(output_dir, "gifs")
     os.makedirs(gifs_dir, exist_ok=True)
+    checkpoints_dir = os.path.join(output_dir, "checkpoints")
+    os.makedirs(checkpoints_dir, exist_ok=True)
     
     # Set up logging to file
     log_file = os.path.join(output_dir, "train.log")
@@ -562,7 +630,10 @@ def main():
     print(f"  Generations: {num_generations}")
     print(f"  Population: {pop_size}, Batch: {batch_size}")
     print(f"  Task interval: {task_interval} gens")
-    print(f"  Noise range: {noise_range}")
+    if task_type == 'noise':
+        print(f"  Task type: noise, range: {noise_range}")
+    elif task_type == 'param':
+        print(f"  Task type: param ({param_name}), range: {param_range}")
     print(f"  k (novelty neighbors): {k}")
     print(f"  iso_sigma: {iso_sigma}, line_sigma: {line_sigma}")
     print(f"  Num evals: {num_evals}")
@@ -579,6 +650,24 @@ def main():
     obs_dim = obs.shape[-1]
     action_dim = env.action_space(env_params).n
     
+    # Pre-generate deterministic task sequence (same across methods for same trial)
+    num_tasks = num_generations // task_interval
+    task_rng = jax.random.key(trial * 7919)  # Separate RNG, deterministic per trial
+    if task_type == 'noise':
+        task_noise_vectors = [jnp.zeros((obs_dim,))]  # Task 0 = no noise (identical to non-continual)
+        for t in range(1, num_tasks):
+            task_rng, noise_key = random.split(task_rng)
+            nv = random.normal(noise_key, (obs_dim,)) * noise_range
+            task_noise_vectors.append(nv)
+        print(f"  Pre-generated {num_tasks} noise vectors (task 0 = zero noise)")
+    elif task_type == 'param':
+        task_param_values = [param_cfg['default_val']]  # Task 0 = default
+        for t in range(1, num_tasks):
+            task_rng, param_key = random.split(task_rng)
+            pv = float(random.uniform(param_key, minval=param_range[0], maxval=param_range[1]))
+            task_param_values.append(pv)
+        print(f"  Pre-generated {num_tasks} param values: {task_param_values}")
+    
     print(f"  Obs dim: {obs_dim}, Action dim: {action_dim}")
     
     # Create policy
@@ -589,7 +678,7 @@ def main():
     print(f"  Network: {hidden_dims}, {num_params} params")
     
     # Create scoring function
-    scoring_fn = make_scoring_fn(env, env_params, policy, param_template, episode_length, env_name, num_evals)
+    scoring_fn = make_scoring_fn(env, policy, param_template, episode_length, env_name, num_evals)
     
     # Initialize wandb
     config = {
@@ -598,29 +687,38 @@ def main():
         'iso_sigma': iso_sigma, 'line_sigma': line_sigma,
         'seed': seed, 'trial': trial, 'num_evals': num_evals,
         'hidden_dims': hidden_dims, 'task_interval': task_interval,
-        'noise_range': noise_range, 'continual': True,
+        'task_type': task_type, 'noise_range': noise_range,
+        'param_name': param_name, 'param_range': param_range, 'continual': True,
     }
     wandb.init(project=args.wandb_project, config=config,
-               name=f"dns_{env_name}_continual_trial{trial}", reinit=True)
+               name=f"dns_{env_name}_continual_{task_type}_pop{pop_size}_trial{trial}", reinit=True)
     
     # Initialize population
     key, pop_key = jax.random.split(key)
     population = random.normal(pop_key, (pop_size, num_params)) * 0.1
     
     # Generate initial noise vector (task 0)
-    key, noise_key = random.split(key)
-    noise_vector = random.normal(noise_key, (obs_dim,)) * noise_range
+    noise_vector = jnp.zeros((obs_dim,))
     current_task = 0
+    
+    if task_type == 'noise':
+        noise_vector = task_noise_vectors[0]
+    elif task_type == 'param':
+        param_val = task_param_values[0]
+        env_params = env_params.replace(**{param_name: param_val})
     
     # Initial evaluation
     print(f"\nEvaluating initial population...")
     key, eval_key = jax.random.split(key)
-    fitnesses, descriptors, mean_fitnesses = scoring_fn(population, eval_key, noise_vector)
-    novelties = compute_novelty(descriptors, k)
+    fitnesses, descriptors, mean_fitnesses = scoring_fn(population, eval_key, noise_vector, env_params)
+    novelties = _compute_dominated_novelty(fitnesses, descriptors, k)
     
     print(f"  Initial best fitness (mean-of-10): {float(jnp.max(mean_fitnesses)):.2f}")
-    print(f"  Task 0 noise vector: {jax.device_get(noise_vector)}")
-    print(f"  Noise magnitude: {float(jnp.linalg.norm(noise_vector)):.4f}")
+    if task_type == 'noise':
+        print(f"  Task 0 noise vector: {jax.device_get(noise_vector)}")
+        print(f"  Noise magnitude: {float(jnp.linalg.norm(noise_vector)):.4f}")
+    elif task_type == 'param':
+        print(f"  Task 0 {param_name}: {float(getattr(env_params, param_name)):.4f}")
     
     # Training loop
     best_overall_fitness = -float('inf')
@@ -631,6 +729,26 @@ def main():
     start_time = time.time()
     render_fn = get_render_fn(env_name)
     
+    # Metrics tracking
+    solved_threshold = SOLVED_THRESHOLDS.get(env_name)
+    task_start_gen = 0
+    task_gens_to_threshold = None
+    all_metrics = []
+    
+    # Zero-shot eval for task 0: evaluate a random individual on task 0
+    zt_params = jax.device_get(population[0])
+    zt_rewards = []
+    for eval_trial in range(10):
+        key, eval_key_trial = random.split(key)
+        _, trial_reward = rollout_for_gif(
+            env, env_params, policy, zt_params, param_template,
+            episode_length, eval_key_trial, noise_vector
+        )
+        zt_rewards.append(trial_reward)
+    task_zt_mean = float(np.mean(zt_rewards))
+    task_zt_std = float(np.std(zt_rewards))
+    print(f"  Task 0 zero-shot: {task_zt_mean:.2f} +/- {task_zt_std:.2f}")
+    
     print(f"\nStarting continual training...")
     
     for gen in range(num_generations):
@@ -639,11 +757,26 @@ def main():
             # Save 10 GIFs for THIS TASK before switching
             fitness_host = jax.device_get(fitnesses)
             population_host = jax.device_get(population)
-            current_best_idx = int(np.argmax(fitness_host))
-            current_best_fitness = float(np.max(fitness_host))
+            # Use best from current population (end of task)
+            mean_fitness_host_task = jax.device_get(mean_fitnesses)
+            current_best_idx = int(np.argmax(mean_fitness_host_task))
             current_best_params = population_host[current_best_idx].copy()
             
-            print(f"  Debug: task_best_fitness={task_best_fitness:.2f}, current_gen_best={current_best_fitness:.2f}")
+            # Per-task evaluation with 10 trials
+            print(f"\n  Task {current_task} final evaluation (10 trials)...")
+            task_eval_rewards = []
+            for eval_trial in range(10):
+                key, eval_key_trial = random.split(key)
+                _, trial_reward = rollout_for_gif(
+                    env, env_params, policy, current_best_params, param_template,
+                    episode_length, eval_key_trial, noise_vector
+                )
+                task_eval_rewards.append(trial_reward)
+            task_eval_mean = float(np.mean(task_eval_rewards))
+            task_eval_std = float(np.std(task_eval_rewards))
+            print(f"  Task {current_task} eval: {task_eval_mean:.2f} +/- {task_eval_std:.2f}")
+            wandb.summary[f"task_{current_task}_eval_mean"] = task_eval_mean
+            wandb.summary[f"task_{current_task}_eval_std"] = task_eval_std
             
             # Create task subfolder and save 10 GIFs
             task_gif_dir = os.path.join(gifs_dir, f"task{current_task}")
@@ -672,13 +805,68 @@ def main():
             except Exception as e:
                 print(f"  Warning: Failed to save GIFs: {e}")
             
+            # Save per-task checkpoint
+            task_ckpt_path = os.path.join(checkpoints_dir, f"task_{current_task}.pkl")
+            ckpt_data = {
+                'flat_params': np.array(current_best_params),
+                'task_idx': current_task,
+                'task_type': task_type,
+                'generation': gen,
+                'best_fitness': float(task_best_fitness),
+                'eval_mean': task_eval_mean,
+                'eval_std': task_eval_std,
+                'zero_shot_eval_mean': task_zt_mean,
+                'zero_shot_eval_std': task_zt_std,
+                'gens_to_threshold': task_gens_to_threshold,
+            }
+            if task_type == 'noise':
+                ckpt_data['noise_vector'] = jax.device_get(noise_vector)
+            elif task_type == 'param':
+                ckpt_data['param_name'] = param_name
+                ckpt_data['param_value'] = float(getattr(env_params, param_name))
+            with open(task_ckpt_path, 'wb') as f:
+                pickle.dump(ckpt_data, f)
+            print(f"    Saved task checkpoint: {task_ckpt_path}")
+            
+            # Store per-task metrics
+            all_metrics.append({
+                'task_idx': current_task,
+                'eval_mean': task_eval_mean,
+                'eval_std': task_eval_std,
+                'zero_shot_eval_mean': task_zt_mean,
+                'zero_shot_eval_std': task_zt_std,
+                'gens_to_threshold': task_gens_to_threshold,
+            })
+
             # Switch to new task
             current_task += 1
-            key, noise_key = random.split(key)
-            noise_vector = random.normal(noise_key, (obs_dim,)) * noise_range
-            print(f"\n>>> Task {current_task} started at gen {gen}")
-            print(f"  Full noise: {jax.device_get(noise_vector)}")
-            print(f"  Noise magnitude: {float(jnp.linalg.norm(noise_vector)):.4f}")
+            task_start_gen = gen
+            task_gens_to_threshold = None
+            if task_type == 'noise':
+                noise_vector = task_noise_vectors[current_task]
+                print(f"\n>>> Task {current_task} started at gen {gen}")
+                print(f"  Full noise: {jax.device_get(noise_vector)}")
+                print(f"  Noise magnitude: {float(jnp.linalg.norm(noise_vector)):.4f}")
+            elif task_type == 'param':
+                param_val = task_param_values[current_task]
+                env_params = env_params.replace(**{param_name: param_val})
+                print(f"\n>>> Task {current_task} started at gen {gen}")
+                print(f"  {param_name}: {param_val:.4f}")
+            
+            # Zero-shot evaluation on new task (before training)
+            zt_rewards = []
+            for eval_trial in range(10):
+                key, eval_key_trial = random.split(key)
+                _, trial_reward = rollout_for_gif(
+                    env, env_params, policy, current_best_params, param_template,
+                    episode_length, eval_key_trial, noise_vector
+                )
+                zt_rewards.append(trial_reward)
+            task_zt_mean = float(np.mean(zt_rewards))
+            task_zt_std = float(np.std(zt_rewards))
+            print(f"  Task {current_task} zero-shot: {task_zt_mean:.2f} +/- {task_zt_std:.2f}")
+            wandb.summary[f"task_{current_task}_zero_shot_mean"] = task_zt_mean
+            wandb.summary[f"task_{current_task}_zero_shot_std"] = task_zt_std
             
             # Reset task-specific best tracking for new task
             task_best_fitness = -float('inf')
@@ -686,8 +874,8 @@ def main():
             
             # Re-evaluate population with new noise
             key, eval_key = jax.random.split(key)
-            fitnesses, descriptors, mean_fitnesses = scoring_fn(population, eval_key, noise_vector)
-            novelties = compute_novelty(descriptors, k)
+            fitnesses, descriptors, mean_fitnesses = scoring_fn(population, eval_key, noise_vector, env_params)
+            novelties = _compute_dominated_novelty(fitnesses, descriptors, k)
         
         # Generate offspring
         key, var_key = jax.random.split(key)
@@ -695,7 +883,7 @@ def main():
         
         # Evaluate offspring
         key, eval_key = jax.random.split(key)
-        offspring_fitnesses, offspring_descriptors, offspring_mean_fitnesses = scoring_fn(offspring, eval_key, noise_vector)
+        offspring_fitnesses, offspring_descriptors, offspring_mean_fitnesses = scoring_fn(offspring, eval_key, noise_vector, env_params)
         
         # DNS selection (uses single-trial fitness for selection)
         population, fitnesses, descriptors, novelties = dns_selection(
@@ -707,7 +895,7 @@ def main():
         # Re-evaluate population to get mean fitness for logging
         # (since DNS selection mixed parents and offspring, we need fresh mean_fitnesses)
         key, eval_key = jax.random.split(key)
-        _, _, mean_fitnesses = scoring_fn(population, eval_key, noise_vector)
+        _, _, mean_fitnesses = scoring_fn(population, eval_key, noise_vector, env_params)
         
         # Copy to host for numpy operations - use mean-of-10 for tracking
         mean_fitness_host = jax.device_get(mean_fitnesses)
@@ -722,6 +910,12 @@ def main():
             task_best_fitness = gen_best
             task_best_params = population_host[best_idx].copy()
         
+        # Track generations to threshold (SU metric)
+        if solved_threshold is not None and task_gens_to_threshold is None:
+            if gen_best >= solved_threshold:
+                task_gens_to_threshold = gen - task_start_gen
+                print(f"  Task {current_task} reached threshold {solved_threshold} at gen {gen} (gens_in_task={task_gens_to_threshold})")
+        
         # Update overall best (for checkpoint)
         if gen_best > best_overall_fitness:
             best_overall_fitness = gen_best
@@ -732,13 +926,17 @@ def main():
         genomic_div = compute_genomic_diversity(population)
         mean_novelty = float(jnp.nanmean(novelties))
         
-        wandb.log({
+        log_dict = {
             "generation": gen, "best_fitness": gen_best,
             "mean_fitness": gen_mean, "best_overall": best_overall_fitness,
             "fitness_diversity": fitness_div, "genomic_diversity": genomic_div,
             "mean_novelty": mean_novelty, "task": current_task,
-            "noise_magnitude": float(jnp.linalg.norm(noise_vector)),
-        })
+        }
+        if task_type == 'noise':
+            log_dict["noise_magnitude"] = float(jnp.linalg.norm(noise_vector))
+        elif task_type == 'param':
+            log_dict[param_name] = float(getattr(env_params, param_name))
+        wandb.log(log_dict)
         
         if gen % args.log_interval == 0 or gen == num_generations - 1:
             print(f"Gen {gen:4d} | Task {current_task} | Best: {gen_best:8.2f} | Mean: {gen_mean:8.2f} | Overall: {best_overall_fitness:8.2f} | Nov: {mean_novelty:.3f}")
@@ -748,14 +946,27 @@ def main():
     print(f"  Best overall: {best_overall_fitness:.2f}")
     print(f"  Total tasks: {current_task + 1}")
     
-    # Save 10 GIFs for final task
-    fitness_host = jax.device_get(fitnesses)
+    # Use best from final generation of this task
+    mean_fitness_host = jax.device_get(mean_fitnesses)
     population_host = jax.device_get(population)
-    final_best_idx = int(np.argmax(fitness_host))
+    final_best_idx = int(np.argmax(mean_fitness_host))
     final_best_params = population_host[final_best_idx].copy()
-    final_best_fitness = float(np.max(fitness_host))
     
-    print(f"  Debug: Final task_best_fitness={task_best_fitness:.2f}, current_best={final_best_fitness:.2f}")
+    # Per-task evaluation with 10 trials for final task
+    print(f"\n  Task {current_task} final evaluation (10 trials)...")
+    task_eval_rewards = []
+    for eval_trial in range(10):
+        key, eval_key_trial = random.split(key)
+        _, trial_reward = rollout_for_gif(
+            env, env_params, policy, final_best_params, param_template,
+            episode_length, eval_key_trial, noise_vector
+        )
+        task_eval_rewards.append(trial_reward)
+    task_eval_mean = float(np.mean(task_eval_rewards))
+    task_eval_std = float(np.std(task_eval_rewards))
+    print(f"  Task {current_task} eval: {task_eval_mean:.2f} +/- {task_eval_std:.2f}")
+    wandb.summary[f"task_{current_task}_eval_mean"] = task_eval_mean
+    wandb.summary[f"task_{current_task}_eval_std"] = task_eval_std
     
     task_gif_dir = os.path.join(gifs_dir, f"task{current_task}")
     os.makedirs(task_gif_dir, exist_ok=True)
@@ -794,6 +1005,62 @@ def main():
             'final_task': current_task,
         }, f)
     print(f"Saved: {ckpt_path}")
+    
+    # Save final task checkpoint
+    task_ckpt_path = os.path.join(checkpoints_dir, f"task_{current_task}.pkl")
+    final_ckpt_data = {
+        'flat_params': np.array(final_best_params),
+        'task_idx': current_task,
+        'task_type': task_type,
+        'generation': num_generations,
+        'best_fitness': float(task_best_fitness),
+        'eval_mean': task_eval_mean,
+        'eval_std': task_eval_std,
+        'zero_shot_eval_mean': task_zt_mean,
+        'zero_shot_eval_std': task_zt_std,
+        'gens_to_threshold': task_gens_to_threshold,
+    }
+    if task_type == 'noise':
+        final_ckpt_data['noise_vector'] = jax.device_get(noise_vector)
+    elif task_type == 'param':
+        final_ckpt_data['param_name'] = param_name
+        final_ckpt_data['param_value'] = float(getattr(env_params, param_name))
+    with open(task_ckpt_path, 'wb') as f:
+        pickle.dump(final_ckpt_data, f)
+    print(f"Saved final task checkpoint: {task_ckpt_path}")
+    
+    # Store final task metrics
+    all_metrics.append({
+        'task_idx': current_task,
+        'eval_mean': task_eval_mean,
+        'eval_std': task_eval_std,
+        'zero_shot_eval_mean': task_zt_mean,
+        'zero_shot_eval_std': task_zt_std,
+        'gens_to_threshold': task_gens_to_threshold,
+    })
+    
+    # Compute aggregate metrics and save to YAML
+    num_tasks = len(all_metrics)
+    num_solved = sum(1 for m in all_metrics if solved_threshold is not None and m['eval_mean'] >= solved_threshold)
+    success_rate = num_solved / num_tasks if num_tasks > 0 else 0.0
+    zt_values = [m['zero_shot_eval_mean'] for m in all_metrics]
+    
+    summary_metrics = {
+        'method': 'dns',
+        'env': env_name,
+        'task_type': task_type,
+        'num_tasks': num_tasks,
+        'solved_threshold': solved_threshold,
+        'success_rate': success_rate,
+        'num_solved': num_solved,
+        'zero_shot_transfer_mean': float(np.mean(zt_values)),
+        'zero_shot_transfer_std': float(np.std(zt_values)),
+        'per_task': all_metrics,
+    }
+    metrics_path = os.path.join(output_dir, "metrics.yaml")
+    with open(metrics_path, 'w') as f:
+        yaml.dump(summary_metrics, f, default_flow_style=False)
+    print(f"Saved metrics: {metrics_path}")
     
     wandb.finish()
     print(f"\nDone! Results saved to {output_dir}")

@@ -4,7 +4,7 @@
 
 GPU_ID=${1:-2}
 NUM_TRIALS=${2:-5}
-FRICTIONS="5.0"
+FRICTIONS="1.0"
 
 ENV="CheetahRun"
 OUTPUT_BASE="projects/mujoco/dns_${ENV}"

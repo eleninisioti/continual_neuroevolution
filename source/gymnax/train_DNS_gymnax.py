@@ -83,7 +83,7 @@ ENV_CONFIGS = {
         "batch_size": 256,
         "hidden_dims": (16, 16),
         "episode_length": 500,
-        "num_evals": 1,
+        "num_evals": 10,
         "k": 3,
         "iso_sigma": 0.05,
         "line_sigma": 0.5,
@@ -94,7 +94,7 @@ ENV_CONFIGS = {
         "batch_size": 256,
         "hidden_dims": (32, 32),
         "episode_length": 500,
-        "num_evals": 1,
+        "num_evals": 10,
         "k": 3,
         "iso_sigma": 0.05,
         "line_sigma": 0.5,
@@ -105,7 +105,7 @@ ENV_CONFIGS = {
         "batch_size": 256,
         "hidden_dims": (32, 32),
         "episode_length": 500,
-        "num_evals": 1,
+        "num_evals": 10,
         "k": 3,
         "iso_sigma": 0.05,
         "line_sigma": 0.5,
@@ -152,19 +152,48 @@ def create_policy_network(key, obs_dim, action_dim, hidden_dims=(16, 16)):
 # DNS Algorithm
 # ============================================================================
 
-def compute_novelty(descriptors: jnp.ndarray, k: int = 3) -> jnp.ndarray:
-    """Compute novelty scores as average distance to k nearest neighbors."""
-    descriptors = jnp.nan_to_num(descriptors, nan=0.0, posinf=0.0, neginf=0.0)
+def _compute_dominated_novelty(fitness, descriptor, k):
+    """Compute dominated novelty — exact port of QDax dns_repertoire.py.
     
-    diffs = descriptors[:, None, :] - descriptors[None, :, :]
-    distances = jnp.linalg.norm(diffs, axis=-1)
-    distances = distances + jnp.eye(distances.shape[0]) * 1e10
-    
-    k_nearest_distances = jnp.sort(distances, axis=1)[:, :k]
-    novelty = jnp.mean(k_nearest_distances, axis=1)
-    novelty = jnp.nan_to_num(novelty, nan=0.0, posinf=0.0, neginf=0.0)
-    
-    return novelty
+    For each individual, dominated novelty is the mean distance in descriptor
+    space to the k nearest neighbors that have fitness >= its own.
+    Returns NaN for the fittest individuals (no fitter neighbors exist).
+    NaN sorts highest in descending argsort, so they are always kept.
+    """
+    n = fitness.shape[0]
+    if n <= 1:
+        return jnp.full(n, jnp.nan)
+    k = min(k, n - 1)
+    valid = fitness != -jnp.inf
+
+    # Neighbor mask excluding self
+    neighbor = valid[:, None] & valid[None, :]
+    neighbor = neighbor & ~jnp.eye(n, dtype=bool)
+
+    # Fitter-or-equal mask: fitter[i,j] = True if fitness[j] >= fitness[i]
+    fitter = fitness[:, None] <= fitness[None, :]
+    fitter = jnp.where(neighbor, fitter, False)
+
+    # Pairwise distances
+    distance = jnp.linalg.norm(
+        descriptor[:, None, :] - descriptor[None, :, :], axis=-1
+    )
+    distance = jnp.where(neighbor, distance, jnp.inf)
+
+    # Distances to fitter neighbors only
+    distance_fitter = jnp.where(fitter, distance, jnp.inf)
+
+    # Dominated novelty: mean distance to k nearest fitter neighbors
+    values_fit, indices_fit = jax.vmap(
+        lambda x: jax.lax.top_k(-x, k)
+    )(distance_fitter)
+    dominated_novelty = jnp.mean(
+        -values_fit,
+        axis=-1,
+        where=jnp.take_along_axis(fitter, indices_fit, axis=-1),
+    )
+
+    return dominated_novelty
 
 
 def dns_selection(
@@ -172,37 +201,39 @@ def dns_selection(
     new_genotypes, new_fitnesses, new_descriptors,
     population_size, k,
 ):
-    """DNS selection: combine parent and offspring, select based on combined fitness+novelty score."""
+    """DNS selection — follows QDax DominatedNoveltyRepertoire.add().
+    
+    Combines parents and offspring, computes dominated novelty on the combined
+    pool, and keeps the top population_size individuals by dominated novelty.
+    """
+    # Combine candidates
     combined_genotypes = jnp.concatenate([genotypes, new_genotypes], axis=0)
     combined_fitnesses = jnp.concatenate([fitnesses, new_fitnesses], axis=0)
     combined_descriptors = jnp.concatenate([descriptors, new_descriptors], axis=0)
-    
-    combined_novelties = compute_novelty(combined_descriptors, k)
-    combined_fitnesses = jnp.nan_to_num(combined_fitnesses, nan=-1e6, posinf=1e6, neginf=-1e6)
-    
-    # Normalize fitness to [0, 1]
-    f_min, f_max = jnp.min(combined_fitnesses), jnp.max(combined_fitnesses)
-    f_range = jnp.maximum(f_max - f_min, 1e-8)
-    norm_fitness = (combined_fitnesses - f_min) / f_range
-    
-    # Normalize novelty to [0, 1]
-    n_min, n_max = jnp.min(combined_novelties), jnp.max(combined_novelties)
-    n_range = jnp.maximum(n_max - n_min, 1e-8)
-    norm_novelty = (combined_novelties - n_min) / n_range
-    
-    combined_scores = jnp.nan_to_num(norm_fitness + norm_novelty, nan=-1e6)
-    selected_indices = jnp.argsort(combined_scores)[-population_size:]
-    
+
+    # Compute dominated novelty on combined pool
+    dominated_novelty = _compute_dominated_novelty(
+        combined_fitnesses, combined_descriptors, k
+    )
+
+    # Use dominated novelty as meta-fitness, invalid individuals get -inf
+    valid = combined_fitnesses != -jnp.inf
+    meta_fitness = jnp.where(valid, dominated_novelty, -jnp.inf)
+
+    # Select survivors (NaN from fittest individuals sorts highest in descending order)
+    indices = jnp.argsort(meta_fitness)[::-1]
+    survivor_indices = indices[:population_size]
+
     return (
-        combined_genotypes[selected_indices],
-        combined_fitnesses[selected_indices],
-        combined_descriptors[selected_indices],
-        combined_novelties[selected_indices],
+        combined_genotypes[survivor_indices],
+        combined_fitnesses[survivor_indices],
+        combined_descriptors[survivor_indices],
+        dominated_novelty[survivor_indices],
     )
 
 
 def isoline_variation(genotypes, key, iso_sigma=0.05, line_sigma=0.5, batch_size=256):
-    """Isoline variation operator for generating offspring."""
+    """Iso+Line-DD variation operator — exact port of QDax mutation_operators.py."""
     pop_size = genotypes.shape[0]
     param_dim = genotypes.shape[1]
     
@@ -210,14 +241,16 @@ def isoline_variation(genotypes, key, iso_sigma=0.05, line_sigma=0.5, batch_size
     parent1_indices = random.randint(k1, (batch_size,), 0, pop_size)
     parent2_indices = random.randint(k2, (batch_size,), 0, pop_size)
     
-    parent1 = genotypes[parent1_indices]
-    parent2 = genotypes[parent2_indices]
+    x1 = genotypes[parent1_indices]
+    x2 = genotypes[parent2_indices]
     
-    alpha = random.uniform(k3, (batch_size, param_dim), minval=-line_sigma, maxval=1.0 + line_sigma)
-    offspring = parent1 + alpha * (parent2 - parent1)
+    # QDax: line_noise is a scalar per individual from normal distribution
+    line_noise = random.normal(k3, (batch_size,)) * line_sigma
+    # QDax: iso_noise is per-parameter from normal distribution
+    iso_noise = random.normal(k4, (batch_size, param_dim)) * iso_sigma
     
-    noise = random.normal(k4, (batch_size, param_dim)) * iso_sigma
-    offspring = offspring + noise
+    # QDax formula: offspring = (x1 + iso_noise) + (x2 - x1) * line_noise
+    offspring = (x1 + iso_noise) + (x2 - x1) * line_noise[:, None]
     
     return offspring
 
@@ -553,7 +586,8 @@ def main():
     cfg = ENV_CONFIGS[env_name]
     num_generations = args.num_generations or cfg["num_generations"]
     pop_size = args.pop_size or cfg["pop_size"]
-    batch_size = args.batch_size or cfg["batch_size"]
+    batch_size = args.batch_size if args.batch_size is not None else max(1, pop_size // 2)
+    batch_size = min(batch_size, pop_size)
     hidden_dims = cfg["hidden_dims"]
     episode_length = cfg["episode_length"]
     num_evals = args.num_evals or cfg["num_evals"]
@@ -620,7 +654,7 @@ def main():
     print(f"\nEvaluating initial population...")
     key, eval_key = jax.random.split(key)
     fitnesses, descriptors, mean_fitnesses = scoring_fn(population, eval_key)
-    novelties = compute_novelty(descriptors, k)
+    novelties = _compute_dominated_novelty(fitnesses, descriptors, k)
     
     print(f"  Initial best fitness (selection): {float(jnp.max(fitnesses)):.2f}")
     print(f"  Initial best fitness (mean 10): {float(jnp.max(mean_fitnesses)):.2f}")

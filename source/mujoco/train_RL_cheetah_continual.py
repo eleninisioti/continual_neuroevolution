@@ -95,18 +95,36 @@ def create_env_with_gravity(env_name, gravity_z):
     return create_modified_env(env_name, task_mod='gravity', multiplier=gravity_z / -9.81)
 
 
-def sample_task_multipliers(num_tasks, default_mult=1.0, low_mult=0.2, high_mult=5.0):
-    """Generate multiplier values for each task, cycling through three values.
+def sample_task_multipliers(num_tasks, default_mult=1.0, low_mult=0.2, high_mult=5.0, 
+                            mode='cycle', seed=42):
+    """Generate multiplier values for each task.
     
-    Cycles through:
-    1. default_mult (1.0 = normal)
-    2. low_mult (0.2 = reduced)
-    3. high_mult (5.0 = increased)
+    Args:
+        num_tasks: Number of tasks
+        default_mult: Default multiplier (used in cycle mode)
+        low_mult: Low multiplier / range minimum
+        high_mult: High multiplier / range maximum
+        mode: Sampling mode:
+            - 'cycle': Cycle through default -> low -> high (original behavior)
+            - 'log_uniform': Sample log-uniformly from [low_mult, high_mult]
+        seed: Random seed for log_uniform mode
     
     Returns array of multipliers.
     """
-    multiplier_cycle = [default_mult, low_mult, high_mult]
-    multipliers = jnp.array([multiplier_cycle[i % 3] for i in range(num_tasks)])
+    if mode == 'cycle':
+        multiplier_cycle = [default_mult, low_mult, high_mult]
+        multipliers = jnp.array([multiplier_cycle[i % 3] for i in range(num_tasks)])
+    elif mode == 'log_uniform':
+        # Sample log-uniformly from [low_mult, high_mult]
+        # log10(low) to log10(high), then 10^x
+        import numpy as np
+        rng = np.random.default_rng(seed)
+        log_low = np.log10(low_mult)
+        log_high = np.log10(high_mult)
+        log_samples = rng.uniform(log_low, log_high, size=num_tasks)
+        multipliers = jnp.array(10 ** log_samples)
+    else:
+        raise ValueError(f"Unknown sampling mode: {mode}. Use 'cycle' or 'log_uniform'.")
     return multipliers
 
 
@@ -159,6 +177,11 @@ def parse_args():
                         help='Low friction multiplier (default 0.2 = slippery/icy)')
     parser.add_argument('--friction_high_mult', type=float, default=5.0,
                         help='High friction multiplier (default 5.0 = sticky/rough)')
+    
+    # Sampling mode for multipliers
+    parser.add_argument('--sampling_mode', type=str, default='cycle',
+                        choices=['cycle', 'log_uniform'],
+                        help='How to sample multipliers: cycle (default->low->high) or log_uniform')
     
     # PPO hyperparameters
     parser.add_argument('--num_envs', type=int, default=2048,
@@ -407,6 +430,20 @@ def main():
             'value_hidden_sizes': '128,128,128,128',
             'activation': 'swish',
         },
+        'Go1JoystickFlatTerrain': {
+            'timesteps_per_task': 10_000_000,
+            'num_envs': 4096,
+            'learning_rate': 3e-4,
+            'batch_size': 2048,
+            'discounting': 0.97,
+            'entropy_cost': 1e-2,
+            'episode_length': 1000,
+            'num_minibatches': 32,
+            'num_updates_per_batch': 4,
+            'unroll_length': 20,
+            'reward_scaling': 1.0,
+            'action_repeat': 1,
+        },
     }
     
     # Default values for checking if user explicitly set something
@@ -471,14 +508,27 @@ def main():
     print(f"  Timesteps per task: {timesteps_per_task:,}")
     print(f"  Total timesteps: {num_tasks * timesteps_per_task:,}")
     
-    # Sample task multipliers based on task_mod
+    # Sample task multipliers based on task_mod and sampling mode
+    sampling_mode = args.sampling_mode
     key = jax.random.key(args.seed)
     if task_mod == 'gravity':
-        multipliers = sample_task_multipliers(num_tasks, gravity_default_mult, gravity_low_mult, gravity_high_mult)
-        print(f"  Gravity multipliers: {gravity_default_mult}x -> {gravity_low_mult}x -> {gravity_high_mult}x (cycling)")
+        multipliers = sample_task_multipliers(
+            num_tasks, gravity_default_mult, gravity_low_mult, gravity_high_mult,
+            mode=sampling_mode, seed=args.seed
+        )
+        if sampling_mode == 'cycle':
+            print(f"  Gravity multipliers: {gravity_default_mult}x -> {gravity_low_mult}x -> {gravity_high_mult}x (cycling)")
+        else:
+            print(f"  Gravity multipliers: log-uniform [{gravity_low_mult}, {gravity_high_mult}]")
     else:  # friction
-        multipliers = sample_task_multipliers(num_tasks, friction_default_mult, friction_low_mult, friction_high_mult)
-        print(f"  Friction multipliers: {friction_default_mult}x -> {friction_low_mult}x -> {friction_high_mult}x (cycling)")
+        multipliers = sample_task_multipliers(
+            num_tasks, friction_default_mult, friction_low_mult, friction_high_mult,
+            mode=sampling_mode, seed=args.seed
+        )
+        if sampling_mode == 'cycle':
+            print(f"  Friction multipliers: {friction_default_mult}x -> {friction_low_mult}x -> {friction_high_mult}x (cycling)")
+        else:
+            print(f"  Friction multipliers: log-uniform [{friction_low_mult}, {friction_high_mult}]")
     
     multiplier_list = [float(m) for m in multipliers]
     print(f"  Multiplier values: {[f'{m:.2f}' for m in multiplier_list]}")
@@ -619,7 +669,7 @@ def main():
                   f"Best Task: {best_reward_per_task[task_idx]:8.2f} | "
                   f"Best Overall: {best_reward_overall:8.2f} | "
                   f"{task_mod}: {multiplier:6.2f} | "
-                  f"Time: {elapsed:6.1f}s")
+                  f"Time: {elapsed:6.1f}s", flush=True)
             
             # Accumulate training metrics for CSV
             training_metrics_list.append({

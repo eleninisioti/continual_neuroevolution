@@ -513,13 +513,12 @@ def main():
     def jit_tell(key, population, fitness, state, params):
         return es.tell(key, population, fitness, state, params)
     
-    # Generate initial noise vector (task 0)
-    key, noise_key = random.split(key)
-    noise_vector = random.normal(noise_key, (obs_dim,)) * noise_range
+    # Task 0: no noise (identical to non-continual)
+    noise_vector = jnp.zeros((obs_dim,))
     current_task = 0
     
-    print(f"\n  Task 0 noise vector: {jax.device_get(noise_vector)}")
-    print(f"  Noise magnitude: {float(jnp.linalg.norm(noise_vector)):.4f}")
+    print(f"\n  Task 0: no noise (baseline)")
+    print(f"  Noise magnitude: 0.0000")
     
     # Warmup JIT
     print("\nJIT compiling...")

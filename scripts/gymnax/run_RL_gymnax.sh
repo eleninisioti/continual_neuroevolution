@@ -10,7 +10,7 @@ set -e
 # Configuration
 GPU="${GPU:-3}"
 NUM_TRIALS="${NUM_TRIALS:-2}"
-METHODS="${1:- trac redo}"
+METHODS="${1:- ppo}"
 ENVS="${ENVS:-MountainCar-v0}"
 
 echo "=========================================="

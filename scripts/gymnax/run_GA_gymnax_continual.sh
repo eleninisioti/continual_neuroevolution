@@ -1,16 +1,16 @@
 #!/bin/bash
 # Run GA gymnax continual experiments across 3 envs and 3 trials
 
-ENVS=("CartPole-v1" "Acrobot-v1" "MountainCar-v0")
+ENVS=("CartPole-v1")
 TRIALS=(1)
-GPU="2"
+GPU="0"
 
 for env in "${ENVS[@]}"; do
     for trial in "${TRIALS[@]}"; do
         echo "========================================"
         echo "GA Continual: $env, Trial $trial"
         echo "========================================"
-        python source/gymnax/train_GA_gymnax_continual.py --env "$env" --trial "$trial" --gpus "$GPU" --noise_range 1.0
+        python source/gymnax/train_GA_gymnax_continual.py --env "$env" --trial "$trial" --gpus "$GPU" --noise_range 1.0 --noise_type random
     done
 done
 

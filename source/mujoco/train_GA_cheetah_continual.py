@@ -209,15 +209,18 @@ def final_evaluation(env, policy, best_params, param_template, key, env_name, mu
     # Unflatten best params
     params = unflatten_params(best_params, param_template)
     
+    # JIT compile the rollout function for speed
+    jit_rollout_with_traj = jax.jit(lambda k: rollout_episode_with_trajectory(
+        env, policy, params, k, max_steps
+    ))
+    
     rewards = []
     
     for trial in range(num_eval_trials):
         key, eval_key = jax.random.split(key)
         
         # Run episode and get trajectory
-        reward, trajectory = rollout_episode_with_trajectory(
-            env, policy, params, eval_key, max_steps
-        )
+        reward, trajectory = jit_rollout_with_traj(eval_key)
         reward_val = float(reward)
         rewards.append(reward_val)
         
@@ -789,17 +792,6 @@ def main():
                 }
             }, f)
         print(f"  Best policy saved to: {save_path}")
-    
-    # Run final evaluation with 100 trials, GIFs, and histogram
-    # Use the last multiplier value for final eval
-    if best_params_overall is not None:
-        key, eval_key = jax.random.split(key)
-        final_multiplier = float(multiplier_list[-1])
-        eval_save_dir = os.path.join(output_dir, "eval_results")
-        final_evaluation(
-            env, policy, best_params_overall, param_template, eval_key, env_name, final_multiplier,
-            num_eval_trials=100, max_steps=max_episode_steps, save_dir=eval_save_dir
-        )
     
     # Save training metrics to CSV
     if training_metrics_list:
