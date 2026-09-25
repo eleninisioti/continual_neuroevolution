@@ -1,0 +1,22 @@
+defaults:
+  - env: symbolic
+  - env_size: s
+  - learning:
+    - ppo-base
+    - ppo-rnn
+  - misc: misc
+  - eval: s
+  - train_levels: s
+  - model:
+    - model-base
+    - model-transformer
+    - model-perm-invariant-mlp
+  - _self_
+
+
+eval:
+  eval_freq: 64
+misc:
+  video_frequency: 2
+
+seed: 0

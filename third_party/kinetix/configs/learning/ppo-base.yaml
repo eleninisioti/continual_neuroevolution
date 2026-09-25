@@ -1,0 +1,41 @@
+lr: 5e-5
+peak_lr: 3e-4
+initial_lr: 1e-5
+warmup_frac: 0.1
+max_grad_norm: 1.0
+total_timesteps: 1073741824
+num_train_envs: 16
+num_minibatches: 4
+gamma: 0.995
+update_epochs: 8
+clip_eps: 0.2
+gae_lambda: 0.9
+ent_coef: 0.01
+anneal_lr: false
+warmup_lr: false
+vf_coef: 0.5
+permute_state_during_training: false
+filter_levels: true
+level_filter_n_steps: 64
+level_filter_sample_ratio: 2
+use_redo: false  # Enable ReDo-PPO (reinitialise dormant neurons; kinetix/models/redo.py)
+monitor_dormant: false  # Count dormant neurons without resetting (for analysis)
+redo_tau: 0.025  # Dormancy threshold, as a fraction of the layer mean score. The
+                 # reference default (inspiration/redo/src/config.py) and the one
+                 # every suite uses -- see source/shared/algorithms/redo.py. Was 0.01.
+# How dormancy is scored: "variability" = std(activation), "magnitude" = mean|activation|.
+# These networks are tanh, where a unit saturated at +/-1 passes no gradient but has the
+# LARGEST possible mean|activation| -- so "magnitude" can never flag it. See
+# kinetix/models/actor_critic.py.
+dormant_criterion: variability
+redo_interval: 50  # Updates between ReDo passes
+redo_batch_size: 512  # Samples used to score neurons
+redo_targets: both  # policy | value | both
+
+# C-CHAIN (Tang et al., ICML 2025); kinetix/models/cchain.py. Defaults are the
+# reference values, shared with source/gymnax/cchain.py.
+use_cchain: false
+chain_target_rel_scale: 10000.0  # 0 disables the churn regulariser
+chain_warmup_updates: 10  # Updates into a task before the coefficient auto-tunes
+chain_coef_window: 50  # Recent updates averaged by the coefficient controller
+use_trac: false  # Enable TRAC optimizer wrapper

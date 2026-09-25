@@ -1,0 +1,104 @@
+[project]
+name = "continual-neuroevolution"
+version = "0.1.0"
+description = "Continual neuroevolution experiments (GA / DNS / PBT / ES / PPO / DQN) on gymnax, brax, MuJoCo Playground and Kinetix."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+
+# Core stack: everything needed for the gymnax and brax experiments
+# (source/gymnax, source/brax, scripts/postprocess).
+# Versions used to produce the paper results are pinned exactly; the
+# resolved transitive closure lives in uv.lock.
+dependencies = [
+    # --- JAX ---
+    # On Linux we install the CUDA 12 plugin by default (the cluster setup).
+    # Elsewhere (macOS / CPU-only CI) we fall back to plain CPU JAX.
+    "jax[cuda12]==0.5.3 ; sys_platform == 'linux'",
+    "jax==0.5.3 ; sys_platform != 'linux'",
+    "numpy==1.26.4",
+
+    # --- JAX ecosystem / neuroevolution ---
+    "brax==0.14.0",
+    "chex==0.1.90",
+    "distrax==0.1.5",
+    "equinox==0.13.4",
+    "evosax==0.2.0",
+    "flax==0.10.6",
+    "jaxtyping==0.3.7",
+    "optax==0.2.6",
+    "orbax-checkpoint==0.11.24",
+    "trac-optimizer==0.0.2",
+
+    # --- Environments ---
+    "gym==0.26.2",
+    "gymnasium==1.2.3",
+    "gymnax==0.0.9",
+    "xminigrid==0.9.3",
+    # Our instrumented Kinetix fork, installed editable from third_party/
+    # (see [tool.uv.sources]). A core dep so a bare `uv sync` is enough.
+    "kinetix-env",
+
+    # --- Torch (DQN baselines in source/gymnax/train_DQN_gymnax*.py) ---
+    "torch==2.9.1",
+
+    # --- Config / experiment tracking ---
+    "hydra-core==1.3.2",
+    "omegaconf==2.3.0",
+    "wandb==0.24.0",
+
+    # --- Analysis / plotting (scripts/postprocess) ---
+    "matplotlib>=3.10",
+    "networkx>=3.6",
+    "pandas>=2.2",
+    "scikit-learn>=1.6",
+    "scipy>=1.14",
+    "seaborn>=0.13",
+
+    # --- IO / misc ---
+    "absl-py",
+    "dm-env",
+    "etils",
+    "imageio",
+    "imageio-ffmpeg",
+    "mediapy",
+    "msgpack",
+    "pillow",
+    "pyyaml",
+    "safetensors",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ipython",
+    "ruff",
+]
+
+[tool.uv.sources]
+# This is our INSTRUMENTED fork of Kinetix, and the only tree that runs. Its
+# models/actor_critic.py carries the dormant-neuron instrumentation (28 mentions
+# of `dormant`); the PPO trainer unpacks four values from network.apply and reads
+# `redo_tau`, so it does not run against stock Kinetix at all. It also carries
+# kinetix/levels/, which upstream does not.
+#
+# A vanilla upstream copy used to sit beside it at `third_party/kinetix/methods/
+# Kinetix` while this tree was named `kinetix_old` -- so the directory called
+# "kinetix" was the one nothing used, and the "old" one was the live dependency.
+# The upstream copy is deleted and this tree now holds the name. The hazard it
+# created is worth remembering: the run scripts cd into the source dir first, and
+# a local `kinetix/` package shadows whatever is installed, so one wrong cwd
+# silently trained a different network.
+kinetix-env = { path = "third_party/kinetix", editable = true }
+
+[tool.uv]
+# numpy is held at 1.26.4 for JAX 0.5.3 / Kinetix compatibility; on Python
+# 3.13 there is no prebuilt wheel, so it is compiled from sdist on install.
+no-build-isolation-package = []
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# The repo is a collection of experiment scripts, not an importable library.
+packages = []
