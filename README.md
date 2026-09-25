@@ -92,5 +92,4 @@ python scripts/make_lineplot.py --help
 
 ## License
 
-The code in `source/` and `scripts/` is released under the MIT License.
 `third_party/kinetix/` keeps its original license (see the `LICENSE` file in that directory).
