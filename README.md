@@ -69,8 +69,8 @@ The full experiment grids are defined in `scripts/train/run_experiments.sh` and
 started with `scripts/train/launch.sh`, which spreads the jobs over the available GPUs:
 
 ```bash
-bash scripts/train/launch.sh gymnax_noncontinual es ga dns ppo trac redo cchain
-bash scripts/train/launch.sh gymnax_continual    es ga dns ppo trac redo cchain
+bash scripts/train/launch.sh gymnax_noncontinual nes ga dns ppo trac redo cchain
+bash scripts/train/launch.sh gymnax_continual    nes ga dns ppo trac redo cchain
 ```
 
 The `scripts/train/queue_iclr_*.sh` scripts run the configurations reported in the
