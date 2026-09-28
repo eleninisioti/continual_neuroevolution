@@ -131,8 +131,10 @@ RL_METHODS = ('ppo', 'trac', 'redo', 'cchain', 'pbt')
 
 
 #: Arm-name suffix for PBT without explore: the loser copies the winner's
-#: weights and keeps the hyperparameters it started with (`--pbt_mode
-#: weights_only`, Jaderberg et al. Sect. 4.1.2). `pbt_weights` / `pbt2_weights`
+#: weights and every member trains at the config's one set of
+#: hyperparameters, no initial spread (`--pbt_mode weights_only`, Jaderberg
+#: et al. Sect. 4.1.2). Before 2026-09-28 weights_only still drew the x U(0.5,
+#: 1.5) spread and a loser took the winner's values. `pbt_weights` / `pbt2_weights`
 #: are the ablation of `pbt` / `pbt2` (2026-09-19); every earlier PBT run on
 #: disk is mode `full`, whatever `source/algorithms/rl/pbt.py`'s
 #: DEFAULT_PBT_MODE says -- the runner's own default is `full`.
@@ -836,19 +838,27 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
             optax.clip_by_global_norm(hp['max_grad_norm']),
             optax.inject_hyperparams(optax.adam)(
                 learning_rate=float(hp['learning_rate']), b1=adam_b1))
-        # The initial spread, the old gymnax trainer's convention: lr and
-        # ent_coef at x U(0.5, 1.5) of the config's, weights from each
-        # member's own init key. One split off the run's key stream.
+        # Weights from each member's own init key, one split off the run's
+        # key stream. Hyperparameters: in a mode that explores them (`full`,
+        # `hp_only`) each member starts at x U(0.5, 1.5) of the config's lr
+        # and ent_coef, the old gymnax trainer's convention. In
+        # `weights_only` there is ONE set, the config's, on every member and
+        # for the whole run -- until 2026-09-28 weights_only drew the spread
+        # too and a loser took the winner's values, so every `pbt_weights`
+        # run before then selected hyperparameters within x[0.5, 1.5].
         key, pop_key = random.split(key)
         member_keys = random.split(pop_key, N)
         spread = np.random.default_rng(seed * 31 + N)
         members = []
         for i in range(N):
             p_key, v_key, r_key = random.split(member_keys[i], 3)
-            lr = float(np.clip(hp['learning_rate'] * spread.uniform(0.5, 1.5),
-                               *bounds['learning_rate']))
-            ec = float(np.clip(hp['ent_coef'] * spread.uniform(0.5, 1.5),
-                               *bounds['ent_coef']))
+            if perturb_hp:
+                lr = float(np.clip(hp['learning_rate'] * spread.uniform(0.5, 1.5),
+                                   *bounds['learning_rate']))
+                ec = float(np.clip(hp['ent_coef'] * spread.uniform(0.5, 1.5),
+                                   *bounds['ent_coef']))
+            else:
+                lr, ec = float(hp['learning_rate']), float(hp['ent_coef'])
             m_reset = random.split(r_key, num_tasks)
             members.append(dict(
                 policy=_with_lr(TrainState.create(
@@ -877,11 +887,15 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
             moves = pbt_lib.pbt_moves(order, key, exploit_fraction)
             for loser, winner in moves:
                 w, l = members[winner], members[loser]
-                hyper = {'learning_rate': w['lr'], 'ent_coef': w['ent_coef']}
                 if perturb_hp:
+                    # Explore: the winner's hyperparameters, perturbed.
                     key, h_key = random.split(key)
-                    hyper = pbt_lib.perturb_hyperparams(hyper, h_key,
-                                                        perturb_factor)
+                    hyper = pbt_lib.perturb_hyperparams(
+                        {'learning_rate': w['lr'], 'ent_coef': w['ent_coef']},
+                        h_key, perturb_factor)
+                else:
+                    # weights_only: the one set every member already has.
+                    hyper = {'learning_rate': l['lr'], 'ent_coef': l['ent_coef']}
                 lr = hyper['learning_rate']
                 if copy_weights:
                     # The winner's weights AND its normaliser (the first
@@ -1308,6 +1322,9 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
                 'pbt_exploit_fraction': exploit_fraction,
                 'pbt_perturb_factor': perturb_factor, 'pbt_mode': pbt_mode,
                 'pbt_exploits': int(pbt['exploits']),
+                'pbt_member_hyperparams': [
+                    {'learning_rate': float(m['lr']), 'ent_coef': float(m['ent_coef'])}
+                    for m in pbt['members']],
                 'elite_convention': 'best_member'}
                if pbt is not None else {}),
             'learning_rate': hp['learning_rate'], 'optimizer': 'adam',
