@@ -41,8 +41,7 @@ The AURORA caveat: its latent space is learned per run, so its *scale* is not
 shared between two runs and `bd_aurora_diversity` must not be compared across
 methods or seeds directly. Within a run it is a valid trend. For cross-method
 comparison, re-encode the saved behaviour snapshots with one encoder trained on
-the pooled trajectories -- that is what
-`scripts/neurips_2026_rebuttal/behaviour_diversity_analysis.py` does.
+the pooled trajectories.
 
 Not every family exists for every task
 --------------------------------------
@@ -70,7 +69,7 @@ Units
 * `occupancy`, `action_freq`: mean pairwise Jensen-Shannon *distance*
   (sqrt of the base-2 divergence), in [0, 1].
 * `probe` (discrete): mean pairwise Jensen-Shannon *divergence* in nats, the
-  same formula as `source/studies/gymnax/pbt_diagnostics.py`, so the numbers stay
+  same formula as the old gymnax PBT diagnostics, so the numbers stay
   comparable with what the paper already reports; plus the fraction of probe
   states on which two policies pick different greedy actions.
 * `probe` (continuous): mean pairwise Euclidean distance between action vectors
@@ -178,26 +177,6 @@ def _cheetah_descriptor(obs, weights, aux):
         _masked_mean(contact[:, 0], weights),
         _masked_mean(contact[:, 1], weights),
     ])
-
-
-def _ant_descriptor(obs, weights, aux):
-    """Duty factor of each of the ant's four feet.
-
-    The same descriptor as `_cheetah_descriptor`, one dimension per leg. Cully
-    et al. (2015) use exactly this for their six-legged robot, and it is what
-    QDax's `ant_uni` measures: a trot, a pace and a three-legged limp are
-    different gaits with different duty-factor vectors, and none of the four
-    numbers is the forward velocity the ant is rewarded for.
-
-    `aux["foot_contact"]` is (T, 4) in {0, 1}, ordered as
-    `source/studies/brax/behaviour_brax.py:ANT_FOOT_GEOMS`. The four legs are named
-    after the geoms in brax's ant.xml rather than by compass direction, because
-    the xml's own names do not agree with the geometry: `right_ankle` sits at
-    (-x, +y) and `back_leg` at (-x, -y).
-    """
-    del obs
-    contact = aux["foot_contact"]
-    return jnp.stack([_masked_mean(contact[:, i], weights) for i in range(4)])
 
 
 def _cartpole_coords(obs):
@@ -343,21 +322,6 @@ ENV_BEHAVIOUR_SPECS = {
         handcrafted_names=("left_foot_contact_frac", "right_foot_contact_frac"),
         handcrafted_low=(0.0, 0.0),
         handcrafted_high=(1.0, 1.0),
-        action_kind="continuous",
-        coords_fn=None,
-    ),
-    # Brax `ant`, the other continuous-control task. Same descriptor family as
-    # CheetahRun with four legs instead of two, and no occupancy family for the
-    # same reason: ant's reward is forward velocity, so a histogram over the
-    # torso's position or speed would be the return re-labelled. The ant's own
-    # observation does not even contain the torso x/y -- brax drops qpos[:2] --
-    # so there is nothing to bin over without reaching into the simulator.
-    "ant": EnvBehaviourSpec(
-        handcrafted_fn=_ant_descriptor,
-        handcrafted_names=("left_foot_contact_frac", "right_foot_contact_frac",
-                           "third_foot_contact_frac", "fourth_foot_contact_frac"),
-        handcrafted_low=(0.0, 0.0, 0.0, 0.0),
-        handcrafted_high=(1.0, 1.0, 1.0, 1.0),
         action_kind="continuous",
         coords_fn=None,
     ),

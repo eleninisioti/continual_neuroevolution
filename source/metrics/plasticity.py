@@ -19,7 +19,7 @@ module follows them rather than inventing a single one:
 
   discrete (gymnax)     cross-entropy H(pi_before, pi_after)
                         `crl_procgen/vis_train_procgen_c_chain.py:192`
-  continuous (ant)      mean squared difference of action means
+  continuous (cheetah)  mean squared difference of action means
                         `crl_dmc/crl_run_ppo_c_chain_dmc.py:339`
 
 Both are logged for EVERY method, not just C-CHAIN: the reference's own
@@ -106,7 +106,7 @@ def action_disagreement_continuous(actions_a, actions_b, action_range=2.0):
     from one end of its range to the other scores 1.0 and an unchanged policy
     scores 0.0: the same [0, 1] reading as the discrete version.
 
-    Why this and not the argmax test: cheetah's and ant's NE policies are
+    Why this and not the argmax test: the cheetah's NE policies are
     deterministic tanh-squashed vectors, so there is no `argmax` to disagree on,
     and every pair of distinct continuous actions would count as a full
     disagreement -- churn would read ~1.0 always and measure nothing.
@@ -169,7 +169,7 @@ def policy_churn_cross_entropy(logits_before, logits_after):
     `stop_gradient` on the reference so this is a pull towards the old policy
     when it is used as a loss, rather than a mutual averaging of the two.
 
-    Lives here, not in `source/studies/gymnax/cchain.py`, because it is now a measure
+    Lives here, not in `source/algorithms/rl/cchain.py`, because it is now a measure
     every method needs: the stationary gymnax trainer imports cchain behind a
     try/except so a checkout without it can still run PPO, and a churn column
     for all four methods cannot sit behind that guard.
@@ -210,7 +210,7 @@ def pairwise_churn(apply_flat, parents, offspring, probe_obs,
       (b) exactly one update
       (c) evaluated off-batch
 
-    Elite-to-elite satisfies (b) and (c) but breaks (a): `SimpleGA.tell` re-sorts
+    Elite-to-elite satisfies (b) and (c) but breaks (a): `GASearcher.tell` re-sorts
     a combined archive, so the elite at generation t+1 is frequently not a
     descendant of the elite at t -- it is a different genome from a different
     lineage, and the "churn" is then a jump between two unrelated networks
@@ -337,7 +337,7 @@ class NEPlasticityTracker:
                  max_pop_sample=64, max_pairwise=128, prefix='Dense_',
                  continuous=False, action_range=2.0, max_ntk_probe=128,
                  activations_fn=None, probe_batch_dims=None):
-        """`continuous=True` for the cheetah/ant policies.
+        """`continuous=True` for the cheetah policies.
 
         The churn measure is the only thing it changes -- dormancy is scored on
         hidden activations and does not care what the output layer means. It
@@ -387,7 +387,7 @@ class NEPlasticityTracker:
             # churn columns. It was mean |da| / action_range until the churn
             # columns moved to the published MSE, which left this on a
             # different scale from `ne_churn` and `ne_elite_churn_action` in the
-            # same record -- 0.18 against 1e-3 on the ant, three columns and two
+            # same record -- 0.18 against 1e-3, three columns and two
             # units. Whatever the estimator, all three move together.
             diff = outputs[:, None] - outputs[None, :]
             pair = jnp.square(diff).reshape(n, n, -1).mean(axis=-1)

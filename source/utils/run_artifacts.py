@@ -1,11 +1,5 @@
 """The files a finished population-based run leaves on disk.
 
-Was the bottom of ``source/studies/gymnax/continual_common.py``, which mixed the
-gymnax environment with the run's output format. Writing ``results.json`` and
-``checkpoints.npz`` has nothing to do with gymnax -- the format is what
-``evaluate_continual.py`` and the figure scripts read, and it is the same
-format whichever suite produced it -- so it lives with the other
-process-level utilities instead.
 """
 
 from __future__ import annotations
@@ -21,9 +15,9 @@ import numpy as np
 # ============================================================================
 #
 # A finished run is read by two things that never re-run training:
-#   training_metrics.json  scripts/neurips_2026_rebuttal/make_figures.py, for
+#   training_metrics.json  scripts/plotting/make_lineplot.py, for
 #                          the learning curve. One record per generation.
-#   results.json +         source/studies/evaluate_continual.py, which scores
+#   results.json +         scripts/analysis/evaluate_continual.py, which scores
 #   checkpoints.npz        the saved sub-task agents at a controlled episode
 #                          count. Everything it needs to rebuild the policy and
 #                          the sub-task sequence is in results.json.
@@ -60,14 +54,14 @@ def save_eval_artifacts(output_dir, *, method, env, trial, seed, pop_size,
         fitness -- the definition the gymnax training scripts already use.
     incumbent
         What the optimizer would hand back: `archive[0]` for the GA -- its best
-        archive member, NOT a mean -- the distribution mean for OpenES/NES, and
+        archive member, NOT a mean -- the distribution mean for ES, and
         the repertoire best for DNS. Unbiased in population size.
     centroid
         Optional, and the one the CENTROID LINEPLOT scores: the coordinate-wise
         mean of the population's WEIGHTS, which is `archive.mean(0)` for the GA
         and `population.mean(0)` for DNS -- neither of them `incumbent`, and
         neither a network the search ever evaluated. It coincides with
-        `incumbent` for OpenES/NES, where the distribution mean is both. Saved
+        `incumbent` for ES, where the distribution mean is both. Saved
         beside the other two rather than replacing either, so a figure can be
         drawn against whichever object its curve plots. Runs that predate it
         simply have no `centroid` key and the readers fall back.
@@ -150,7 +144,7 @@ def save_checkpoints(output_dir, *, noise_vectors, finalgen=None,
 
     ``save_eval_artifacts`` above writes both, which is right for the gymnax
     trainers -- they have no other ``results.json``. The suite-generic runners
-    do: ``source/studies/generalists/common.py:write_run`` already writes one,
+    do: ``source/runners/common.py:write_run`` already writes one,
     with the nested-``config`` schema every analysis script reads through
     ``load_config``. Calling ``save_eval_artifacts`` from those runners would
     silently overwrite it with the flat schema and drop ``task_sequence``,
@@ -163,7 +157,7 @@ def save_checkpoints(output_dir, *, noise_vectors, finalgen=None,
 
         centroid   the network the centroid lineplot scores -- the mean of the
                    population's WEIGHTS. `population_mean` on every searcher:
-                   the distribution mean for NES/OpenES, the elite archive's
+                   the distribution mean for ES, the elite archive's
                    mean for the GA, the repertoire's for DNS. NOT `incumbent`
                    on the last two, which is the whole point of storing it.
         incumbent  what the optimizer would hand back (archive[0] / the mean /

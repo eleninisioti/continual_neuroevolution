@@ -29,8 +29,7 @@ Two things it is careful about:
 * AURORA latents live in a per-run space, so `bd_aurora_diversity` is only
   comparable *within* a run. The snapshots written to `behaviour_snapshots.npz`
   exist so that one encoder can be fitted on the pooled trajectories offline
-  and every population re-encoded in a single shared space --- see
-  `scripts/neurips_2026_rebuttal/behaviour_diversity_analysis.py`.
+  and every population re-encoded in a single shared space.
 """
 
 from __future__ import annotations

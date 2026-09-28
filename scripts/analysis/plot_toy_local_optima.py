@@ -14,7 +14,7 @@ stop ES when it is rugged.
     (paper = projects/iclr_2027/paper)
 
 The runs are the two switching toys of the generalists report, re-run with
-source/studies/toy/sweep.py (which records the centroid every generation):
+scripts/train/toy_sweep.py (which records the centroid every generation):
 
     smooth  projects/iclr_2027/runs_toy/smooth (report section A). Each
             sub-task is a plane tilted toward its own side and capped at 0.70;
@@ -37,12 +37,12 @@ the saved centroid path at every generation and checked against the sweep's
 own every-10-generation record. A seed is a generalist when that reaches 98%
 of the 0.70 peak.
 
-Arms: ES is NES (CLAUDE.md); the GA re-scores its archive every generation.
+Arms: ES and the GA, which re-scores its archive every generation.
 Each at its best sigma of that sweep (the sweep's own choice).
 
 Third column: share of seeds generalist at the end against sigma, at the
 drawn level, from the wider sigma sweeps runs_toy/sigma_{smooth,rugged}
-(GA and NES only, sigma 0.01 to 0.8; d = 2 only).
+(GA and ES only, sigma 0.01 to 0.8; d = 2 only).
 """
 
 from __future__ import annotations
@@ -74,7 +74,7 @@ DATA = pcl.FINAL / 'data' / STEM
 RUN_SUFFIX = ''                            # '_d128' under --dims 128
 # figure name -> sweep method, in the paper's one method order
 # (make_lineplot.METHOD_ORDER: GA before ES) since 2026-09-21.
-ARMS = {'ga': 'ga', 'es': 'nes'}
+ARMS = {'ga': 'ga', 'es': 'es'}
 # (landscape, row title, level drawn, level axis label, level symbol)
 ROWS = [('smooth', 'Smooth', 0.1, 'Shared region $h$', 'h'),
         ('rugged', 'Local optima', 1.6, 'Barrier depth $a$', 'a')]
@@ -482,10 +482,10 @@ def tables(meta):
         for n, t, *_ in ROWS)
     md = [f'# {STEM}', '',
           f"Extracted {meta['extracted']} from {sources} (report sections A and B, "
-          f"re-run with `source/studies/toy/sweep.py`). Built by "
+          f"re-run with `scripts/train/toy_sweep.py`). Built by "
           f"`scripts/analysis/plot_toy_local_optima.py`.", '',
           'Two sub-tasks alternate every 100 generations for 1000. Pop 64, 24 seeds. '
-          f"ES = NES, GA with archive re-scoring, at each sweep's best sigma ({sigmas}).",
+          f"ES and the GA with archive re-scoring, at each sweep's best sigma ({sigmas}).",
           'Every number is for the CENTROID (the ES mean; the mean of the GA elite '
           'archive). Its generalist score is min(A, B); a generalist scores at least '
           '98% of the 0.70 peak.', '',

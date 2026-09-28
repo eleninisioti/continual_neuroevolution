@@ -17,7 +17,7 @@ The main figure is built in two steps, as plot_noncontinual_solve.py's:
 `--extract` reads the runs through the symlink trees under paper/<suite>/data
 (`<family>/continual/<arm>`, README.md beside each) and saves the per-seed
 curves, task switches and kept arms; without it only the saved data is read.
-The cheetah RL arms there are the ant-PPO-shape runs.
+The cheetah RL arms there are the brax-PPO-shape runs.
 
 --appendix draws the rest straight from the run trees (not yet moved to final):
 
@@ -34,14 +34,10 @@ its `load_report` (same runs, arms, superseded-arm checks, rolling median over
 1% of the records, bootstrap band), with a dashed line at every task switch
 from its `phase_edges`.
 
-A family draws ONE of OpenES/NES and ONE of PBT-PPO N=8/N=2: the paper treats
-each pair as one method, so each is ONE legend entry, `ES` and `PBT-PPO`
-(the markdown's Kept column says which variant). In the main figure ES is NES,
-except on Kinetix where it is plain OpenES (`es`); elsewhere, and for
-PBT everywhere, the variant is the one with the higher Cum. elite over the
-family's continual cells (es_arm.py). Since 2026-09-24 the ES variant is
-es_arm.kept_for(tree): NES everywhere except Kinetix (es_arm.KEPT_BY_SUITE),
-the same choice as before, now in one place.
+A family draws ONE of PBT-PPO N=8/N=2: the paper treats the pair as one
+method, so it is ONE legend entry, `PBT-PPO` (the markdown's Kept column says
+which variant): the one with the higher Cum. elite over the family's
+continual cells (es_arm.py). ES is the one `es` arm.
 An arm with a trial still running is left out of its family until every trial
 it started has finished, rather than drawn from its first seeds.
 
@@ -149,7 +145,7 @@ LAYOUT = {'main': (5, (3.2, 2.6), None),
           'kinetix': (1, (6.5, 2.4), 4)}
 TAIL = 0.10             # Phase end reads the last this fraction of every phase
 # The variant behind a pair's one legend entry, for the markdown.
-KEPT = {'es': 'OpenES', 'nes': 'NES', 'pbt': 'PBT N=8', 'pbt2': 'PBT N=2'}
+KEPT = {'pbt': 'PBT N=8', 'pbt2': 'PBT N=2'}
 
 
 RUNNING = 3600         # s: a trial with no results whose train.log moved this recently
@@ -174,25 +170,21 @@ def complete_arms(root, cells):
     return arms
 
 
-def load_tree(tree, cells, es_kept=None):
-    """`(data, per_gen, edges_in_generations, [kept ES arm, kept PBT arm], cum)`
-    for `cells` of one continual tree. Each tree here is one finish_iclr.sh
-    family, so ES vs NES (unless `es_kept` fixes it) and PBT N=8 vs N=2 are each
-    es_arm.py's pick over these cells (higher Cum. elite); the losers are
-    dropped from `data` and the kept arm is filed under its pair's first name
-    (`es`, `pbt`), one legend entry a pair."""
+def load_tree(tree, cells):
+    """`(data, per_gen, edges_in_generations, [kept PBT arm], cum)` for `cells`
+    of one continual tree. Each tree here is one finish_iclr.sh family, so PBT
+    N=8 vs N=2 is es_arm.py's pick over these cells (higher Cum. elite); the
+    loser is dropped from `data` and the kept arm is filed under `pbt`, one
+    legend entry."""
     root = PROJECT / tree
     arms = complete_arms(root, cells)
     args = lp.parse_args([str(root), '--phase', 'continual', '--cells', *cells,
                           '--metric', 'centroid', '--methods', *arms, '--out', '-'])
     rep = lp.load_report(args)
-    pairs = (ncs.es_arm.ARMS, ncs.es_arm.PBT_ARMS)
+    pairs = (ncs.es_arm.PBT_ARMS,)
     cum = ncs.es_arm.load(root, 'continual', cells, arms=sum(pairs, ()))
     kept = [ncs.es_arm.pick(cum, pair)[0] if set(pair) <= set(arms)
             else next((a for a in pair if a in arms), None) for pair in pairs]
-    if es_kept:
-        assert es_kept in arms, f'{es_kept} has no finished runs under {root}'
-        kept[0] = es_kept
     for by_method in rep.data.values():
         for pair, k in zip(pairs, kept):
             for arm in pair:
@@ -231,8 +223,8 @@ def write_markdown(figures, methods, path):
              '`scripts/analysis/plot_continual_lineplots.py`; change the panels in its '
              '`PANELS` table.', '',
              f'**Phase end**: the curve\'s mean over the last {TAIL:.0%} of every phase, '
-             'averaged over phases, then seeds. Cheetah do-nothing floor ~677. The ES '
-             'and PBT-PPO columns are the variant in Kept (module docstring for the '
+             'averaged over phases, then seeds. Cheetah do-nothing floor ~677. The '
+             'PBT-PPO column is the variant in Kept (module docstring for the '
              'rule). `--`: arm not drawn (not run, or still training).', '']
     for fig, panels in figures.items():
         drawn = [m for m in methods if any(m in col['curves'] for *_, col in panels)]
@@ -264,14 +256,13 @@ def _cells(fig_filter):
 
 def extract():
     """Read the main figure's runs and write DATA.npz (`<tree>|<cell>|<arm>|gens`
-    and `...|curves`, unsmoothed, kept arms only, filed under `es`/`pbt`) and
+    and `...|curves`, unsmoothed, kept arms only, the PBT one filed under `pbt`) and
     DATA.json (task switches and kept arms a tree, Cum. elite a trial, the runs
     each arm resolves to)."""
     arrays = {}
     meta = {'edges': {}, 'kept': {}, 'elite_cum': {}, 'sources': {}}
     for tree, cells in _cells(lambda f: f == 'main').items():
-        data, per_gen, edges, kept, cum = load_tree(
-            tree, cells, es_kept=ncs.es_arm.kept_for(tree))
+        data, per_gen, edges, kept, cum = load_tree(tree, cells)
         meta['edges'][tree], meta['kept'][tree] = edges.tolist(), kept
         for cell in cells:
             meta['elite_cum'][_key(tree, cell)] = cum.get(cell.split('_sigma')[0], {})
@@ -333,7 +324,7 @@ def main() -> int:
                     help='draw the appendix figures (from the run trees) instead')
     args = ap.parse_args()
     plt.rcParams.update({'font.size': 9})
-    # `pbt` stands for either PBT size here (load_tree); `es` is already `ES`.
+    # `pbt` stands for either PBT size here (load_tree).
     lp.METHOD_STYLE['pbt'] = {**lp.METHOD_STYLE['pbt'], 'label': 'PBT-PPO'}
     if args.appendix:
         figures, out, md = load_appendix(), OUT, OUT / 'continual_lineplots.md'

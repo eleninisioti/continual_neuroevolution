@@ -5,7 +5,7 @@
     .venv/bin/python scripts/analysis/child_survival.py probe --panels cheetah_noise --phases 1::2 --gpus 4
     .venv/bin/python scripts/analysis/child_survival.py table
 
-The question (2026-09-17). On the rugged toy (`source/studies/toy/sweep.py`)
+The question (2026-09-17). On the rugged toy (`scripts/train/toy_sweep.py`)
 a GA stops finding the generalist when the ruggedness spans many coordinates,
 because an isotropic gaussian child has to land well on every rugged coordinate
 at once. The toy reads this as `q`: the share of the incumbent's gaussian
@@ -18,8 +18,7 @@ The same reading on the paper's continual_main tasks
 
   parent    the saved agent at every plasticity checkpoint (end of each
             sub-task phase, `checkpoints.npz`): the GA's `incumbent`, the ES's
-            `centroid` (the network ES perturbs). ES = NES except on Kinetix,
-            where it is the OpenES arm (`es` -> es_hold), as CLAUDE.md says.
+            `centroid` (the network ES perturbs).
   width     the run's OWN mutation width at that checkpoint: the logged
             `sigma` column at the phase's last record where the run logs one,
             else the config (`mutation_std`, then `sigma`). This matters:
@@ -105,7 +104,7 @@ import numpy as np                                             # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 sys.path.insert(0, str(REPO / 'scripts' / 'analysis'))
 PROJECT = REPO / 'projects' / 'iclr_2027'
 OUT = REPO / 'results' / 'child_survival'
@@ -132,14 +131,6 @@ PANEL = {p[0]: p for p in PANELS}
 MULTIPLES = (0.0, 0.1, 0.25, 0.5, 1.0, 2.0)
 TOLERANCE = 0.02          # the toy's q_tolerance, as a share of the score span
 N_BOOT = 2000
-
-
-def es_dir(tree):
-    return 'es' if tree.startswith('paper/kinetix') else 'nes'
-
-
-def arm_dir(arm, tree):
-    return es_dir(tree) if arm == 'es' else arm
 
 
 # ---------------------------------------------------------------------------
@@ -345,7 +336,7 @@ def cmd_probe(args):
         floor, best = panel_span(tree, cell)
         span = best - floor
         for arm in args.arms:
-            adir = PROJECT / tree / 'continual' / arm_dir(arm, tree)
+            adir = PROJECT / tree / 'continual' / arm
             source = 'incumbent' if arm == 'ga' else 'centroid'
             suffix = '' if args.shard is None else '__shard' + args.shard.replace('/', 'of')
             raw_path = OUT / 'raw' / f'{name}__{arm}{suffix}.json'
@@ -499,7 +490,7 @@ def cmd_curvature(args):
             # --tree probes an arm outside the paper's tree (plain ES on
             # Kinetix: runs_kinetix_ep128_ev1/kinetix, arm `es`), saved as `--label`.
             adir = (PROJECT / args.tree / 'continual' / arm if args.tree
-                    else PROJECT / tree / 'continual' / arm_dir(arm, tree))
+                    else PROJECT / tree / 'continual' / arm)
             arm = args.label or arm
             raw_path = CURV_OUT / 'raw' / f'{name}__{arm}.json'
             rows = json.loads(raw_path.read_text()) if raw_path.exists() else []
@@ -776,7 +767,7 @@ def cmd_overlap(args):
     for name in args.panels:
         _, tree, cell, title = OVERLAP_PANEL[name]
         for arm in args.arms:
-            adir = PROJECT / tree / args.stage / arm_dir(arm, tree)
+            adir = PROJECT / tree / args.stage / arm
             # --source incumbent on pbt: its best single member instead of the
             # weight mean it reports, to test whether averaging makes the width.
             label = args.label or arm
@@ -892,7 +883,7 @@ FIG2_OF_PANEL = {        # overlap panel -> Figure 2's stability_plasticity key
     'acrobot_actions': 'paper/gymnax/data/actions_2task|Acrobot_v1_sigma1.0',
     'mountaincar_actions': 'paper/gymnax/data/actions_2task|MountainCar_v0_sigma1.0',
 }
-NE_ARMS = {'es', 'nes', 'ga'}
+NE_ARMS = {'es', 'ga'}
 
 
 def cmd_overlap_vs_tradeoff(args):
@@ -950,7 +941,7 @@ def overlap_points(key_name='matched:1', good=0.8):
         span = la_best - floor
         frozen = frozen_methods(key)
         for arm in sorted({r['arm'] for r in sel}):
-            m = 'nes' if arm == 'es' else arm
+            m = arm
             if m not in by_m:
                 continue
             st = [overlap_stats(r, best, 0.05, good) for r in sel if r['arm'] == arm]
@@ -1177,7 +1168,7 @@ def main():
                        'see the curvature section')
     c.add_argument('--panels', nargs='+', default=['kinetix'], choices=list(PANEL))
     c.add_argument('--arms', nargs='+', default=['es', 'ga', 'ppo'],
-                   help='arm directories under continual/ (es -> nes/es as in probe)')
+                   help='arm directories under continual/')
     c.add_argument('--sigmas', nargs='+', type=float, default=list(CURV_SIGMAS))
     c.add_argument('--pairs', type=int, default=120, help='antithetic pairs: 240 draws')
     c.add_argument('--copies', type=int, default=4, help='parent re-scores (noise control)')

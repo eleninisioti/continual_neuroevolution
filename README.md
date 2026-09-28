@@ -10,9 +10,11 @@ gymnax, Brax/MJX, MiniGrid and Kinetix.
 |---|---|
 | `source/algorithms/` | one implementation per method (`ne/` neuroevolution, `rl/` PPO and its variants) |
 | `source/envs/` | environment wrappers and task schedules (gymnax, Brax/MJX, MiniGrid, Kinetix) |
-| `source/studies/` | per-benchmark settings and command-line entry points (`cli.py`) |
+| `source/configs/` | one YAML config per benchmark: cells, methods, hyperparameters and budgets |
+| `source/runners/` | the two training loops every benchmark shares: `train_nes.py` (GA, ES, DNS) and `train_ppo.py` (PPO and its variants, PBT) |
+| `source/run.py` | the one entry point that reads a config and calls a runner |
 | `source/metrics/`, `source/utils/` | plasticity metrics and shared utilities |
-| `scripts/train/` | launch scripts for the experiments in the paper |
+| `scripts/train/` | `run.sh`, which runs the experiments in the paper |
 | `scripts/analysis/`, `scripts/make_*.py` | post-hoc evaluation, tables and figures |
 | `third_party/kinetix/` | a modified copy of Kinetix, with dormant-neuron instrumentation and the level set we use |
 
@@ -32,7 +34,6 @@ source .venv/bin/activate
 
 # 3. Check the install
 python -c "import jax; print(jax.devices())"
-python scripts/check_imports.py
 ```
 
 `uv sync` installs the exact versions in `uv.lock` (JAX 0.5.3 with CUDA 12, Brax 0.14,
@@ -49,45 +50,81 @@ pip install -e .
 
 ## Running experiments
 
-Run every command from the repository root. Each benchmark has one entry point, and
-`--help` lists its options:
+Run every command from the repository root. One script runs everything:
 
 ```bash
-python source/studies/minigrid/cli.py --help
-python source/studies/kinetix/cli.py --help
-python source/studies/mjx/cli.py --help      # Brax / MJX: HalfCheetah and Ant
+bash scripts/train/run.sh [--gpus N] SETTING[:METHODS] [SETTING[:METHODS] ...]
 ```
 
-For example, a quick check that the MiniGrid configuration resolves:
+It queues every trial of every setting you name, in that order, and runs them one per
+GPU on the first `N` GPUs (default: all visible). Each benchmark has a stationary and a
+continual setting:
+
+| Benchmark | Stationary setting | Continual setting | Cells (stationary / continual) |
+|---|---|---|---|
+| gymnax | `gymnax_noncontinual` | `gymnax_continual` | CartPole-v1, Acrobot-v1, MountainCar-v0 / each at noise σ 0.02, 1.0, 2.0 |
+| MiniGrid | `minigrid_noncontinual` | `minigrid_continual` | MiniGrid_8x8, MiniGrid_16x16 / MiniGrid_8x8_16x16 |
+| Kinetix | `kinetix_noncontinual` | `kinetix_continual` | the 20 `Kinetix-h*` levels / Kinetix20 |
+| MJX HalfCheetah | `cheetah_noncontinual` | `cheetah_continual` | cheetah / cheetah_noise, cheetah_friction |
+
+`all` stands for all eight, and `gymnax_popsize` is the population-size sweep.
+
+Methods:
+
+| Method | Name(s) |
+|---|---|
+| GA | `ga` |
+| GA + Novelty (DNS) | `dns` (gymnax, Kinetix), `dns_gaussian` (MiniGrid, Kinetix, MJX) |
+| ES | `es` (z-scored fitness + SGD on gymnax, MiniGrid and MJX; centred ranks + Adam on Kinetix) |
+| PBT | `pbt` (population of 8), `pbt2` (population of 2) |
+| PPO, TRAC-PPO, ReDo-PPO, C-CHAIN-PPO | `ppo`, `trac`, `redo`, `cchain` |
+
+Without `:METHODS` a setting runs the methods the paper reports for that benchmark
+(`reported_arms` in `source/configs/<benchmark>.yaml`). Examples:
 
 ```bash
-python source/studies/minigrid/cli.py --env MiniGrid_8x8_16x16 --method ppo \
-    --output_dir /tmp/minigrid_check --dry_run
+# every experiment in the paper, on 8 GPUs
+bash scripts/train/run.sh --gpus 8 all
+
+# all methods on the gymnax continual setting, on 4 GPUs
+bash scripts/train/run.sh --gpus 4 gymnax_continual
+
+# only GA and PPO, on two settings one after the other
+bash scripts/train/run.sh --gpus 2 gymnax_noncontinual:ga,ppo gymnax_continual:ga,ppo
+
+# one quick trial, to check the setup
+ENVS=CartPole-v1 bash scripts/train/run.sh --gpus 1 --trials 1 --root runs gymnax_noncontinual:ga
 ```
 
-The full experiment grids are defined in `scripts/train/run_experiments.sh` and
-started with `scripts/train/launch.sh`, which spreads the jobs over the available GPUs:
+Options: `--gpu-ids 0,2` picks exact GPUs, `--trials N` sets trials per method and cell
+(default 10), `--root DIR` sets where runs go, and `--dry-run` prints the job list
+without running it. `bash scripts/train/run.sh --help` lists the rest.
 
-```bash
-bash scripts/train/launch.sh gymnax_noncontinual nes ga dns ppo trac redo cchain
-bash scripts/train/launch.sh gymnax_continual    nes ga dns ppo trac redo cchain
-```
+Each run is written to `<root>/<benchmark>/<setting>/<method>/<cell>/trial_<n>/`, and
+its log to `logs/run/`. A trial that already has a `training_metrics.json` is skipped,
+so running the same command again runs only what is missing or failed.
 
-The `scripts/train/queue_iclr_*.sh` scripts run the configurations reported in the
-paper, one per benchmark (for example, `queue_iclr_kinetix_continual.sh` and
-`queue_iclr_minigrid_continual.sh`).
+### How a run is put together
+
+| Path | Role |
+|---|---|
+| `source/run.py` | the one Python entry point: `--suite <benchmark> --env <cell> --method <m>` |
+| `source/configs/<benchmark>.yaml` | what an experiment is: cells, methods, hyperparameters, compute-matched budgets |
+| `source/utils/config.py` | loads a benchmark's YAML and derives what `run.py` needs from it (cells, budgets, budget checks) |
+| `source/runners/` | the two training loops every benchmark shares: `train_nes.py` (GA, ES, DNS) and `train_ppo.py` (PPO and its variants, PBT) |
+| `source/algorithms/` | the methods themselves (`ne/`, `rl/`) |
 
 ## Evaluation and figures
 
 ```bash
 # Zero-shot transfer: writes evaluation.json next to each run
-python -m source.studies.evaluate_continual --root <runs>/gymnax/continual --episodes 100
+python scripts/analysis/evaluate_continual.py --root <runs>/gymnax/continual --episodes 100
 
 # Forgetting: evaluates every checkpoint on every task
 python scripts/analysis/behavioural_divergence.py --runs_root <runs> ...
 
 # Training curves and the metric table
-python scripts/make_lineplot.py --help
+python scripts/plotting/make_lineplot.py --help
 ```
 
 ## License

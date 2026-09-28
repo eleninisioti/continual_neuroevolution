@@ -1,40 +1,41 @@
-"""Dominated Novelty Search: selection, variation, and the diversity measures.
+"""Dominated Novelty Search, the paper's "GA + Novelty" arm.
 
-DNS -- the paper's "GA + Novelty" arm -- replaces the GA's fitness-ranked
-truncation with a rank on *dominated novelty*: an individual's mean distance in
-descriptor space to the k nearest individuals that beat it on fitness. A
-low-fitness individual survives when nothing similar to it is better, which is
-what keeps the population spread out instead of converging.
+DNS replaces the GA's fitness-ranked truncation with a rank on *dominated
+novelty*: an individual's mean distance in descriptor space to the k nearest
+individuals that are at least as fit. A low-fitness individual survives when
+nothing similar to it is better, which is what keeps the population spread out
+instead of converging. The fittest individuals have no fitter neighbour and
+score NaN, which sorts highest under a descending argsort -- so elitism falls
+out of the ranking rather than being a special case around it.
 
-The fittest individuals have no fitter neighbour and score NaN, which sorts
-highest under a descending argsort -- so elitism falls out of the ranking rather
-than being a special case around it.
+Two methods of one class, differing only in the variation operator
+(`source/algorithms/ne/variation.py`):
 
-`isoline_variation` is the crossover DNS pairs with -- but only by default.
-The operator is a CHOICE, not part of the method: it lives in
-`source/algorithms/ne/variation.py`, shared with the GA, and either method can
-run with either operator. That exists because DNS and the GA differed in the
-operator as well as the selection rule, so a DNS-over-GA gap confounded
-"novelty selection helps" with "recombination helps"; `--variation gaussian`
-here and `--variation isoline` on the GA are the arms that separate them.
+    dns            Iso+LineDD, DNS as published.
+    dns_gaussian   the GA's gaussian mutation, so `ga` vs `dns_gaussian`
+                   differs in the selection rule alone.
 
-The descriptor space is either hand-designed (`handcrafted_descriptors`) or
-learned online by AURORA (`source/metrics/aurora.py`), which is the default on
-tasks with no established descriptor.
+The descriptor space is either hand-designed (per suite, see `source/envs`)
+or learned online by AURORA (`source/metrics/aurora.py`).
 
-An exact port of QDax `dns_repertoire.py`, and identical between the stationary
-and continual DNS trainers.
+The dominated-novelty computation is an exact port of QDax
+`dns_repertoire.py`.
 """
+
+from __future__ import annotations
+
+from typing import NamedTuple
 
 import jax
 import jax.numpy as jnp
-import numpy as np
 from jax import random
 
-from source.algorithms.ne.variation import isoline_variation as _isoline
+from source.algorithms.ne.variation import (
+    GAUSSIAN, ISOLINE, VARIATIONS, resolve_params, vary,
+)
 
 
-def _compute_dominated_novelty(fitness, descriptor, k, normalize=False):
+def dominated_novelty(fitness, descriptor, k, normalize=False):
     """Compute dominated novelty — exact port of QDax dns_repertoire.py.
 
     For each individual, dominated novelty is the mean distance in descriptor
@@ -94,144 +95,131 @@ def _compute_dominated_novelty(fitness, descriptor, k, normalize=False):
     return dominated_novelty
 
 
-def dns_selection(
-    genotypes, fitnesses, descriptors, observations,
-    new_genotypes, new_fitnesses, new_descriptors, new_observations,
-    population_size, k, normalize=False,
-):
-    """DNS selection — follows QDax DominatedNoveltyRepertoire.add().
+class DNSState(NamedTuple):
+    repertoire: jnp.ndarray    # (repertoire_size, num_params)
+    fitness: jnp.ndarray       # (repertoire_size,) MAXIMISED
+    descriptors: jnp.ndarray   # (repertoire_size, descriptor_dim)
+    generation: jnp.ndarray
+    # (repertoire_size, traj_steps, obs_dim) under AURORA, else a (P, 0, 0)
+    # placeholder. The trajectories travel with the survivors because the
+    # AURORA encoder is retrained during the run and EVERY stored descriptor
+    # has to be recomputed with the new encoder -- a descriptor encoded by a
+    # superseded encoder is not comparable with a fresh one.
+    observations: jnp.ndarray = jnp.zeros((0, 0, 0))
 
-    Combines parents and offspring, computes dominated novelty on the combined
-    pool, and keeps the top population_size individuals by dominated novelty.
 
-    The observation trajectories travel with the survivors so that the AURORA
-    encoder can be retrained on them and every stored descriptor recomputed
-    whenever the encoder changes (as in AURORA.train()). Same contract as
-    train_DNS_gymnax.py.
+class DNSSearcher:
+    """Dominated Novelty Search. ``method='dns'`` or ``'dns_gaussian'``.
+
+    Offspring come from ``variation`` (Iso+LineDD by default); survivors are
+    the repertoire_size individuals of highest dominated novelty, the fittest
+    (NaN) always first.
+
+    The repertoire is RE-SCORED every generation, for the same reason as the
+    GA's archive (`source/algorithms/ne/ga.py`): under a switching schedule a
+    stored fitness and a stored descriptor were measured on a different
+    sub-task, and "who dominates whom" would compare numbers from two tasks.
+    ``population_size`` is therefore the EVALUATION BUDGET per generation and
+    ``repertoire_ratio`` splits it: at 512 / 0.5 the repertoire is 256 and 256
+    offspring are bred from it, matching the other methods' 512 evaluations.
+
+    The iso/line sigmas default to the reference's corrected values
+    (0.005 / 0.05).
     """
-    # Combine candidates
-    combined_genotypes = jnp.concatenate([genotypes, new_genotypes], axis=0)
-    combined_fitnesses = jnp.concatenate([fitnesses, new_fitnesses], axis=0)
-    combined_descriptors = jnp.concatenate([descriptors, new_descriptors], axis=0)
-    # None under --descriptor handcrafted, where nothing reads trajectories.
-    combined_observations = (
-        None if observations is None
-        else jnp.concatenate([observations, new_observations], axis=0))
 
-    # Compute dominated novelty on combined pool
-    dominated_novelty = _compute_dominated_novelty(
-        combined_fitnesses, combined_descriptors, k, normalize=normalize
-    )
+    needs_descriptors = True
+    # Recorded in the run config (`train_nes.searcher_resolved`).
+    refresh = True
 
-    valid = combined_fitnesses != -jnp.inf
-    # THE TOP TIER IS KEPT AS A BLOCK (2026-09-18). The reference protects the
-    # unique fittest individual (NaN novelty, sorted first) and nothing else:
-    # members that TIE at the top score their novelty against each other, and
-    # when they share a descriptor -- every DeepSea solver walks the one
-    # solving path, every CartPole solver scores 500 -- that novelty is 0,
-    # they rank below every non-solver, and are all dropped in the same
-    # generation; a solution survived only while it was unique. Here every
-    # member with no STRICTLY fitter neighbour ranks above the rest, ordered
-    # among themselves by the same `<=` novelty, so tied solvers are kept
-    # (the most novel ones if the tier is larger than the population) and a
-    # population that ties everywhere -- the floor after a switch -- is still
-    # ranked by novelty, exactly as before. Strict `<` inside the novelty
-    # itself was tried first and is wrong: on that floor every member is
-    # "fittest", every score is NaN, and selection degenerates to keeping the
-    # newest offspring.
-    n = combined_fitnesses.shape[0]
-    strictly_fitter = combined_fitnesses[:, None] < combined_fitnesses[None, :]
-    strictly_fitter = strictly_fitter & valid[None, :] & ~jnp.eye(n, dtype=bool)
-    top_tier = valid & ~jnp.any(strictly_fitter, axis=1)
-    rank_novelty = jnp.where(jnp.isnan(dominated_novelty), jnp.inf, dominated_novelty)
-    meta_fitness = jnp.where(valid, rank_novelty, -jnp.inf)
-    # lexicographic (tier, novelty): a stable sort on novelty, then on tier
-    order = jnp.argsort(meta_fitness, stable=True)[::-1]
-    indices = order[jnp.argsort(~top_tier[order], stable=True)]
-    survivor_indices = indices[:population_size]
+    def __init__(self, num_params, population_size, descriptor_dim,
+                 iso_sigma=0.005, line_sigma=0.05, k=3, init_scale=0.1,
+                 normalize_descriptors=False, traj_steps=0, obs_dim=0,
+                 repertoire_ratio=0.5, init_around_mean=True,
+                 variation=ISOLINE, sigma_init=0.1, cross_over_rate=0.0):
+        self.num_params = int(num_params)
+        self.population_size = int(population_size)
+        self.descriptor_dim = int(descriptor_dim)
+        if variation not in VARIATIONS:
+            raise ValueError(f'variation must be one of {VARIATIONS}, '
+                             f'not {variation!r}')
+        self.variation = variation
+        self.variation_params = (
+            resolve_params(ISOLINE, iso_sigma=iso_sigma,
+                           line_sigma=line_sigma)
+            if variation == ISOLINE else
+            resolve_params(GAUSSIAN, sigma=sigma_init,
+                           cross_over_rate=cross_over_rate))
+        self.k = int(k)
+        self.init_scale = float(init_scale)
+        self.normalize_descriptors = bool(normalize_descriptors)
+        # Where the repertoire starts: jittered copies of the seed policy, or
+        # the reference's `N(0, init_scale)` -- as `GASearcher.init_around_mean`.
+        self.init_around_mean = bool(init_around_mean)
+        self.repertoire_size = max(
+            1, int(self.population_size * float(repertoire_ratio)))
+        self.num_offspring = self.population_size - self.repertoire_size
+        if self.num_offspring < 1:
+            raise ValueError('DNS needs repertoire_ratio < 1')
+        # The name the run configs carry for the offspring count.
+        self.batch_size = self.num_offspring
+        self.traj_steps = int(traj_steps)
+        self.obs_dim = int(obs_dim)
 
-    return (
-        combined_genotypes[survivor_indices],
-        combined_fitnesses[survivor_indices],
-        combined_descriptors[survivor_indices],
-        None if combined_observations is None else combined_observations[survivor_indices],
-        dominated_novelty[survivor_indices],
-    )
+    def init(self, key, mean):
+        r = self.repertoire_size
+        jitter = random.normal(key, (r, self.num_params))
+        return DNSState(
+            repertoire=((mean[None, :] if self.init_around_mean else 0.0)
+                        + self.init_scale * jitter),
+            fitness=jnp.full((r,), -jnp.inf),
+            descriptors=jnp.zeros((r, self.descriptor_dim)),
+            generation=jnp.asarray(0, dtype=jnp.int32),
+            observations=jnp.zeros((r, self.traj_steps, self.obs_dim)))
 
+    def ask(self, key, state):
+        # Parents are drawn from the WHOLE repertoire (see `_draw_parents` in
+        # variation.py). Offspring first, then the repertoire to be re-scored.
+        offspring = vary(self.variation, state.repertoire, key,
+                         self.num_offspring, self.variation_params)
+        return jnp.concatenate([offspring, state.repertoire], axis=0), None
 
-def isoline_variation(genotypes, key, iso_sigma=0.005, line_sigma=0.05,
-                      batch_size=256, return_parents=False):
-    """Iso+Line-DD variation, in the argument order the DNS trainers call it.
+    def tell(self, state, aux, fitness, descriptors=None, observations=None):
+        if descriptors is None:
+            raise ValueError('DNS needs behaviour descriptors')
+        novelty = dominated_novelty(fitness, descriptors, self.k,
+                                    self.normalize_descriptors)
+        valid = fitness != -jnp.inf
+        meta = jnp.where(valid, novelty, -jnp.inf)
+        # NaN (the fittest, having no fitter neighbour) sorts first descending.
+        keep = jnp.argsort(meta)[::-1][:self.repertoire_size]
+        new = state._replace(repertoire=aux[keep], fitness=fitness[keep],
+                             descriptors=descriptors[keep],
+                             generation=state.generation + 1)
+        if observations is not None:
+            new = new._replace(observations=observations[keep])
+        return new
 
-    The operator itself lives in `source/algorithms/ne/variation.py`, shared
-    with the GA so that the two methods can be crossed with either operator and
-    the novelty-selection claim can be separated from the recombination one.
-    This wrapper only reorders arguments: every DNS trainer here calls it
-    positionally as `(population, key, iso_sigma, line_sigma, batch_size)`,
-    which is not the `(genotypes, key, num_offspring, ...)` shape every other
-    operator has.
+    def reencode(self, state, descriptors):
+        """Replace every stored descriptor, after the encoder was retrained.
 
-    The sigma defaults are the DNS reference's
-    (inspiration/DNS/Dominated-Novelty-Search/configs/algo/{me,aurora}.yaml).
-    They were 0.05/0.5 until 2026-07-29, ten times too large -- see
-    docs/dns_cheetah_diagnosis.md and the shared module's docstring.
-    """
-    return _isoline(genotypes, key, batch_size, iso_sigma=iso_sigma,
-                    line_sigma=line_sigma, return_parents=return_parents)
+        Separate from ``tell`` because it happens on AURORA's schedule rather
+        than every generation, and because the encoder lives in the runner.
+        """
+        return state._replace(descriptors=descriptors)
 
+    def incumbent(self, state):
+        """The highest-fitness member. The repertoire is deliberately diverse,
+        so its average is not a policy."""
+        return state.repertoire[jnp.argmax(state.fitness)]
 
-def handcrafted_descriptors(observations, env_name):
-    """Hand-designed descriptors, from the last valid observation of the episode.
+    def population_mean(self, state):
+        """The coordinate-wise mean of the repertoire -- the same caveat as
+        `GASearcher.population_mean`, and stronger: the repertoire is selected
+        for behavioural spread."""
+        return jnp.mean(state.repertoire, axis=0)
 
-    Only used with --descriptor handcrafted; the default is the unsupervised
-    AURORA encoding of the whole trajectory.
-    """
-    last_obs = observations[:, -1, :]
-    if 'CartPole' in env_name:
-        return jnp.stack([last_obs[:, 0], last_obs[:, 2]], axis=-1)  # cart pos, pole angle
-    elif 'MountainCar' in env_name:
-        return last_obs  # position and velocity
-    elif 'Acrobot' in env_name:
-        return last_obs[:, :2]  # cos, sin of first joint
-    return last_obs[:, :2]
+    # A persistent population, and one selected for spread.
+    has_population = True
 
-
-def compute_fitness_diversity(fitnesses):
-    return float(jnp.std(fitnesses))
-
-
-def compute_descriptor_diversity(descriptors):
-    """Mean pairwise distance in (learned) descriptor space."""
-    n = descriptors.shape[0]
-    if n < 2:
-        return 0.0
-    distances = jnp.linalg.norm(
-        descriptors[:, None, :] - descriptors[None, :, :], axis=-1
-    )
-    mask = jnp.triu(jnp.ones((n, n)), k=1)
-    return float(jnp.sum(distances * mask) / jnp.sum(mask))
-
-
-def compute_genomic_diversity(genotypes, sample_size=32):
-    """Compute genomic diversity using sampling to avoid OOM."""
-    pop_size = genotypes.shape[0]
-    if pop_size < 2:
-        return 0.0
-    
-    actual_sample = min(sample_size, pop_size)
-    indices = np.random.choice(pop_size, size=actual_sample, replace=False)
-    sampled = genotypes[indices]
-    
-    sampled_np = np.array(sampled)
-    g_min = np.min(sampled_np, axis=0, keepdims=True)
-    g_max = np.max(sampled_np, axis=0, keepdims=True)
-    g_range = np.maximum(g_max - g_min, 1e-8)
-    norm_genotypes = (sampled_np - g_min) / g_range
-    
-    diffs = norm_genotypes[:, None, :] - norm_genotypes[None, :, :]
-    distances = np.linalg.norm(diffs, axis=-1)
-    
-    mask = np.triu(np.ones((actual_sample, actual_sample)), k=1)
-    mean_dist = np.sum(distances * mask) / np.sum(mask)
-    
-    return float(mean_dist)
+    def population(self, state):
+        return state.repertoire

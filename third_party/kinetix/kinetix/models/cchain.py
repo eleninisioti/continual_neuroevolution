@@ -1,7 +1,7 @@
 """C-CHAIN: Continual Churn Approximated Reduction (Tang et al., ICML 2025)
 for the Kinetix actor-critic.
 
-Port of `source/studies/gymnax/cchain.py` -- itself a port of
+Port of the gymnax C-CHAIN (now `source/algorithms/rl/cchain.py`) -- itself a port of
 `inspiration/C-CHAIN/crl_gym_classic_control/` -- onto this repo's Kinetix PPO,
 so the Kinetix `cchain` column means the same thing as the gymnax and mujoco
 ones.
@@ -44,7 +44,7 @@ import jax.numpy as jnp
 
 
 # Reference defaults (Tang et al. and the reference implementation), identical
-# to the ones source/studies/gymnax/cchain.py uses.
+# to the ones source/algorithms/rl/cchain.py uses.
 DEFAULT_TARGET_REL_SCALE = 10000.0
 DEFAULT_WARMUP_UPDATES = 10
 DEFAULT_COEF_WINDOW = 50

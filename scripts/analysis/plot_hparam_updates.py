@@ -57,7 +57,7 @@ from matplotlib.gridspec import GridSpec                   # noqa: E402
 
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parent.parent
-for p in (REPO, REPO / 'scripts', HERE):
+for p in (REPO, REPO / 'scripts' / 'plotting', HERE):
     sys.path.insert(0, str(p))
 import make_lineplot as lp                                 # noqa: E402
 import plot_continual_lineplots as pcl                     # noqa: E402
@@ -73,7 +73,7 @@ DATA = pcl.FINAL / 'data' / f'{STEM}.json'
 
 TEXT_WIDTH_IN = 5.5
 MUTED = '#6b6a65'
-FAMILY_TITLE = {'ppo': 'PPO', 'nes': 'ES'}
+FAMILY_TITLE = {'ppo': 'PPO', 'es': 'ES'}
 METRICS = {'cum': 'Cum. centroid', 'final': 'End-of-sub-task return',
            'la': 'Learning accuracy LA', 'F': 'Forgetting F'}
 # The metrics each figure is drawn for. LA and F exist only where the
@@ -110,7 +110,7 @@ FAMILIES = {
         titles={'CartPole_v1_sigma1.0': 'CartPole, noise',
                 'Acrobot_v1_sigma1.0': 'Acrobot, noise',
                 'MountainCar_v0_sigma0.1': 'MountainCar, noise'},
-        gen_steps=512 * 3 * 500, link='reported', arms=('ppo', 'nes'),
+        gen_steps=512 * 3 * 500, link='reported', arms=('ppo', 'es'),
         sweeps={'minibatches': _mb('ppo_minibatches', (4, 8, 128), 32),
                 'lr': _lr('ppo_lr')}),
     'actions': dict(
@@ -149,10 +149,10 @@ FAMILIES = {
 # ES columns first: the paper's one method order (make_lineplot.METHOD_ORDER,
 # NE before RL, as Figure 2) since 2026-09-21.
 AXES = [
-    ('nes', 'pop', 'population $P$',
-     [('nes_pop128', 128), ('reported', 512), ('nes_pop2048', 2048)], 'int'),
-    ('nes', 'lr', r'learning rate $\alpha$',
-     [('nes_lr0.25x', 0.25), ('reported', 1), ('nes_lr4x', 4)], 'mult'),
+    ('es', 'pop', 'population $P$',
+     [('es_pop128', 128), ('reported', 512), ('es_pop2048', 2048)], 'int'),
+    ('es', 'lr', r'learning rate $\alpha$',
+     [('es_lr0.25x', 0.25), ('reported', 1), ('es_lr4x', 4)], 'mult'),
 
     ('ppo', 'epochs', 'epochs $K$',
      [('ppo_epochs1', 1), ('ppo_epochs3', 3), ('reported', 10), ('ppo_epochs30', 30)], 'int'),
@@ -374,10 +374,7 @@ def save(fig, stem, width, height):
 
 
 def _colour(arm):
-    """The paper reports NES as ES: one method, ES's colour, as every other
-    figure (plot_stability_plasticity.ES_COLOUR). METHOD_STYLE's own `nes`
-    entry is a darker gold that appears nowhere else in the paper."""
-    return lp.METHOD_STYLE['es' if arm == 'nes' else arm]['color']
+    return lp.METHOD_STYLE[arm]['color']
 
 
 def draw_sweep(meta, metric, args):

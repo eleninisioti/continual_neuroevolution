@@ -18,7 +18,7 @@ THE QUESTION. The paper compares every method at one setting (Appendix tables
 hyper_ne / hyper_rl). scripts/train/queue_iclr_hparam.sh moves ONE
 hyperparameter at a time over two orders of magnitude around that setting --
 x0.1, x0.3, x3, x10 -- with everything else the reported run's: the GA's
-mutation width, NES's search width, PPO's learning rate and PPO's entropy
+mutation width, ES's search width, PPO's learning rate and PPO's entropy
 coefficient, on the three classic-control cells of the main continual figure
 (CartPole / Acrobot at offset 1.0, MountainCar at 0.1), five trials each. The
 reported value is the reported run itself (runs_centroid, ten trials), read
@@ -81,7 +81,7 @@ FAMILIES = {
         results=PROJECT / 'paper/gymnax/hparam/results/centroid',
         cells=('CartPole_v1_sigma1.0', 'Acrobot_v1_sigma1.0', 'MountainCar_v0_sigma0.1'),
         titles=('CartPole, noise', 'Acrobot, noise', 'MountainCar, noise'),
-        default={'ga_sigma': 0.5, 'nes_sigma': 0.1}),
+        default={'ga_sigma': 0.5, 'es_sigma': 0.1}),
     'actions': dict(
         reported=PROJECT / 'paper/gymnax/actions/2task/results/centroid',
         reported_tree='paper/gymnax/data/actions_2task',
@@ -90,7 +90,7 @@ FAMILIES = {
         cells=('CartPole_v1_sigma1.0', 'Acrobot_v1_sigma1.0', 'MountainCar_v0_sigma1.0'),
         titles=('CartPole, action reversal', 'Acrobot, action reversal',
                 'MountainCar, action reversal'),
-        default={'ga_sigma': 0.5, 'nes_sigma': 0.1}),
+        default={'ga_sigma': 0.5, 'es_sigma': 0.1}),
     'minigrid': dict(
         reported=PROJECT / 'paper/minigrid/minigrid/results/centroid',
         reported_tree='paper/minigrid/data',
@@ -98,7 +98,7 @@ FAMILIES = {
         results=PROJECT / 'paper/minigrid/hparam/results/centroid',
         cells=('MiniGrid_8x8_16x16',),
         titles=('MiniGrid 8x8 / 16x16',),
-        default={'ga_sigma': 0.01, 'nes_sigma': 0.1}),
+        default={'ga_sigma': 0.01, 'es_sigma': 0.1}),
 }
 # A panel is (family, cell); the figure lays the families out one row each.
 PANELS = [(f, c, t) for f, spec in FAMILIES.items() for c, t in zip(spec['cells'], spec['titles'])]
@@ -111,7 +111,7 @@ TITLES = {(f, c): t for f, c, t in PANELS}
 # sweeps PPO), so they draw nothing.
 SWEEPS = {
     'ga_sigma': dict(arm='ga', label=r'GA, mutation width $\sigma$', style='ga'),
-    'nes_sigma': dict(arm='nes', label=r'ES, search width $\sigma$', style='es'),
+    'es_sigma': dict(arm='es', label=r'ES, search width $\sigma$', style='es'),
     'ppo_lr': dict(arm='ppo', label=r'PPO, learning rate $\alpha$', style='ppo'),
     'ppo_ent': dict(arm='ppo', label=r'PPO, entropy coefficient $\beta$', style='ppo'),
 }
@@ -126,7 +126,7 @@ def default_of(key, family, cell):
     return PPO_LR.get(cell, 3e-4) if key == 'ppo_lr' else 0.01
 
 
-ROWS = (('Neuroevolution: the search width', ('ga_sigma', 'nes_sigma')),
+ROWS = (('Neuroevolution: the search width', ('ga_sigma', 'es_sigma')),
         ('PPO: learning rate and entropy coefficient', ('ppo_lr', 'ppo_ent')))
 MULTS = (0.1, 0.3, 1.0, 3.0, 10.0)
 N_BOOT = 2000
@@ -165,16 +165,14 @@ def load_plane(results_dir, keep, cells):
 
 def reported_arms(family):
     """The arms the paper reports for `family`, from the stability figure's
-    saved data (one ES arm, one PBT arm), else the family's es_arm.json."""
+    saved data (one ES arm, one PBT arm), else the default arms."""
     spec = FAMILIES[family]
     saved = FINAL / 'data' / 'stability_plasticity.json'
     if saved.exists():
         arms = json.loads(saved.read_text()).get('arms', {}).get(spec['reported_tree'])
         if arms:
             return list(arms)
-    es_json = spec['reported'].parent.parent / 'es_arm.json'
-    kept = json.loads(es_json.read_text()).get('kept') if es_json.exists() else None
-    return ['ga', kept or 'nes', 'ppo', 'trac', 'redo', 'cchain', 'pbt']
+    return ['ga', 'es', 'ppo', 'trac', 'redo', 'cchain', 'pbt']
 
 
 def sweep_of(arm):

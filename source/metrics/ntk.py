@@ -52,8 +52,8 @@ many probe states were used.
 
 ## Cost, and why it is capped
 
-`G_theta` is (n, |theta|) and the Gram matrix is (n, n). At n = 128 and the
-ant's ~21k parameters that is ~11 MB and a 128x128 eigendecomposition -- cheap,
+`G_theta` is (n, |theta|) and the Gram matrix is (n, n). At n = 128 and
+~21k parameters that is ~11 MB and a 128x128 eigendecomposition -- cheap,
 but it is a full jacobian, so it is NOT free per generation the way a weight
 norm is. `max_samples` caps n; the default 128 places the effective rank to
 well inside the between-generation variation.

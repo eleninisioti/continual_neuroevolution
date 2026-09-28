@@ -10,10 +10,10 @@
 
 The paper-directory version of
 `projects/iclr_2027/runs_mechanism/analysis/scripts/landscape_all.py`, which
-drew NES against PPO only and chose checkpoints to fit the hypothesis (NES a
-generalist it kept, PPO one it lost). Here the run tree and the ES/NES arm are
-the paper directory's (`es_arm.json`; `pbt` is whichever of PBT N=8 / N=2
-`plot_metrics_overview.keep_one_arm` keeps), the agent is the centroid one
+drew ES against PPO only and chose checkpoints to fit the hypothesis (ES a
+generalist it kept, PPO one it lost). Here the run tree is the paper
+directory's (the one its post-hoc passes record; `pbt` is whichever of PBT
+N=8 / N=2 `plot_metrics_overview.keep_one_arm` keeps), the agent is the centroid one
 (`generalist_checkpoints.SOURCES`), and the threshold is the one the outcome
 figure classifies with (registry for gymnax, 0.8 MiniGrid, 2000 HalfCheetah).
 
@@ -60,8 +60,7 @@ PAPER = REPO / 'projects/iclr_2027/paper'
 ARMS = ['ga', 'es', 'ppo', 'redo', 'cchain', 'trac', 'pbt']
 # generalist_checkpoints.SOURCES['centroid']: the population mean where one is saved
 # (NE and PBT), else the single policy.
-SOURCE = {'ga': 'centroid', 'es': 'centroid', 'nes': 'centroid', 'pbt': 'centroid',
-          'pbt2': 'centroid'}
+SOURCE = {'ga': 'centroid', 'es': 'centroid', 'pbt': 'centroid', 'pbt2': 'centroid'}
 GYM = {'CartPole': (475.0, 0.0), 'Acrobot': (-80.0, -160.0), 'MountainCar': (-150.0, -250.0)}
 # (threshold, colour floor, grid points a side, episodes, chunk) per body.
 SPEC = {'minigrid': (0.8, 0.0, 31, 4, 256), 'cheetah': (2000.0, 0.0, 21, 2, 512)}
@@ -73,7 +72,7 @@ TYPES = ['kept', 'lost', 'generalist', 'switching', 'stuck', 'neither']
 
 def panels():
     """[(paper dir, cell)] in `plot_generalist_outcomes.GRID` order."""
-    sys.path.insert(0, str(REPO / 'scripts'))
+    sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
     sys.path.insert(0, str(REPO / 'scripts/analysis'))
     import plot_generalist_outcomes as pgo
     return [(p[0], p[1]) for _, row in pgo.GRID for p in row if p]
@@ -135,7 +134,7 @@ def make_scorer(results_path, ckpt, episodes):
     import jax
     import jax.numpy as jnp
     import numpy as np
-    from source.studies import evaluate_continual as ec
+    import evaluate_continual as ec
     from source.envs.run_context import RunContext, run_config, is_gymnax_run
     cfg = run_config(json.loads(pathlib.Path(results_path).read_text()))
     if is_gymnax_run(cfg):
@@ -205,24 +204,34 @@ def slice_plane(d, src, t, trial, n, episodes, chunk, axis=None, rel_beta=None, 
     return al, be, grids, at, float(np.linalg.norm(e1))
 
 
+def run_root(sub):
+    """The run tree a paper directory was built from, as its post-hoc passes
+    record it (the same lookup as plot_plasticity_overview.load_column)."""
+    res = PAPER / sub / 'results/centroid'
+    for name, key in (('plasticity_checkpoints.json', 'runs_root'),
+                      ('curvature_width.json', 'root')):
+        if (res / name).exists():
+            return REPO / json.loads((res / name).read_text())['meta'][key]
+    sys.exit(f'{sub}: no post-hoc pass under {res} records its run tree')
+
+
 def compute(sub, cell, arms, force):
     import numpy as np
-    es = json.loads((PAPER / sub / 'es_arm.json').read_text())
-    sys.path.insert(0, str(REPO / 'scripts'))
+    sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
     sys.path.insert(0, str(REPO / 'scripts/analysis'))
     import plot_metrics_overview as pmo
-    pbt_arm = pmo.keep_one_arm(sub, ['pbt', 'pbt2'])[1][1]
-    root = REPO / es['root'] / 'continual'
+    pbt_arm = pmo.keep_one_arm(sub, ['pbt', 'pbt2'])[1][0]
+    root = run_root(sub) / 'continual'
     thr, lo, n, episodes, chunk = spec(sub, cell)
     out = PAPER / sub / 'results/centroid/landscape'
     out.mkdir(parents=True, exist_ok=True)
     jpath = out / f'{cell}.json'
     blob = json.loads(jpath.read_text()) if jpath.exists() else {}
     blob.update(paper_dir=sub, cell=cell, root=str(root.relative_to(REPO)), threshold=thr,
-                floor=lo, grid=n, episodes=episodes, window=WINDOW, es_arm=es['kept'])
+                floor=lo, grid=n, episodes=episodes, window=WINDOW)
     blob.setdefault('rows', {})
     for arm in arms:
-        run_arm = {'es': es['kept'], 'pbt': pbt_arm}.get(arm, arm)
+        run_arm = {'pbt': pbt_arm}.get(arm, arm)
         if arm in blob['rows'] and not force and (out / f'{cell}_{arm}.npz').exists():
             print(f'{sub} {cell} {arm}: done, skipped', flush=True)
             continue

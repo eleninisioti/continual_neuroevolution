@@ -47,13 +47,13 @@ plot_stability_plasticity.py (which reads the centroid).
 Where the runs come from. GA on MountainCar is the plain gymnax GA
 (`<tree>/_ga_plain_backup`), not the paper's `ga_focus_explore`: GA + Novelty
 is the plain GA plus novelty selection, so that is the comparison that
-isolates novelty, and the focus runs log no behavioural diversity. The ES arm
-is the family's (es_arm.json; NES in both). GA + Novelty is read from the
+isolates novelty, and the focus runs log no behavioural diversity. GA +
+Novelty is read from the
 2026-09-16 re-runs that re-score the repertoire every generation
 (`runs_*_dnsrefresh`, scripts/train/cluster/submit_gymnax_dns.sh) when all
 their trials are there; `--dns boundary` -- or their absence -- falls back to
-the earlier runs, which re-scored the population AT each switch (CLAUDE.md rule
-(d)) and are stamped PRELIMINARY on the figure.
+the earlier runs, which re-scored the population AT each switch (so the method was
+told where the boundaries were) and are stamped PRELIMINARY on the figure.
 """
 
 from __future__ import annotations
@@ -107,11 +107,6 @@ METRIC_LABEL = {'la': 'Learning accuracy', 'cum': 'Cum. return',
                 'rec': 'Return after a switch'}
 
 
-def es_kept(sub):
-    path = PROJECT / 'paper' / sub / 'es_arm.json'
-    return json.loads(path.read_text())['kept'] if path.exists() else 'nes'
-
-
 def trial_dirs(tree, method, cell):
     base = PROJECT / tree / 'gymnax/continual'
     if method == 'ga' and cell.startswith('MountainCar'):
@@ -158,17 +153,16 @@ def load(column, dns_mode, score='elite_eval_fitness'):
     """`{(family, env): {method: {'div', 'la', 'rec'}}}`, the rescaling, and
     whether every GA + Novelty cell is the re-run."""
     data, scale, fixed = {}, {}, True
-    for fam, tree, rerun, cells, sub in FAMILIES:
+    for fam, tree, rerun, cells, _sub in FAMILIES:
         d_tree, ok = dns_tree(tree, rerun, cells, dns_mode)
         fixed &= ok
-        es = es_kept(sub)
         for env, cell in cells.items():
             panel = data[fam, env] = {}
-            for m in (es, 'ga', 'dns_gaussian'):
+            for m in ('es', 'ga', 'dns_gaussian'):
                 rows = [read_trial(t, column, score)
                         for t in trial_dirs(d_tree if m == 'dns_gaussian' else tree, m, cell)]
                 if rows:
-                    panel['es' if m == es else m] = {
+                    panel[m] = {
                         k: np.array([r[k] for r in rows]) for k in rows[0]}
             best = max(float(np.mean(r['la'])) for r in panel.values())
             for m in RL_ARMS:

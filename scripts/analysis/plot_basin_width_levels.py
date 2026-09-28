@@ -55,7 +55,7 @@ from matplotlib.lines import Line2D                        # noqa: E402
 from scipy.stats import spearmanr                          # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 sys.path.insert(0, str(REPO / 'scripts/analysis'))
 import plot_basin_width_methods as b                        # noqa: E402
 import plot_basin_width_return as r                         # noqa: E402

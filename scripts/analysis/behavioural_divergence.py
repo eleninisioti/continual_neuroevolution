@@ -52,7 +52,7 @@ bounded by log 2, finite under disjoint support -- and `occupancy_shift` is the
 distributional divergence that *is* cross-method comparable.
 
 Reads any run written in the continual format of
-`source/studies/evaluate_continual.py` (a `results.json` beside a
+`scripts/analysis/evaluate_continual.py` (a `results.json` beside a
 `checkpoints.npz`), so it works on the NE runs and on the PPO/C-CHAIN ones
 without being told which is which. A gymnax run is rebuilt by `EnvContext`
 below, with `saved_task_params` resolving what each sub-task did to the env;
@@ -72,9 +72,9 @@ Outputs (under <results>/continual/):
     bd_vs_forgetting.pdf           does divergence predict the reward lost?
 
 Usage:
-    python scripts/neurips_2026_rebuttal/behavioural_divergence_analysis.py \
+    python scripts/analysis/behavioural_divergence.py \
         --runs_root projects/gymnax/ne_popsweep --pop_sizes 128 --gpus 0
-    python scripts/neurips_2026_rebuttal/behavioural_divergence_analysis.py \
+    python scripts/analysis/behavioural_divergence.py \
         --envs CartPole_v1 --methods ga es --num_tasks 10
 """
 
@@ -90,13 +90,12 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# One dirname deeper since 2026-09-08: this file moved from
-# `scripts/` into `scripts/outdated/`.
+# This file has moved between `scripts/` and its subdirectories.
 def _find_repo_root(start):
     """Walk up from `start` until the directory holding `pyproject.toml`.
 
     Not `dirname(dirname(...))`: that hardcodes how deep this file sits, and
-    every time a script moved between `scripts/`, `scripts/outdated/` and
+    every time a script moved between `scripts/` and its subdirectories
     `scripts/analysis/` the count went stale and the failure was a
     ModuleNotFoundError or a runs_root pointing inside `scripts/`. A marker
     search is correct wherever the file lives.
@@ -144,7 +143,7 @@ from source.metrics.behavioral_divergence import (  # noqa: E402
     subsample_states,
 )
 
-RUNS_ROOT = os.path.join(REPO_ROOT, "projects", "neurips_2026_rebuttal")
+RUNS_ROOT = os.path.join(REPO_ROOT, "runs")
 
 METHOD_STYLE = {
     "ga":     {"label": "GA",           "color": "#4CBB47"},

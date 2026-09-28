@@ -4,11 +4,11 @@ The NE methods search in a flat parameter vector and the RL methods keep a
 pytree, so both representations are needed and `get_flat_params` /
 `unflatten_params` are the bridge between them.
 
-`MLPPolicy` is the discrete-action policy. `PolicyNetwork` is an alias of it,
-not a copy: gymnax's NE and RL trainers must search the *same* architecture or
+`MLPPolicy` is the discrete-action policy. `PolicyNetwork` is an alias of it:
+gymnax's NE and RL trainers must search the *same* architecture or
 the comparison measures capacity rather than method, and two identical class
 definitions are two things that can drift. `ContinuousMLPPolicy` is the
-cheetah/ant counterpart. `ValueNetwork` is PPO's critic and is deliberately NOT
+cheetah counterpart. `ValueNetwork` is PPO's critic and is deliberately NOT
 matched to the policy -- it has no NE counterpart, so there is nothing to match
 it to, and shrinking it would handicap PPO for no comparability gain.
 
@@ -25,39 +25,25 @@ from jax import flatten_util
 
 # The policy architecture every method in a suite must use.
 #
-# Fairness across methods is per (suite, env): when a figure puts GA, ES, DNS,
-# PPO, ReDo, TRAC, C-CHAIN and PBT-PPO on one axis, they must all be searching
-# the same policy. Across suites the architectures differ because the tasks do
-# (discrete gymnax logits against continuous cheetah/ant torques against
-# kinetix's permutation-invariant encoder), and nothing compares across suites.
 #
 # `activation` is the HIDDEN activation. The output layer differs by action
-# space, not by method: gymnax emits logits, cheetah/ant tanh-squash to the
+# space, not by method: gymnax emits logits, the cheetah tanh-squashes to the
 # actuator range.
 #
 # Changing an entry here invalidates every run of that suite -- it is a method
-# change, not a knob. See CLAUDE.md.
+# change, not a knob: every method on the suite shares it.
 POLICY_ARCH = {
     'gymnax':  {'hidden_dims': (16, 16),   'activation': 'relu'},
     'mujoco':  {'hidden_dims': (128, 128), 'activation': 'tanh'},
     # brax is 'swish' as of 2026-08-11, and the reason is measured rather than
-    # aesthetic: PPO CANNOT LEARN THE ANT ON TANH AT THE SMALL-BATCH SHAPE.
-    #
-    # Same trainer, same seed, same env (friction pinned 1.0, speed target
-    # 2.0), same 512/16/32/10/5 rollout, only the activation differing:
-    #
-    #     swish   end of sub-task 0  4868.6   sub-task 1  3967.4
-    #     tanh    end of sub-task 0  1157.5   sub-task 1   475.4
-    #
-    # against 4110.1 / 2857.6 for the reported run this reproduces. Tanh does
-    # not merely learn worse, it falls from 1157 to 475 across a boundary where
-    # NOTHING CHANGES -- a within-task collapse, not forgetting. It is fine at
-    # brax's big-batch shape (4780), so what fails is the interaction of tanh
-    # with 10 update epochs over 80-transition minibatches.
+    # aesthetic: at the small-batch shape (512/16/32/10/5 rollout) PPO on tanh
+    # collapsed within a task where swish learned. It is fine at brax's
+    # big-batch shape, so what fails is the interaction of tanh with 10 update
+    # epochs over 80-transition minibatches.
     #
     # This entry was 'tanh' from the day `--activation` became a flag, chosen so
     # PPO would search the same network as GA/ES/DNS. Every run in
-    # `projects/neurips_2026_rebuttal/runs/` predates that flag and therefore
+    # the earlier run trees predates that flag and therefore
     # ran make_ppo_networks' swish default on the RL side while NE ran tanh --
     # so the reported trees are internally MISMATCHED, and no single value here
     # reproduces both halves of them. Choosing swish keeps the fairness property
@@ -104,7 +90,7 @@ class MLPPolicy(nn.Module):
 class ContinuousMLPPolicy(nn.Module):
     """Deterministic continuous-action policy, tanh hidden and tanh output.
 
-    The cheetah and ant NE policy. It was defined identically and separately in
+    The cheetah NE policy. It was defined identically and separately in
     six trainers; it lives here so the RL side has one thing to match.
     """
     hidden_dims: tuple = (128, 128)
@@ -251,7 +237,7 @@ class KinetixPixelsPolicy(nn.Module):
 
     Emits ``sum(dims_per_distribution)`` logits (16 at the medium env size:
     four motor bindings x 3, two thruster bindings x 2), which
-    `source/studies/generalists/actors.py:MULTI_DISCRETE` reads as six
+    `source/algorithms/rl/action_heads.py:MULTI_DISCRETE` reads as six
     independent categoricals. That head is the ONLY thing PPO needed for this
     body; it is a new action space, not a second PPO.
     """
@@ -316,142 +302,5 @@ def create_kinetix_pixels_policy_network(key, image_shape, global_info_dim,
                                  hidden_dims=tuple(hidden_dims),
                                  action_dim=int(action_dim))
     obs_dim = int(np.prod(image_shape)) + int(global_info_dim)
-    params = policy.init(key, jnp.zeros((obs_dim,)))
-    return policy, params
-
-
-class KinetixTransformerPolicy(nn.Module):
-    """Kinetix's ``ActorCriticTransformer``, actor half, over a FLAT entity
-    observation.
-
-    Kinetix's second network (Matthews et al. 2025, `configs/model/model-
-    transformer.yaml`, the ``symbolic_entity`` observation): every circle and
-    polygon is a token, encoded by a per-type Dense; two gated self-attention
-    layers run over the shape tokens plus a constant dummy token, with
-    joints and thrusters passing messages into the shapes they connect; the
-    scene embedding is the masked mean of the tokens; and the actor head on top
-    is the same ``fc_layer_depth x fc_layer_width`` tanh MLP the pixel policy
-    has. The attention stack is Kinetix's own `Transformer` module, imported,
-    not copied; the encoders, the dummy token, the mask handling and the head
-    are `ActorCriticTransformer.__call__` line for line, with the critic half,
-    the carry and the (T, B) axes removed for the same reasons as
-    `KinetixPixelsPolicy` (see its docstring).
-
-    The observation arrives FLAT: ``entity_layout`` is the ``(name, shape)``
-    list of `EntityObservation`'s fields in the order the suite concatenated
-    them (`source/envs/kinetix.py:ENTITY_LAYOUT`). Masks come back as ``> 0.5``
-    and indexes as rounded int32 -- they were exact small integers as floats.
-
-    ``LAYERS`` and ``hidden_activations`` expose the actor HEAD only
-    (``Dense_0 .. Dense_{depth}``): that is the Dense chain ReDo can recycle
-    and the dormancy probes read, as on every MLP body. The attention trunk has
-    no per-unit notion ReDo defines, so it is measured by the weight and churn
-    rows and left alone by recycling.
-    """
-    entity_layout: tuple
-    hidden_dims: tuple = (128,) * 5
-    action_dim: int = 16
-    encoder_size: int = 128           # transformer_encoder_size
-    num_heads: int = 8
-    qkv_features: int = 16            # transformer_size
-    num_layers: int = 2               # transformer_depth
-
-    @property
-    def LAYERS(self):
-        return tuple(f'Dense_{i}' for i in range(len(self.hidden_dims) + 1))
-
-    def _unflatten(self, x):
-        out, i = {}, 0
-        for name, shape in self.entity_layout:
-            n = 1
-            for d in shape:
-                n *= int(d)
-            out[name] = x[..., i:i + n].reshape(x.shape[:-1] + tuple(shape))
-            i += n
-        for name in ('circle_mask', 'polygon_mask', 'joint_mask',
-                     'thruster_mask', 'attention_mask'):
-            out[name] = out[name] > 0.5
-        for name in ('joint_indexes', 'thruster_indexes'):
-            out[name] = jnp.round(out[name]).astype(jnp.int32)
-        return out
-
-    @nn.compact
-    def __call__(self, x):
-        from flax.linen.initializers import constant, orthogonal
-        from kinetix.models.transformer_model import Transformer
-
-        batch_shape = x.shape[:-1]
-        # Kinetix's modules are written for (T, B, ...): one step, flat batch.
-        obs = self._unflatten(x.reshape((1, -1, x.shape[-1])))
-        act = nn.tanh
-
-        def encoder(features, entity_id, concat, name):
-            width = self.encoder_size - (1 if concat else 0)
-            emb = act(nn.Dense(width, kernel_init=orthogonal(np.sqrt(2)),
-                               bias_init=constant(0.0), name=name)(features))
-            if concat:
-                # Kinetix's `id_1h`: one extra column holding the type id.
-                emb = jnp.concatenate(
-                    [emb, jnp.full(emb.shape[:-1] + (1,), float(entity_id))],
-                    axis=-1)
-            return emb
-
-        circle_enc = encoder(obs['circles'], 0, True, 'enc_circle')
-        polygon_enc = encoder(obs['polygons'], 1, True, 'enc_polygon')
-        joint_enc = encoder(obs['joints'], -1, False, 'enc_joint')
-        thruster_enc = encoder(obs['thrusters'], -1, False, 'enc_thruster')
-
-        shape_enc = jnp.concatenate([polygon_enc, circle_enc], axis=2)
-        shape_mask = jnp.concatenate([obs['polygon_mask'],
-                                      obs['circle_mask']], axis=2)
-
-        # aggregate_mode 'dummy_and_mean': a constant dummy token that every
-        # active shape attends to and from, then the masked mean.
-        T, B, _, K = circle_enc.shape
-        shape_enc = jnp.concatenate([jnp.ones((T, B, 1, K)), shape_enc], axis=2)
-        shape_mask = jnp.concatenate([jnp.ones((T, B, 1), dtype=bool),
-                                      shape_mask], axis=2)
-        attn = obs['attention_mask']
-        n = attn.shape[-1]
-        overall = (jnp.ones((T, B, attn.shape[2], n + 1, n + 1), dtype=bool)
-                   .at[:, :, :, 1:, 1:].set(attn))
-
-        def mask_out_inactives(active, matrix):
-            return matrix & active[:, None] & active[None, :]
-
-        overall = jax.vmap(jax.vmap(mask_out_inactives))(shape_mask, overall)
-
-        emb = Transformer(num_layers=self.num_layers, num_heads=self.num_heads,
-                          qkv_features=self.qkv_features,
-                          encoder_size=self.encoder_size, gating=True,
-                          gating_bias=0.0, name='transformer')(
-            shape_enc,
-            jnp.repeat(overall, repeats=self.num_heads // overall.shape[2],
-                       axis=2),
-            joint_enc, obs['joint_mask'], obs['joint_indexes'] + 1,
-            thruster_enc, obs['thruster_mask'], obs['thruster_indexes'] + 1)
-        h = jnp.mean(emb, axis=2, where=shape_mask[..., None])[0]   # (B, K)
-
-        for i, dim in enumerate(self.hidden_dims):
-            h = act(nn.Dense(dim, kernel_init=orthogonal(np.sqrt(2)),
-                             bias_init=constant(0.0), name=f'Dense_{i}')(h))
-            self.sow('intermediates', 'dense', h)
-        logits = nn.Dense(self.action_dim, kernel_init=orthogonal(0.01),
-                          bias_init=constant(0.0),
-                          name=f'Dense_{len(self.hidden_dims)}')(h)
-        return logits.reshape(batch_shape + (self.action_dim,))
-
-    def hidden_activations(self, params, x):
-        """``[dense0 .. dense{depth-1}]`` of the actor head, (batch, width)."""
-        _, state = self.apply(params, x, mutable=['intermediates'])
-        return list(state['intermediates']['dense'])
-
-
-def create_kinetix_transformer_policy_network(key, entity_layout, action_dim,
-                                              hidden_dims=(128,) * 5):
-    policy = KinetixTransformerPolicy(entity_layout=tuple(
-        (name, tuple(shape)) for name, shape in entity_layout),
-        hidden_dims=tuple(hidden_dims), action_dim=int(action_dim))
-    obs_dim = sum(int(np.prod(shape)) for _, shape in entity_layout)
     params = policy.init(key, jnp.zeros((obs_dim,)))
     return policy, params

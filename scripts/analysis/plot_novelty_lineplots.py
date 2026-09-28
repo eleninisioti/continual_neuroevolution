@@ -46,7 +46,7 @@ import matplotlib.pyplot as plt                            # noqa: E402
 import numpy as np                                         # noqa: E402
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / 'plotting'))
 import plot_noncontinual_solve as ncs                      # noqa: E402
 import plot_diversity_plasticity as pdp                    # noqa: E402
 lp, PROJECT, REPO = pdp.lp, pdp.PROJECT, pdp.REPO
@@ -76,7 +76,7 @@ DIVERSITY_ROWS = [('behaviour', 'Behav. diversity'), ('genomic', 'Genomic divers
 COLUMN_SOURCES = {'behaviour': ('bd_behavioural_diversity', 'bd_probe_disagreement'),
                   'genomic': ('bd_genomic_diversity',)}
 LOG_ROWS = {'genomic'}
-ARM_DIR = {'es': 'nes', 'ga': 'ga', 'dns_gaussian': 'dns_gaussian', 'pbt': 'pbt'}   # ES is NES
+ARM_DIR = {'es': 'es', 'ga': 'ga', 'dns_gaussian': 'dns_gaussian', 'pbt': 'pbt'}
 # The paper's one method order (make_lineplot.METHOD_ORDER, as Figure 2) since
 # 2026-09-21: GA, GA + Novelty, ES, PBT-PPO. It used to put ES first.
 METHODS = [m for m in lp.METHOD_ORDER if m in ARM_DIR]

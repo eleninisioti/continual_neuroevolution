@@ -21,7 +21,7 @@ bodies and across families:
                               (`source/metrics/plasticity.py`), here between
                               every pair of members.
 
-The column names are the ones `scripts/make_plasticity_figure.py` already
+The column names are the ones `scripts/plotting/make_plasticity_figure.py` already
 resolves for its `genomic_diversity` and `fitness_std` rows (the gymnax
 trainers' behaviour tracker wrote them), so the diversity figure needs no
 new vocabulary.

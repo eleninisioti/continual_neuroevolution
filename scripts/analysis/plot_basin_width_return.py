@@ -67,7 +67,7 @@ import matplotlib.pyplot as plt                            # noqa: E402
 from scipy.stats import mannwhitneyu                       # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 sys.path.insert(0, str(REPO / 'scripts/analysis'))
 import plot_basin_width_methods as b                        # noqa: E402
 import plot_generalist_scores as pgs                        # noqa: E402

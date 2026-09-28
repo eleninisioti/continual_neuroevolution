@@ -83,22 +83,19 @@ __all__ = [
 # Three named sets, because the repo contains all of them and they are not
 # interchangeable:
 #
-#   "repo"     -- the constants in source/studies/gymnax/train_*_gymnax_continual.py.
-#   "pbt_doc"  -- the values docs/pbt_rebuttal_hypotheses.md reports PBT
-#                 against. That document states explicitly that any GA/ES
-#                 numbers compared with its table must be recomputed at these
-#                 values, so a comparison using "repo" thresholds is invalid.
-#   "rebuttal" -- the set the NeurIPS 2026 rebuttal figures report against;
-#                 scripts/neurips_2026_rebuttal/make_figures.py reads it
-#                 directly, so this is the one definition behind every table
-#                 in that figure set.
+#   "repo"     -- the constants the old per-method gymnax continual trainers used.
+#   "pbt_doc"  -- the values an earlier PBT analysis reports against; any
+#                 GA/ES numbers compared with its table must be recomputed at
+#                 these values, so a comparison using "repo" thresholds is
+#                 invalid.
+#   "loose"    -- the looser set an earlier figure set reported against.
 #
 # The choice matters. On Acrobot the repo's -70 sits past what the gymnax
 # neuroevolution runs reach at any population size, so every cell floors at
 # 0.000 and a population-size trend that is clearly present at -90 becomes
 # invisible. Report the set you used.
 #
-# "rebuttal" is looser still, for two reasons specific to that suite. Its
+# "loose" is looser still, for two reasons specific to that suite. Its
 # episodes are capped at 500 steps rather than gymnax's defaults, so the
 # standard thresholds describe a different task; and the two method families
 # do not report the same statistic -- NE logs `best_fitness`, a max over its
@@ -123,7 +120,7 @@ THRESHOLD_SETS: Mapping[str, Mapping[str, float]] = {
         "Acrobot-v1": -90.0,
         "MountainCar-v0": -120.0,
     },
-    "rebuttal": {
+    "loose": {
         "CartPole-v1": 400.0,
         "Acrobot-v1": -120.0,
         "MountainCar-v0": -200.0,
@@ -367,7 +364,7 @@ def zero_shot_transfer(
 
     Args:
         run: The run to score. Its tasks must carry ``zero_shot_returns``,
-            which ``source/studies/evaluate_continual.py`` produces.
+            which ``scripts/analysis/evaluate_continual.py`` produces.
         reducer: Statistic mapping a sub-task's zero-shot episode returns to
             ZT_tau.
 
@@ -380,7 +377,7 @@ def zero_shot_transfer(
     if not per_task:
         raise ValueError(
             f"run {run.method}/{run.env}/pop={run.pop_size}/trial={run.trial} has "
-            "no zero-shot evaluations; re-run source.studies.gymnax.evaluate_continual "
+            "no zero-shot evaluations; re-run scripts/analysis/evaluate_continual.py "
             "so that each sub-task's agent is also scored on the next sub-task"
         )
     return float(np.mean(per_task))

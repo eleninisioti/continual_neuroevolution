@@ -7,10 +7,8 @@ downstream -- `scripts/compare.py`, the churn and dormancy figures -- was
 written against the gymnax names, so the brax trees have to speak them too or
 each reader needs a per-suite special case.
 
-This mapping was written and debugged inside
-`source/studies/brax/train_RL_ant_continual_legs.py`. It is here rather than there so
-the stationary ant trainer, and later the cheetah ones, get it without a second
-copy that can drift -- the drift being exactly what
+It lives here rather than in a trainer so every brax trainer gets it without
+a second copy that can drift -- the drift being exactly what
 `docs/unify_implementations.md` is a record of.
 
 The left-hand name is what lands in `training_metrics.json`; the tuple is the
@@ -63,21 +61,6 @@ CORE_KEYS = {
     'std_reward': ('eval/episode_reward_std',),
 }
 
-# Ant-specific. What the robot is actually DOING, not just what it scored: on
-# the target-speed task a reward near 1000 is equally consistent with standing
-# still while paying control cost, running far past the target for no credit,
-# and falling over halfway. Three separate misreadings of that reward were only
-# settled by measuring velocity, so it is logged rather than inferred.
-ANT_KEYS = {
-    'x_velocity': ('eval/episode_x_velocity',),
-    'x_velocity_std': ('eval/episode_x_velocity_std',),
-    'y_velocity': ('eval/episode_y_velocity',),
-    'episode_length': ('eval/avg_episode_length',),
-    'reward_forward': ('eval/episode_reward_forward',),
-    'reward_survive': ('eval/episode_reward_survive',),
-    'reward_ctrl': ('eval/episode_reward_ctrl',),
-}
-
 # Weight statistics. Unlike everything above these are not renames of a brax
 # metric: `ppo_continual_train` computes them with the same
 # `source/metrics/weight_stats.py` the NE trainers use and writes them
@@ -98,7 +81,7 @@ NTK_KEYS = {
     for suffix in ('effective_rank', 'srank', 'trace', 'rank_ratio', 'num_probe')
 }
 
-DIAGNOSTIC_KEYS = {**CORE_KEYS, **ANT_KEYS, **WEIGHT_KEYS, **NTK_KEYS}
+DIAGNOSTIC_KEYS = {**CORE_KEYS, **WEIGHT_KEYS, **NTK_KEYS}
 
 
 def extract(metrics, keys=DIAGNOSTIC_KEYS):

@@ -1,4 +1,4 @@
-"""The study's code: methods, environments, measurements, and the studies themselves.
+"""The study's code: methods, environments, measurements and training loops.
 
 The study is an 8-method x 3-suite grid, and before this package each cell was a
 standalone trainer: `train_GA_gymnax.py` and `train_ES_gymnax.py` differed in 46
@@ -9,12 +9,17 @@ the trainers it was lifted from, so importing it cannot change a run.
 Sub-packages, split by what the code is FOR rather than by which suite it
 grew up in:
 
-  algorithms  the search itself. Changing anything here changes what a run
-              does: `ppo` (the core every RL method builds on -- PPO, ReDo,
-              TRAC, C-CHAIN, and the per-member update inside PBT), `redo`
-              (recycling, and the dormancy criterion it scores on), `networks`
-              (the policy and value nets, flat<->pytree conversion) and
-              `ne.{ga,dns,pbt}`.
+  algorithms  the methods. Changing anything here changes what a run does:
+              `ne/` (GA, DNS, ES/NES and the searchers that wrap them), `rl/`
+              (PPO, ReDo, C-CHAIN, PBT) and `networks` (the policy and value
+              nets, flat<->pytree conversion).
+
+  runners     the two training loops every benchmark shares, `train_nes` and
+              `train_ppo`.
+
+  configs     one YAML file per benchmark: its cells, methods, hyperparameters
+              and compute-matched budgets. `utils/config.py` loads one and
+              `run.py` calls a runner with it.
 
   metrics     what a run MEASURES -- both as it goes and afterwards. Every
               during-run module is a pure observer: it draws on a private RNG
@@ -38,8 +43,9 @@ grew up in:
               argument parser -- see `source/envs/__init__.py`.
 
 The dependency arrows point one way: metrics may use algorithms (dormancy is
-scored with ReDo's own criterion, deliberately), the studies may use anything,
-envs depend on none of them, and nothing in algorithms imports from metrics.
+scored with ReDo's own criterion, deliberately), the runners may
+use anything, envs depend on none of them, and nothing in algorithms imports
+from metrics.
 
 Was `source/` until 2026-09-08. It stopped being 'the shared part' when
 the per-suite trainer directories stopped being the main event: these ARE the

@@ -14,7 +14,7 @@ construction the generalisation literature uses for these three environments
 (Packer et al. 2018, "Assessing Generalization in Deep Reinforcement
 Learning", varies exactly these: CartPole force / length / pole mass, Acrobot
 length / mass / moment of inertia, MountainCar force and gravity) and the
-gymnax counterpart of the ant's friction sub-tasks in ``tasks_mjx.py``. It is
+gymnax counterpart of the friction sub-tasks in ``source/envs/mjx.py``. It is
 wired the same way: ``TaskSpec`` is the ``env_params`` slot, the multiplier is
 a TRACED argument applied to the params inside the rollout, so a switching run
 compiles once, and the two-sub-task experiment is the unperturbed environment
@@ -23,7 +23,7 @@ against one rescaled one. ``PHYSICS_PARAMS`` says what each name rescales, and
 
 This construction, the offset draw, the policy architecture and the rollout are
 taken unchanged from this repo's own continual study
-(``source/studies/gymnax/continual_common.py``, ``source/algorithms/networks.py``).
+(its old ``continual_common.py``, and ``source/algorithms/networks.py``).
 That is deliberate and load-bearing: this project's claims are meant to sit next
 to that study's plasticity numbers, and they only do so if the tasks are the
 same tasks. In particular the offset stream is seeded from the *trial index*
@@ -139,8 +139,8 @@ def make_episode_fn(env, policy, param_template, episode_length):
 # imported rather than copied: the study's claims only sit next to the
 # benchmarking paper's plasticity numbers if the tasks are literally the same
 # tasks, and an import is the only way to make that true by construction.
-# `scripts/outdated/generalists/check_frozen.py` pins the values these produce, so a
-# change to them on the paper's side fails loudly instead of silently moving
+# A check script in the earlier codebase pinned the values these produce, so a
+# change to them on the paper's side failed loudly instead of silently moving
 # this study's numbers.
 
 
@@ -151,7 +151,7 @@ def make_episode_fn(env, policy, param_template, episode_length):
 # gymnax neuroevolution runs reach at any population size, so every cell floors
 # at zero and a real trend becomes invisible. Report the set you used.
 #
-# One caveat from that file does not carry over. Its "rebuttal" set is loosened
+# One caveat from that file does not carry over. Its "loose" set is loosened
 # partly because NE there logs `best_fitness`, a max over 512 population
 # members, while RL logs one policy -- a gap of ~8 reward on Acrobot and ~45 on
 # MountainCar. Nothing in this project logs a max over a population: the
@@ -185,7 +185,7 @@ THRESHOLD_SETS = {
         "Acrobot-v1": -90.0,
         "MountainCar-v0": -120.0,
     },
-    "rebuttal": {
+    "loose": {
         "CartPole-v1": 400.0,
         "Acrobot-v1": -120.0,
         "MountainCar-v0": -200.0,
@@ -615,7 +615,7 @@ def _legacy_task_params(cfg, ckpt_files, stock_params, env_name=None):
     it lives in ``noise_vectors`` and is added to the observation by the
     caller, as in training.
 
-    One function for the three families (CLAUDE.md rule (a)). Before this
+    One function for the three families (one shared code path). Before this
     existed, ``evaluate_continual.py`` resolved the family itself and
     ``behavioural_divergence.py`` resolved nothing, so under the `actions`
     and `param` families the latter rolled every sub-task on the stock body
@@ -797,7 +797,7 @@ def physics_multipliers(spec, num_tasks, first_task_clean=True, trial=1):
     ``describe()``:
 
     ``mults``        sub-task i multiplies the parameter by ``mults[i]``,
-                     cycling past the end -- the ant's ``friction_cycle``
+                     cycling past the end -- the mjx ``friction_cycle``
                      convention with the values written out -- so every trial
                      faces the same pair and differs in its seed only. With
                      ``first_task_clean`` False the first entry is skipped.
@@ -977,7 +977,7 @@ def descriptor_dim(env_name):
 def handcrafted_descriptor(last_obs, env_name):
     """Where the episode ended, as two numbers.
 
-    Taken from `source/algorithms/ne/dns.py handcrafted_descriptors`:
+    Taken from the reference DNS implementation:
     the last valid observation, cut down to the two coordinates that describe
     what the policy *did* rather than how well it scored.
 

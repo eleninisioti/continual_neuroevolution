@@ -19,8 +19,7 @@ paper/visuals/final/data/noncontinual_solve.{npz,json}. Without it the script
 reads only those two files, so the figures and tables rebuild from the paper
 directory alone (the run trees are ~110 GB, the extract a few MB).
 
-The figures keep the style of the NeurIPS rebuttal's stationary gymnax plot
-(scripts/outdated/neurips_2026_rebuttal/make_figures.py `noncontinual_gymnax`):
+The figures keep the style of the earlier stationary gymnax plot:
 one legend row on top, generations on x, plus a light grid. That plot drew
 `best_fitness`, the best individual scored on the episodes it was selected on;
 these draw the CENTROID, the curve `make_lineplot.py --phase noncontinual
@@ -64,7 +63,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt                            # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 import make_lineplot as lp                                 # noqa: E402
 import es_arm                                              # noqa: E402
 
@@ -91,13 +90,10 @@ COLUMNS = [
     ('paper/mjx/cheetah/data', 'cheetah',        'HalfCheetah',    None),
 ]
 KINETIX = 'paper/kinetix/data'
-# finish_iclr.sh THE ARMS: no novelty arm. ES and NES are one method, "ES", and
-# PBT-PPO N=8 and N=2 are one method too: each figure (and its table) draws ONE
-# of each pair. The ES arm is fixed by the paper: NES everywhere, the latest
-# OpenES (`es`, plain OpenES since 2026-09-24) on Kinetix. The PBT arm is the one with the higher
+# finish_iclr.sh THE ARMS: no novelty arm. PBT-PPO N=8 and N=2 are one method:
+# each figure (and its table) draws ONE of the pair, the one with the higher
 # stationary Cum. elite summed over the figure's panels (es_arm.pick).
-ARMS = ['ga', 'es', 'nes', 'ppo', 'trac', 'redo', 'cchain', 'pbt', 'pbt2']
-ES_KEPT = {'main': 'nes', 'kinetix': 'es'}
+ARMS = ['ga', 'es', 'ppo', 'trac', 'redo', 'cchain', 'pbt', 'pbt2']
 TAIL = 0.05             # a trial's final level: its mean over this last fraction
 CONVERGE = 0.95         # Conv.: first generation past this fraction of the rise
 # The LaTeX table's suite group and short row name of each task.
@@ -108,14 +104,14 @@ TEX_HEAD = {'CartPole': ('gymnax', 'CartPole'), 'Acrobot': ('gymnax', 'Acrobot')
             'HalfCheetah': ('Brax', 'HalfCheetah')}
 # Method names short enough to head a column.
 TEX_METHOD = {'trac': 'TRAC', 'redo': 'ReDo', 'pbt': 'PBT'}
-# Which variant an `es` / `pbt` row is, for the captions.
-VARIANT = {'es': 'OpenES', 'nes': 'NES', 'pbt': '$N{=}8$', 'pbt2': '$N{=}2$'}
+# Which variant the `pbt` row is, for the captions.
+VARIANT = {'pbt': '$N{=}8$', 'pbt2': '$N{=}2$'}
 FALLBACK_MARK = r'$^\dagger$'
 
 
 def _kept_note(kept, tex=True):
-    es, pbt = (VARIANT.get(k, k) for k in kept)
-    note = (f'ES is {es}; PBT-PPO is the better of $N{{=}}8$ and $N{{=}}2$ by '
+    pbt = VARIANT.get(kept, kept)
+    note = (f'PBT-PPO is the better of $N{{=}}8$ and $N{{=}}2$ by '
             f'stationary Cum. elite ({pbt}).')
     return note if tex else note.replace('$N{=}', 'N=').replace('$', '')
 
@@ -137,13 +133,13 @@ def _key(tree, cell):
 
 def extract():
     """Read every panel's runs and write DATA.npz (`<tree>|<cell>|<arm>|gens`
-    and `...|curves`, seeds x records, unsmoothed) and DATA.json (Cum. elite a trial for the ES and PBT pairs, the runs each arm resolves to)."""
+    and `...|curves`, seeds x records, unsmoothed) and DATA.json (Cum. elite a trial for the PBT pair, the runs each arm resolves to)."""
     wanted = {}
     for tree, cell, *_ in COLUMNS:
         wanted.setdefault(tree, []).append(cell)
     wanted[KINETIX] = None                          # every Kinetix level
     arrays = {}
-    meta = {'elite_cum': {'es': {}, 'pbt': {}}, 'sources': {}}
+    meta = {'elite_cum': {'pbt': {}}, 'sources': {}}
     for tree, cells in wanted.items():
         data, per_gen = load_tree(tree)
         cells = cells or [c for c in data if c.startswith('Kinetix_')]
@@ -151,7 +147,7 @@ def extract():
             for m, (x, curves) in data[cell].items():
                 arrays[f'{_key(tree, cell)}|{m}|gens'] = x / per_gen if per_gen else x
                 arrays[f'{_key(tree, cell)}|{m}|curves'] = np.asarray(curves, dtype=np.float32)
-        for name, arms in (('es', es_arm.ARMS), ('pbt', es_arm.PBT_ARMS)):
+        for name, arms in (('pbt', es_arm.PBT_ARMS),):
             for c, v in es_arm.load(PROJECT / tree, 'noncontinual', arms=arms).items():
                 if c in cells:
                     meta['elite_cum'][name][_key(tree, c)] = v
@@ -207,8 +203,8 @@ def build_column(arms, xmax):
 
 
 def keep_one_arm(cols, per_cell, arms, kept=None):
-    """Drop, from every column in `cols`, the arm of the pair `arms` (ES/NES or
-    PBT N=8/N=2) that is not `kept` -- by default the one with the lower
+    """Drop, from every column in `cols`, the arm of the pair `arms` (PBT
+    N=8/N=2) that is not `kept` -- by default the one with the lower
     stationary Cum. elite summed over every cell in `per_cell` (es_arm.pick).
     ONE arm for the whole figure and its table: the paper treats each pair as
     one method. A column where `kept` was not run keeps the other arm instead,
@@ -226,7 +222,7 @@ def keep_one_arm(cols, per_cell, arms, kept=None):
                 if use and arm != use:
                     col[key].pop(arm, None)
             # Filed under the pair's first name, one legend entry a pair, as in
-            # plot_continual_lineplots.py: `es` is "ES", `pbt` "PBT-PPO".
+            # plot_continual_lineplots.py: `pbt` is "PBT-PPO".
             if use and use != arms[0] and use in col[key]:
                 col[key][arms[0]] = col[key].pop(use)
     return kept
@@ -357,14 +353,13 @@ def write_tex(cols, methods, levels, kept_main, kept_kx):
     rows = [r for _, rs in groups for r in rs]
     heads = [m for m in methods if any(m in col['rows'] for _, col in rows)]
     fell = any(c[4].get('fallback') for c in cols)
-    es = [VARIANT[k] for k in (kept_main[0], kept_kx[0])]
-    pbt = [VARIANT[k] for k in (kept_main[1], kept_kx[1])]
+    pbt = [VARIANT[k] for k in (kept_main, kept_kx)]
     caption = ' '.join(filter(None, (
         r'Stationary tasks. ' + DEFINITIONS,
-        f'ES is {es[0]} ({es[1]} on Kinetix); PBT-PPO is the better of $N{{=}}8$ and '
+        f'PBT-PPO is the better of $N{{=}}8$ and '
         f'$N{{=}}2$ by stationary Cum. elite, picked separately for Kinetix '
         f'({pbt[0]}; {pbt[1]} on Kinetix).',
-        _fallback_note(kept_main[1]) if fell else '',
+        _fallback_note(kept_main) if fell else '',
         _trials_note([(TEX_HEAD[c[2]][1], c[4]) for c in cols]),
         r'Kinetix: one stationary run a level. --: not run.')))
     n = len(heads) + 1
@@ -419,12 +414,12 @@ def write_markdown(cols, methods, levels, kept_main, kept_kx):
     lines += [f"| Kinetix, each level | `{KINETIX}` | {kx_total:.0f} |", '',
               'The MountainCar GA is `ga_focus_explore` '
               '(`runs_ga_focus_mountaincar/README.md`).', '',
-              'HalfCheetah RL arms are the ant PPO shape only (`paper/mjx/cheetah/data/README.md`); '
+              'HalfCheetah RL arms are the brax PPO shape only (`paper/mjx/cheetah/data/README.md`); '
               'the previous-shape runs are in `noncontinual_prevppo/` and not drawn.', '']
     trials = _trials_note([(c[2], c[4]) for c in cols])
     fell = any(c[4].get('fallback') for c in cols)
     lines += ['Main table: ' + _kept_note(kept_main, tex=False)
-              + (' ' + _fallback_note(kept_main[1]).replace(FALLBACK_MARK, '(dagger) ')
+              + (' ' + _fallback_note(kept_main).replace(FALLBACK_MARK, '(dagger) ')
                  .replace('$N{=}', 'N=').replace('$', '') if fell else '')
               + (' ' + trials if trials else '')
               + ' Kinetix: ' + _kept_note(kept_kx, tex=False), '',
@@ -470,14 +465,13 @@ def main() -> int:
     cols = [(tree, cell, title, xmax, build_column(curves[tree, cell], xmax))
             for tree, cell, title, xmax in COLUMNS]
 
-    def kept_pair(columns, keys, figure):
-        es = keep_one_arm(columns, None, es_arm.ARMS, ES_KEPT[figure])
+    def kept_pbt(columns, keys, figure):
         pbt = keep_one_arm(columns, {k: v for k, v in meta['elite_cum']['pbt'].items()
                                      if k in keys}, es_arm.PBT_ARMS)
-        print(f'{figure} figure keeps {es} and {pbt}')
-        return [es, pbt]
+        print(f'{figure} figure keeps {pbt}')
+        return pbt
 
-    kept_main = kept_pair([c[4] for c in cols],
+    kept_main = kept_pbt([c[4] for c in cols],
                           {_key(tree, cell) for tree, cell, *_ in COLUMNS}, 'main')
     for _tree, _cell, title, _xmax, col in cols:
         print(f'{title:15s} '
@@ -486,7 +480,7 @@ def main() -> int:
     # Every Kinetix level on its own, in the levels' order (make_lineplot.ENV_TITLES).
     levels = [(lp.ENV_TITLES[e], build_column(curves[KINETIX, e], None))
               for e in lp.ENV_TITLES if e.startswith('Kinetix_') and (KINETIX, e) in curves]
-    kept_kx = kept_pair([col for _, col in levels],
+    kept_kx = kept_pbt([col for _, col in levels],
                         {_key(tree, cell) for tree, cell in curves if tree == KINETIX},
                         'kinetix')
     lp.METHOD_STYLE['pbt'] = {**lp.METHOD_STYLE['pbt'], 'label': 'PBT-PPO'}

@@ -32,9 +32,8 @@ gymnax / mjx / kinetix runs can only be argued about.
              it at every switch, a search that smooths it over stays. The
              level is the spike's height s.
 
-`smooth` and `rugged` are ported from
-`scripts/outdated/generalists/analysis/toy_{shared,rugged}_landscape.py` with
-the same constants and formulas, so a run here and the published sweeps score
+`smooth` and `rugged` are ported from the earlier codebase's toy-landscape
+scripts with the same constants and formulas, so a run here and the published sweeps score
 the same point the same way.
 
 Every score function takes the FULL parameter vector `(..., num_params)` and a
@@ -44,7 +43,7 @@ network with many weights that barely matter.
 
 Not in `source/envs/registry.py`: that interface is built around a policy
 rolled out in an environment (observation width, action count, rollouts), and
-a toy has none of it. The runner is `source/studies/toy/sweep.py`. As with the
+a toy has none of it. The runner is `scripts/train/toy_sweep.py`. As with the
 rest of this package, nothing here imports a searcher, a trainer or a parser.
 """
 

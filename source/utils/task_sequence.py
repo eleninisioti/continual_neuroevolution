@@ -1,10 +1,10 @@
 """The continual protocol's task sequence, shared by every suite.
 
-`cycle_task_sequence` lived in `source/studies/gymnax/continual_common.py` and so was
+`cycle_task_sequence` lived in the old gymnax trainers' `continual_common.py` and so was
 available to gymnax alone. brax grew its own partial version --
-`effective_task_idx` in source/envs/brax_ant.py -- which was wired into the
+`effective_task_idx` in source/envs/brax_common.py -- which was wired into the
 observation-noise offsets and NOTHING else, so `--task_period` silently did
-nothing to the friction, leg, speed or gravity sequences. A flag that appears
+nothing to the friction or speed sequences. A flag that appears
 to work and does not is worse than a missing one, which is why this is now one
 definition that every axis folds through.
 """
@@ -58,7 +58,7 @@ def cycle_task_sequence(sequence, period):
 # [0.00125, 0.005]. Both halves of the comparison drew from that range with the
 # same trial-seeded key, so the sub-task sequences silently diverged between
 # the NE and RL arms of what is meant to be one compute-matched experiment
-# (CLAUDE.md rule c). ES/NES had no param branch at all and would have run the
+# (matched steps, same task boundaries). ES/NES had no param branch at all and would have run the
 # observation-noise experiment into the same tree.
 #
 # A SUB-TASK IS A MULTIPLIER, NOT AN ABSOLUTE VALUE. The old sequence drew the
@@ -154,7 +154,7 @@ def action_flip_sequence(num_tasks, period=0, env_name=None, trial=0):
     would give runs of consecutive sub-tasks in the SAME regime -- boundaries
     at which nothing changes -- and a different number of real switches per
     trial. Alternation makes every boundary a real reversal and gives every
-    trial the same number of them, which is what CLAUDE.md rule (c) asks for.
+    trial the same number of them, so every method is compared across the same task boundaries.
     The trial still differs in its training seed; it is the sub-task SEQUENCE
     that is shared, as it is under the other two families.
 

@@ -5,14 +5,14 @@ eight places -- make the env, read its obs/action dims, build the policy, draw
 the sub-task offsets, build the training and evaluation scoring functions, and
 build the two descriptor variants DNS needs. Everything else in that file --
 the searchers, the schedule, the records, the artifacts -- never mentions an
-environment at all, and neither does anything under
-``scripts/outdated/generalists/analysis/`` that reads a table or draws a curve.
+environment at all, and neither does the analysis that reads a table or
+draws a curve.
 
 So a second task family is those eight things and nothing else. This module is
 the interface, and a *suite* is the module that answers it:
 
     gymnax   ``source/envs/gymnax_classic.py``      CartPole / Acrobot / MountainCar
-    mjx      ``source/envs/mjx.py``  CheetahRun / ant
+    mjx      ``source/envs/mjx.py``  CheetahRun
     minigrid ``source/envs/minigrid.py`` MiniGrid (xminigrid),
              since 2026-09-07: the sub-task is WHICH ENVIRONMENT, on a
              symbolic 7x7 view where the NE arms can learn
@@ -22,10 +22,10 @@ which game. It was dropped: the experiments did not separate the methods, and
 carrying a body no result rests on is a cost with no return. `GridConvPolicy`
 in `source/algorithms/networks.py` outlives it -- MiniGrid runs on that network.
 
-Since 2026-09-05 the interface has three more names, added for the ant and
-for the RL arms on it: ``task_vectors`` (what a sub-task IS -- the mjx suite
-makes the ant's a friction multiplier where everything else is an observation
-offset), ``obs_offset`` (what an RL rollout adds to the observation, 0 when the
+Since 2026-09-05 the interface has three more names, added for physics
+sub-tasks and for the RL arms: ``task_vectors`` (what a sub-task IS -- the mjx
+suite can make it a friction multiplier rather than an observation offset),
+``obs_offset`` (what an RL rollout adds to the observation, 0 when the
 sub-task is a change to the physics) and ``rl_env_fns`` (a vectorised
 reset/step pair for ``train_ppo``, so that trainer holds no branch on the
 backend). All three have a default that reproduces the gymnax behaviour bit
@@ -42,7 +42,7 @@ dimensions are read), and delegates the rest.
 
 ``ENV_NAMES`` is unique across suites, so ``suite_for('CheetahRun')`` needs no
 flag anywhere -- ``--env`` alone selects the family, and the queue scripts,
-``train_all.py`` and the analysis all keep taking one environment name.
+``source/run.py`` and the analysis all keep taking one environment name.
 
 ## The key stream is unchanged
 
@@ -118,7 +118,7 @@ class Suite:
 
         None on every suite whose action is one categorical or one continuous
         vector; ``(3, 3, 3, 3, 2, 2)`` on kinetix, where PPO's head is built
-        from it (`source/studies/generalists/actors.py:head_for`).
+        from it (`source/algorithms/rl/action_heads.py:head_for`).
         """
         fn = getattr(self.module, 'action_dims', None)
         return None if fn is None else fn(env)
@@ -214,14 +214,13 @@ def get_suite(name):
 # Which suite owns which environment. Written out rather than discovered by
 # importing both modules, because importing the mjx one pulls in MJX and the
 # playground registry -- seconds, and a hard dependency for anyone who only
-# wants the gymnax half. `train_all.py` reads this before it sets
+# wants the gymnax half. The earlier entry point read this before it set
 # CUDA_VISIBLE_DEVICES, so it must stay import-free of jax as well.
 ENV_SUITE = {
     'CartPole-v1': 'gymnax',
     'Acrobot-v1': 'gymnax',
     'MountainCar-v0': 'gymnax',
     'CheetahRun': 'mjx',
-    'ant': 'mjx',
     # MiniGrid on xminigrid, since 2026-09-07; the pair of environments is a
     # task option (`envs=A,B`), see tasks_minigrid.ENV_CONFIGS.
     'MiniGrid': 'minigrid',
@@ -268,7 +267,7 @@ def make_env_for_run(config):
         for group, values in (task.get('options') or {}).items():
             # `describe()` nests the group's settings under the group's name
             # (`physics: {param, order, low, ...}` on gymnax, `friction: {...}`
-            # on the ant); `build_env` reads them back as `<group>_<key>`.
+            # on mjx); `build_env` reads them back as `<group>_<key>`.
             if isinstance(values, dict):
                 for key, value in values.items():
                     options[f'{group}_{key}'] = value
@@ -305,10 +304,9 @@ def threshold_for(env_name, threshold_set='generalists'):
 
     One place decides, so a table, a figure and a trainer cannot disagree about
     whether an environment has a threshold at all. gymnax has three named sets
-    and this picks one of them; the mjx bodies have none --
+    and this picks one of them; the mjx body has none --
     ``source/metrics/evaluation_metrics.py`` says outright that
-    CheetahRun has no threshold to compare against, and the ant has none either
-    -- so this returns None and everything downstream reports the generalist
+    CheetahRun has no threshold to compare against -- so this returns None and everything downstream reports the generalist
     SCORE instead of a found/held count. Nothing invents a constant.
     """
     # The mjx bodies and MiniGrid have none -- see their modules.

@@ -1,0 +1,151 @@
+# What the mjx study runs: the bodies, their cells and arms, and the budget.
+# The logic that reads this file is `source/utils/config.py:Mjx`.
+
+# ---------------------------------------------------------------------------
+# The bodies
+# ---------------------------------------------------------------------------
+#
+# `env_name` is the suite entry in source/envs/mjx.py. Everything else is a
+# constant this body's own runs were made at.
+#
+# `target_speed` is spelled out rather than left to `ENV_CONFIGS` because it
+# changes what the returns MEAN -- brax's stock reward is unbounded forward
+# velocity and the paper measured that under it a body re-routes around a
+# friction change, so friction alone is not a shift. A silent default would
+# show up in no log.
+#
+# `ne_arms` is the per-body search settings -- sigma does not transfer between
+# bodies. `searcher_kwargs` goes to `ne.build_searcher`, the one place that
+# knows which knobs define which method. `sigma` is the TOP-LEVEL name, not
+# `sigma_init` inside searcher_kwargs: `run_nes` forwards its own `sigma` as
+# `sigma_init`, so passing both is a duplicate keyword and the run dies at
+# construction.
+#
+# The GAUSSIAN PAIR (`ga`, `dns_gaussian`) shares one sigma, so the two
+# isolate the SELECTION RULE and nothing else. They also share
+# `init_around_mean: true` -- `GASearcher`'s default, jittered copies of the
+# flax seed policy, the study's "every arm starts at one point" convention.
+
+shared:
+  # The gaussian pair's AURORA settings, as in runs_repro2 -- a 1000-step
+  # episode is subsampled to 10 descriptor steps.
+  aurora: &aurora {descriptor: aurora, traj_steps: 10, aurora_latent_dim: 6,
+                   aurora_train_ratio: 8}
+
+bodies:
+  cheetah:
+    env_name: CheetahRun
+    # PROVISIONAL -- dm_control's constant for a body this is not. See
+    # probe_cheetah_stationary.sh.
+    target_speed: 10.0
+    # brax's halfcheetah has a median per-dim observation std of 0.803
+    # (measured 2026-09-09 over 200 random-action steps), so 2.0 is ~2.5x
+    # the spread. It is also what runs_repro2/mujoco used, which is the
+    # cell where NE beat RL and the reason this value is kept.
+    noise_range: 2.0
+    # The friction floor: this body's own configuration's 0.2, below which
+    # its contact solver diverges rather than producing a hard task.
+    friction_low: 0.2
+    # GA sigma 0.1 / elite_ratio 0.1 and DNS k 3 with the AURORA settings
+    # above, from runs_repro2/mujoco/continual. Carried across the change of
+    # simulator because sigma is a property of the BODY and the policy
+    # parameterisation -- a (128, 128) tanh MLP over 17 observations and 6
+    # actuators -- and neither changed. ES: sigma 0.04, lr 0.005.
+    ne_arms:
+      # ES: standardized fitness, plain SGD.
+      es: {method: es, sigma: 0.04, learning_rate: 0.005, optimizer: sgd, shaping: zscore}
+      ga:
+        method: ga
+        sigma: &cheetah_ga_sigma 0.1
+        searcher_kwargs: {elite_ratio: 0.1, init_around_mean: true}
+      dns_gaussian:
+        method: dns_gaussian
+        sigma: *cheetah_ga_sigma
+        searcher_kwargs: {cross_over_rate: 0.0, k: 3, init_around_mean: true, <<: *aurora}
+
+# The log-uniform friction draw. A multiplier on the ground, not on the robot.
+# A body's `friction_low` replaces the lower end.
+friction_range: [0.05, 5.0]
+friction_order: random
+
+# ---------------------------------------------------------------------------
+# The cells: every body gets each of these, named <body><suffix>.
+# ---------------------------------------------------------------------------
+#
+# `task_mod` is what a sub-task VECTOR means and is the whole of the difference
+# between the families: an observation offset, a ground-friction multiplier, a
+# reversed action map or a target speed. Everything else -- the body, the
+# reward, the policy, the budget, the phase grid -- is identical across a
+# body's cells, so the families differ in the perturbation and in nothing else.
+# `friction: true` adds the body's friction draw to the task options;
+# `options` adds the rest.
+cells:
+  _noise: {schedule: switch, task_mod: obs_noise}
+  _friction: {schedule: switch, task_mod: friction, friction: true}
+  # A sub-task reverses the action map; the body, the world and the reward
+  # are untouched. `source/envs/mjx.TaskSpec.act`.
+  _action: {schedule: switch, task_mod: action}
+  # A sub-task is a TARGET SPEED, so the conflict is GRADED: a specialist at
+  # either target is far outside the other's Gaussian window, while an
+  # intermediate gait scores moderately on both and wins the worst case.
+  # 2.0 vs 8.0 rather than the module default 0.5/2.0: the window is half the
+  # target, so 0.5 and 2.0 overlap heavily and one gait could satisfy both,
+  # measuring no conflict at all.
+  _speed: {schedule: switch, task_mod: speed, options: {speed_targets: '2.0,8.0'}}
+  # The reward ablation: `target_speed: null` is brax's stock unbounded v_x,
+  # so the search maximises speed instead of holding one. Same sub-tasks as
+  # the two continual families above, and a stationary cell to read them
+  # against -- a speed-maximising run has a different ceiling AND a different
+  # floor from a speed-tracking one, so its numbers cannot be put beside the
+  # target-speed cells without it.
+  _noise_speedmax: {schedule: switch, task_mod: obs_noise, options: {target_speed: null}}
+  _friction_speedmax: {schedule: switch, task_mod: friction, friction: true,
+                       options: {target_speed: null}}
+  _speedmax: {schedule: task0, task_mod: friction, friction: true,
+              options: {target_speed: null}}
+  # The stationary control for BOTH families.
+  '': {schedule: task0, task_mod: friction, friction: true}
+
+num_phases: 20
+# Ten sub-tasks over twenty phases: each visited exactly twice, the second
+# visit being the retention measurement. The gymnax grid's structure.
+num_tasks: 10
+
+# NE half of the matched budget. A phase is 320 / 20 = 16 generations.
+ne_generations: 320
+ne_pop_size: 512
+ne_num_evals: 3                      # pinned across arms
+episode_length: 1000
+
+# RL half. `train_ppo.PPO_CONFIGS` owns these; repeated only so the loader can
+# assert the two agree. A phase is 2400 updates.
+rl_updates: 48000
+redo_interval: 50                    # updates between ReDo passes
+
+# THE REPORTED CURVE, which is not the number either family selects on. The
+# centroid and the population mean are re-scored on FRESH keys over this many
+# episodes, every generation, on every sub-task.
+#
+# 10, matching the gymnax tree's `--report_episodes` and the MiniGrid study, so
+# an mjx curve and a gymnax curve are the same estimator at the same episode
+# count.
+#
+# It is not part of the matched budget: 2 genomes x 10 sub-tasks x 10 episodes
+# x 1000 steps is 2.0e5 a generation against the 1.536e6 the population costs,
+# so 13%. That is the largest this overhead gets anywhere in the project (ten
+# sub-tasks, thousand-step episodes) and it is identical for every NE arm, so
+# it moves no comparison.
+eval_episodes: 10
+
+# ppo and the three continual-RL baselines, all on `run_ppo`'s one loop. No
+# per-arm settings: they differ in the mechanism the runner switches on
+# (TRAC's rescaling, ReDo's recycling, C-CHAIN's regulariser), never in the
+# budget or the optimizer, or the comparison would not be about the mechanism.
+# `pbt` (N = 8) and `pbt2` (N = 2): a population of the plain PPO learner over
+# PPO's own budget, at two sizes (source/runners/train_ppo.py, the PBT block).
+# `pbt_weights` / `pbt2_weights`: the same populations WITHOUT explore
+# (--pbt_mode weights_only, 2026-09-19); the paper's PBT rows are `full`.
+rl_arms: [ppo, trac, redo, cchain, pbt, pbt2, pbt_weights, pbt2_weights]
+
+# The order the figures list them in: NE first, then RL.
+reported_arms: [ga, es, dns_gaussian, ppo, trac, redo, cchain, pbt, pbt2]

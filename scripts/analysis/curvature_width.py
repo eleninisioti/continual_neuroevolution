@@ -3,7 +3,7 @@
     JAX_PLATFORMS=cpu .venv/bin/python scripts/analysis/curvature_width.py \\
         projects/iclr_2027/runs_noise_2task/gymnax \\
         --out projects/iclr_2027/paper/gymnax/noise/2task/results/centroid \\
-        --cells CartPole_v1_sigma0.5 --methods nes ppo
+        --cells CartPole_v1_sigma0.5 --methods es ppo
 
     .venv/bin/python scripts/analysis/curvature_width.py --merge \\
         <out>/shards/*/curvature_width.json --out <out>
@@ -117,7 +117,7 @@ EPS = (0.03, 0.1, 0.3)
 # 0.02 is Kinetix ES's own sigma; it is last so the noise draws of
 # the other radii, and so their stored values, do not change.
 ABS_SIGMA = (0.01, 0.03, 0.1, 0.3, 0.02)
-ARMS = ['ga', 'es', 'nes', 'ppo', 'trac', 'redo', 'cchain', 'pbt', 'pbt2']
+ARMS = ['ga', 'es', 'ppo', 'trac', 'redo', 'cchain', 'pbt', 'pbt2']
 
 
 def calibrate(logits, target):
@@ -341,7 +341,7 @@ def reference_whitening(root, cell, ctx, cache):
         return np.asarray(spec.obs_mean, np.float64), np.asarray(spec.obs_std, np.float64)
     if cell in cache:
         return cache[cell]
-    for arm in ('nes', 'es', 'ga', 'dns'):
+    for arm in ('es', 'ga', 'dns'):
         for res in sorted((root / arm / cell).glob('trial_*/results.json')):
             cfg = merged_config(json.loads(res.read_text()))
             if cfg.get('obs_mean') and cfg.get('obs_std'):

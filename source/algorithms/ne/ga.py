@@ -1,358 +1,242 @@
-"""SimpleGA -- the genetic algorithm arm. The only GA in the codebase.
+"""The genetic algorithm arm: truncation selection with gaussian mutation.
 
-Truncation selection on fitness, then variation of the survivors:
-(mu+lambda) elitism, where `mu = max(1, elite_ratio * popsize)` genomes are kept
-in an archive, `popsize` offspring are bred from it each generation, and `tell`
-keeps the best `mu` of the two sets combined. A good genome is therefore never
-lost.
+(mu + lambda) elitism in the style of Such et al. (2017): an archive of the
+best ``elite_ratio * population_size`` genomes, offspring bred from it by
+gaussian mutation (optionally with uniform crossover), and the next archive
+chosen as the fittest of offspring and archive together.
 
-The variation operator is a CHOICE, not part of the method: `variation`
-selects gaussian mutation (this GA as published, the default) or DNS's
-Iso+LineDD. Both live in `source/algorithms/ne/variation.py`. This exists so
-that a GA/DNS comparison can hold the operator fixed and vary only the
-selection rule -- otherwise "novelty selection helps" is confounded with
-"recombination helps", which is what the two arms differed by until
-2026-09-08.
+The archive is RE-SCORED every generation: it rides along in the evaluated
+batch, so every genome `tell` ranks was scored on the same sub-task in the
+same generation. Keeping each member's stored fitness instead -- the
+reference's behaviour, and right for a stationary task -- is wrong under a
+switching schedule: an archive of sub-task A specialists carrying their
+sub-task A scores cannot be displaced by anything evaluated on sub-task B, so
+the GA would simply stop at the switch. Re-scoring costs ``num_elites``
+evaluations, taken out of the offspring budget, so the GA spends
+``population_size`` evaluations per generation like every other method.
 
-Standalone by design -- no evosax, no QDax, nothing that knows what an
-environment is. The caller passes flat genotypes and their fitnesses.
+Two searchers, one per setting the paper runs:
 
-## What this replaced (2026-08-06)
+    GASearcher        ``method='ga'``: fixed mutation width. gymnax, MiniGrid,
+                      MJX.
+    FocusGASearcher   ``method='ga_focus'``: the GA with the mutation width
+                      and the breeding pool set by how well the archive's
+                      centroid scores against the archive. Kinetix.
 
-Four code paths ran three different algorithms:
-
-  gymnax            this file, via `--ga_version kinetix`
-  kinetix           `experiments/simple_ga_elitist.py`, the same algorithm
-                    reimplemented on the evosax v2 base class
-  mujoco cheetah    `evosax.algorithms.SimpleGA`, which has **no elitism at
-                    all** -- its `tell` overwrites the archive with the
-                    offspring. A plain generational GA, not the method the
-                    paper describes.
-  brax ant          the same evosax GA, plus a manual patch that copied the
-                    previous generation's top genomes over the first slots of
-                    `ask`'s output. That preserved genomes but not their
-                    fitness, and re-evaluated them, so an elite could still be
-                    lost. Removed: elitism is in `tell` now, where it belongs.
-
-Cheetah and ant therefore change behaviour and are re-run. Kinetix keeps the
-same algorithm but not the same random numbers -- it initialised the archive
-from `uniform(-1, 1)` rather than `normal * 0.1`, and its crossover mask
-compared `<` where this one compares `>` (with `cross_over_rate = 0.0` both are
-"take one uniformly drawn parent", so the search is identical in distribution
-but not trajectory-by-trajectory). See docs/unify_implementations.md.
-
-Sigma -- the gaussian operator's width -- follows one mechanism,
-multiplicative decay (`sigma_decay` per generation, floored at `sigma_limit`),
-which covers every schedule the four trainers used. Under `isoline` there is no
-such width and a `sigma_decay != 1.0` is rejected rather than ignored. The one thing it cannot express is ant's per-sub-task restart,
-so that is `reset_sigma`, called explicitly at a task boundary by the caller
-that wants it -- visible in the training loop rather than hidden in a lambda.
+Fitness is MAXIMISED at this interface and negated internally, where the
+archive is kept sorted ascending by loss.
 """
-from typing import Callable, Optional, Tuple
-import jax
+
+from __future__ import annotations
+
+from typing import NamedTuple
+
 import jax.numpy as jnp
-import chex
-from flax import struct
-from functools import partial
+from jax import random
 
-from source.algorithms.ne.variation import (
-    GAUSSIAN, ISOLINE, VARIATIONS, resolve_params, vary,
-)
+from source.algorithms.ne.variation import GAUSSIAN, resolve_params, vary
 
 
-def exp_decay(value: float, decay: float, limit: float) -> float:
-    """Exponential decay with a limit."""
-    return jnp.maximum(value * decay, limit)
+class GAState(NamedTuple):
+    archive: jnp.ndarray      # (num_elites, num_params), best first
+    fitness: jnp.ndarray      # (num_elites,) MINIMISED internally
+    sigma: jnp.ndarray        # scalar mutation width
+    generation: jnp.ndarray
 
 
-@struct.dataclass
-class EvoState:
-    mean: chex.Array
-    archive: chex.Array
-    fitness: chex.Array
-    sigma: float
-    best_member: chex.Array
-    best_fitness: float = jnp.finfo(jnp.float32).max
-    gen_counter: int = 0
+class GASearcher:
+    """Truncation-selection GA with gaussian mutation. ``method='ga'``.
 
-
-@struct.dataclass
-class EvoParams:
-    cross_over_rate: float = 0.0
-    sigma_init: float = 0.07
-    sigma_decay: float = 1.0
-    sigma_limit: float = 0.0001
-    init_scale: float = 0.1
-    clip_min: float = -jnp.finfo(jnp.float32).max
-    clip_max: float = jnp.finfo(jnp.float32).max
-
-
-class SimpleGA:
-    """Simple Genetic Algorithm (Such et al., 2017)
-    Reference: https://arxiv.org/abs/1712.06567
-    Inspired by: https://github.com/hardmaru/estool/blob/master/es.py
-
-    Fitness is **minimised**, as in evosax. Every caller maximises a return, so
-    every caller passes `-fitness` to `tell`.
+    Offspring come first in the evaluated batch and the sort is stable, so a
+    child that ties an archive member's score replaces it.
     """
 
-    def __init__(
-        self,
-        popsize: int,
-        num_dims: int,
-        elite_ratio: float = 0.5,
-        sigma_init: float = 0.1,
-        sigma_decay: float = 1.0,
-        sigma_limit: float = 0.0001,
-        init_scale: float = 0.1,
-        cross_over_rate: float = 0.0,
-        variation: str = GAUSSIAN,
-        iso_sigma: Optional[float] = None,
-        line_sigma: Optional[float] = None,
-    ):
-        self.popsize = popsize
-        self.num_dims = num_dims
-        self.elite_ratio = elite_ratio
-        self.elite_popsize = max(1, int(self.popsize * self.elite_ratio))
-        self.strategy_name = "SimpleGA"
+    needs_descriptors = False
+    # Recorded in the run config (`train_nes.searcher_resolved`).
+    refresh = True
+    variation = GAUSSIAN
 
-        # Set core kwargs es_params
-        self.sigma_init = sigma_init
-        self.sigma_decay = sigma_decay
-        self.sigma_limit = sigma_limit
-        self.init_scale = init_scale
-        self.cross_over_rate = cross_over_rate
+    def __init__(self, num_params, population_size, elite_ratio=0.5,
+                 sigma_init=0.1, cross_over_rate=0.0, init_scale=0.1,
+                 init_around_mean=True):
+        self.num_params = int(num_params)
+        self.population_size = int(population_size)
+        self.num_elites = max(1, int(population_size * elite_ratio))
+        self.num_offspring = self.population_size - self.num_elites
+        if self.num_offspring < 1:
+            raise ValueError('the GA needs elite_ratio < 1')
+        self.sigma_init = float(sigma_init)
+        self.init_scale = float(init_scale)
+        # Where the archive starts. True: jittered copies of the seed policy,
+        # the study's convention so every arm begins at one point. False: the
+        # reference's init, `N(0, init_scale)` on every weight with no seed
+        # policy. On the ant the two are not interchangeable: the seed policy's
+        # actions are twice as large, every jittered copy falls within ~30
+        # steps, while 4% of an N(0, 0.1) population stands for the whole
+        # episode.
+        self.init_around_mean = bool(init_around_mean)
+        self.variation_params = resolve_params(
+            GAUSSIAN, sigma=sigma_init, cross_over_rate=cross_over_rate)
 
-        # Which operator breeds the offspring. `gaussian` is this method as
-        # published (Such et al., 2017) and the default; `isoline` is DNS's
-        # Iso+LineDD, available here so that the GA/DNS comparison can hold the
-        # operator fixed and vary only the selection rule. See
-        # source/algorithms/ne/variation.py.
-        if variation not in VARIATIONS:
-            raise ValueError(f"variation must be one of {VARIATIONS}, "
-                             f"not {variation!r}")
-        self.variation = variation
-        if variation == GAUSSIAN:
-            self.variation_params = resolve_params(
-                GAUSSIAN, sigma=sigma_init, cross_over_rate=cross_over_rate)
-        else:
-            # `sigma_decay` has nothing to decay under Iso+LineDD -- the
-            # operator's widths are the iso/line pair, and DNS never decays
-            # them. Silently ignoring a decay the caller asked for would make
-            # a GA/isoline arm quietly not the schedule its config records, so
-            # this is an error rather than a no-op.
-            if sigma_decay != 1.0:
-                raise ValueError(
-                    "sigma_decay applies to the gaussian operator's width; "
-                    "the isoline operator has no decaying width. Pass "
-                    "sigma_decay=1.0, or decay iso_sigma/line_sigma "
-                    "explicitly if that is what you want.")
-            self.variation_params = resolve_params(
-                ISOLINE, iso_sigma=iso_sigma, line_sigma=line_sigma)
-
-    @property
-    def num_elites(self) -> int:
-        """Archive size. Alias for `elite_popsize`, the name evosax uses."""
-        return self.elite_popsize
-
-    @property
-    def default_params(self) -> EvoParams:
-        """Return default parameters of evolution strategy."""
-        return EvoParams(
-            sigma_init=self.sigma_init,
-            sigma_decay=self.sigma_decay,
-            sigma_limit=self.sigma_limit,
-            init_scale=self.init_scale,
-            cross_over_rate=self.cross_over_rate,
-        )
-
-    def init(
-        self,
-        rng: chex.PRNGKey,
-        params: Optional[EvoParams] = None,
-        init_archive: Optional[chex.Array] = None,
-    ) -> EvoState:
-        """Initialize the evolution strategy.
-
-        The archive holds `elite_popsize` genomes, not `popsize`: it is the
-        surviving elite, and `ask` breeds `popsize` offspring from it. Passing a
-        population of the wrong size was the easiest mistake to make against the
-        old evosax API, so the archive is drawn here by default. `init_archive`
-        overrides it for a warm start, and must be `(elite_popsize, num_dims)`.
-        """
-        if params is None:
-            params = self.default_params
-
-        if init_archive is None:
-            # Normal initialization (like evosax) instead of uniform.
-            initialization = (
-                jax.random.normal(rng, (self.elite_popsize, self.num_dims))
-                * params.init_scale
-            )
-        else:
-            initialization = jnp.asarray(init_archive)
-            if initialization.shape != (self.elite_popsize, self.num_dims):
-                raise ValueError(
-                    f"init_archive must be "
-                    f"({self.elite_popsize}, {self.num_dims}), the archive "
-                    f"size, not {initialization.shape}. The archive is "
-                    f"elite_ratio * popsize genomes, not popsize."
-                )
-
-        state = EvoState(
-            mean=initialization.mean(axis=0),
-            archive=initialization,
-            fitness=jnp.zeros(self.elite_popsize) + jnp.finfo(jnp.float32).max,
-            sigma=params.sigma_init,
-            best_member=initialization.mean(axis=0),
-        )
-        return state
-
-    @partial(jax.jit, static_argnums=(0,))
-    def _breed(self, rng, state, params):
-        """One generation of offspring, with the genome each one descends from.
-
-        The body of `ask`. Split out so `ask_with_parents` can report the
-        pairing without a second copy of this key schedule -- two copies would
-        desynchronise the moment the schedule changed, and the pairing would
-        then be silently wrong rather than obviously broken.
-
-        Which of the two drawn parents is the base differs by operator and is
-        the non-obvious one in both cases; `source/algorithms/ne/variation.py`
-        works it out and returns it, so nothing here has to know.
-        """
-        variation_params = dict(self.variation_params)
-        if self.variation == GAUSSIAN:
-            # The one parameter that moves during a run: `state.sigma` carries
-            # the decay schedule, so it overrides the width the operator was
-            # configured with rather than the other way round.
-            variation_params['sigma'] = state.sigma
-
-        x, parents = vary(self.variation, state.archive, rng, self.popsize,
-                          variation_params, return_parents=True)
-
-        # Clip to bounds
-        x = jnp.clip(x, params.clip_min, params.clip_max)
-
-        return x, parents
-
-    def ask(
-        self,
-        rng: chex.PRNGKey,
-        state: EvoState,
-        params: Optional[EvoParams] = None,
-    ) -> Tuple[chex.Array, EvoState]:
-        """Ask for new parameter candidates to evaluate next."""
-        if params is None:
-            params = self.default_params
-        x, _ = self._breed(rng, state, params)
-        return x, state
-
-    def ask_with_parents(
-        self,
-        rng: chex.PRNGKey,
-        state: EvoState,
-        params: Optional[EvoParams] = None,
-    ):
-        """`ask`, plus the genome each offspring was bred from.
-
-        Returns `(x, state, parents)` with `parents[i]` the archive member that
-        offspring `x[i]` descends from. The plasticity churn column needs this
-        pairing: it measures the effect of ONE update on ONE network, which
-        elite-to-elite cannot do because the elite changes lineage. See
-        `pairwise_churn` in `source/metrics/plasticity.py`.
-
-        Identical offspring to `ask` for the same key -- both go through
-        `_breed`, so this is a strictly additional return and switching a
-        trainer from one to the other does not change its search.
-
-        WHICH PARENT, given there are two, depends on the operator and is the
-        non-obvious one either way -- `b` (the second draw) under gaussian
-        mutation, `x1` (the first) under Iso+LineDD. The reasoning for both is
-        in `source/algorithms/ne/variation.py`, which returns the base parent
-        so nothing here has to re-derive it.
-
-        Under gaussian mutation the pairing was checked by comparing
-        `std(offspring - parent)` against `state.sigma`: it reads 0.166 against
-        a sigma of 0.100 with the wrong parent, and exactly sigma with the
-        right one. Keep that assertion if you touch this.
-
-        Raise `cross_over_rate` above 0, or run the isoline operator at a
-        `line_sigma` large enough to land the offspring nearer `x2` than `x1`,
-        and "the parent" stops being well defined -- this column then needs
-        rethinking rather than relabelling.
-        """
-        if params is None:
-            params = self.default_params
-        x, parents = self._breed(rng, state, params)
-        return x, state, parents
-
-    @partial(jax.jit, static_argnums=(0,))
-    def tell(
-        self,
-        x: chex.Array,
-        fitness: chex.Array,
-        state: EvoState,
-        params: Optional[EvoParams] = None,
-    ) -> EvoState:
-        """Tell performance data for strategy state update.
-
-        `fitness` is minimised. Takes no random key: selection is deterministic.
-        """
-        if params is None:
-            params = self.default_params
-
-        # Combine current elite and recent generation info
-        fitness_combined = jnp.concatenate([fitness, state.fitness])
-        solution = jnp.concatenate([x, state.archive])
-
-        # Select top elite from total archive info
-        idx = jnp.argsort(fitness_combined)[0 : self.elite_popsize]
-        fitness_new = fitness_combined[idx]
-        archive = solution[idx]
-
-        # Update mutation epsilon - multiplicative decay
-        sigma = exp_decay(state.sigma, params.sigma_decay, params.sigma_limit)
-
-        # Set mean to best member seen so far
-        improved = fitness_new[0] < state.best_fitness
-        best_member = jax.lax.select(improved, archive[0], state.best_member)
-        best_fitness = jax.lax.select(improved, fitness_new[0], state.best_fitness)
-
-        return state.replace(
-            fitness=fitness_new,
+    def init(self, key, mean):
+        jitter = random.normal(key, (self.num_elites, self.num_params))
+        archive = ((mean[None, :] if self.init_around_mean else 0.0)
+                   + self.init_scale * jitter)
+        return GAState(
             archive=archive,
-            sigma=sigma,
-            mean=best_member,
-            best_member=best_member,
-            best_fitness=best_fitness,
-            gen_counter=state.gen_counter + 1,
-        )
+            fitness=jnp.full((self.num_elites,), jnp.inf),
+            sigma=jnp.asarray(self.sigma_init, dtype=jnp.float32),
+            generation=jnp.asarray(0, dtype=jnp.int32))
 
-    def reset_sigma(
-        self, state: EvoState, sigma: Optional[float] = None
-    ) -> EvoState:
-        """Restart the mutation schedule, keeping the archive.
+    def ask(self, key, state):
+        params = dict(self.variation_params, sigma=state.sigma)
+        x = vary(GAUSSIAN, state.archive, key, self.num_offspring, params)
+        # Offspring, then the archive to be re-scored.
+        return jnp.concatenate([x, state.archive], axis=0), None
 
-        For continual settings that want generation-0 mutation noise back at
-        each sub-task boundary. `sigma=None` restores `sigma_init`.
+    def tell(self, state, aux, fitness, descriptors=None):
+        loss = -fitness
+        order = jnp.argsort(loss)[:self.num_elites]
+        return state._replace(archive=aux[order], fitness=loss[order],
+                              generation=state.generation + 1)
+
+    def incumbent(self, state):
+        """The best archive member. A GA has no mean; the mean of an elite
+        archive is not itself a policy that was ever evaluated."""
+        return state.archive[0]
+
+    def population_mean(self, state):
+        """The coordinate-wise mean of the elite archive.
+
+        NOT a policy this search ever evaluated, and not one it would return:
+        `incumbent` is. It exists so a figure can ask whether the archive has
+        collapsed onto one solution -- if it has, scoring the mean and scoring
+        the best agree. Two networks that compute the same function can differ
+        by a permutation of their hidden units, and the mean of such a pair is
+        generally much worse than both, so a low value here is evidence of a
+        spread archive, not of a bad search.
         """
-        return state.replace(
-            sigma=self.sigma_init if sigma is None else sigma
-        )
+        return jnp.mean(state.archive, axis=0)
 
-    @staticmethod
-    def decay_for(sigma_init: float, sigma_final: float, num_generations: int) -> float:
-        """Per-generation `sigma_decay` that takes `sigma_init` to `sigma_final`.
+    # The elite archive IS a persistent population: a genome that is best on
+    # sub-task 0 can sit in it alongside one that is best on sub-task 1.
+    has_population = True
 
-        The trainers all spelled this out inline as
-        `(final / init) ** (1 / (gens - 1))`; it is here so that "decay to
-        sigma_final over the run" means one thing everywhere.
-        """
-        if sigma_final is None or sigma_final == sigma_init:
-            return 1.0
-        return float((sigma_final / sigma_init) ** (1.0 / max(1, num_generations - 1)))
+    def population(self, state):
+        return state.archive
 
-    def elite_mean(self, state: EvoState) -> chex.Array:
-        """Mean of the elite archive -- the incumbent the search carries forward."""
-        return state.archive.mean(axis=0)
+
+class FocusGAState(NamedTuple):
+    archive: jnp.ndarray      # (num_elites, num_params), best first
+    fitness: jnp.ndarray      # (num_elites,) MINIMISED internally
+    sigma: jnp.ndarray        # the gaussian width, in [sigma_min, sigma_init]
+    focus: jnp.ndarray        # share of the archive, best first, bred from
+    generation: jnp.ndarray
+
+
+class FocusGASearcher(GASearcher):
+    """The GA that consolidates its archive onto one solution.
+    ``method='ga_focus'``, the Kinetix GA.
+
+    Why: on Kinetix a GA's archive fills with many unrelated solvers of the
+    current level, and their centroid solves nothing. Each generation the
+    centroid is scored beside the archive (one evaluation, taken out of the
+    offspring budget) and ``p`` is the share of the new archive it scores at
+    least as well as. While ``p`` is below ``track_target``:
+
+      sigma    shrinks, ``sigma <- clip(sigma * exp(sigma_rate (p - target)),
+               sigma_min, sigma_init)``, so children stay on their parent's
+               solution;
+      focus    shrinks, ``focus <- clip(focus * exp(-focus_rate (target - p)),
+               1 / num_elites, 1)``, and offspring are bred only from the best
+               ``ceil(focus * num_elites)`` members, so the archive fills with
+               the children of a few solvers.
+
+    Both grow back once the centroid tracks the archive.
+
+    ``explore_fraction`` of the offspring are always bred from the whole
+    archive at ``sigma_init``: after the level changes, a population
+    consolidated at a tiny sigma cannot search the new one, and the explorers
+    do. Nothing here is told where a level boundary is.
+    """
+
+    def __init__(self, num_params, population_size, elite_ratio=0.5,
+                 sigma_init=0.1, cross_over_rate=0.0, init_scale=0.1,
+                 init_around_mean=True, focus_rate=0.3, sigma_rate=0.1,
+                 track_target=0.5, sigma_min=None, explore_fraction=0.0):
+        super().__init__(num_params, population_size, elite_ratio=elite_ratio,
+                         sigma_init=sigma_init, cross_over_rate=cross_over_rate,
+                         init_scale=init_scale,
+                         init_around_mean=init_around_mean)
+        self.num_offspring -= 1          # one evaluation for the centroid
+        if self.num_offspring < 1:
+            raise ValueError('ga_focus needs room for one centroid evaluation')
+        self.focus_rate = float(focus_rate)
+        self.sigma_rate = float(sigma_rate)
+        self.track_target = float(track_target)
+        self.sigma_min = (self.sigma_init / 100.0 if sigma_min is None
+                          else float(sigma_min))
+        self.focus_min = 1.0 / self.num_elites
+        self.num_explore = int(round(float(explore_fraction)
+                                     * self.num_offspring))
+
+    # The width moves every generation, so the logged sigma is the state's.
+    adapts_sigma = True
+
+    def init(self, key, mean):
+        # The split is kept so the archive starts from the same draw as in
+        # the paper's runs.
+        k_init, _ = random.split(key)
+        s = super().init(k_init, mean)
+        return FocusGAState(archive=s.archive, fitness=s.fitness,
+                            sigma=s.sigma,
+                            focus=jnp.asarray(1.0, dtype=jnp.float32),
+                            generation=s.generation)
+
+    def ask(self, key, state):
+        if self.num_explore:
+            key, k_explore = random.split(key)
+        k_mut, _ = random.split(key)
+        # The gaussian operator with both parents drawn from the best
+        # ceil(focus * archive) members; the archive is stored best first.
+        k_a, k_b, k_mate, k_eps = random.split(k_mut, 4)
+        n = state.archive.shape[0]
+        m = self.num_offspring
+        pool = jnp.maximum(1.0, jnp.ceil(state.focus * n))
+        ia = jnp.minimum((random.uniform(k_a, (m,)) * pool).astype(jnp.int32),
+                         n - 1)
+        ib = jnp.minimum((random.uniform(k_b, (m,)) * pool).astype(jnp.int32),
+                         n - 1)
+        take_b = (random.uniform(k_mate, (m, self.num_params))
+                  > self.variation_params['cross_over_rate'])
+        x = (state.archive[ia] * (1 - take_b) + state.archive[ib] * take_b
+             + state.sigma * random.normal(k_eps, (m, self.num_params)))
+        if self.num_explore:
+            explorers = vary(GAUSSIAN, state.archive, k_explore,
+                             self.num_explore,
+                             dict(self.variation_params, sigma=self.sigma_init))
+            x = x.at[:self.num_explore].set(explorers)
+        centroid = jnp.mean(state.archive, axis=0, keepdims=True)
+        # Offspring, the archive to be re-scored, then the centroid.
+        return jnp.concatenate([x, state.archive, centroid], axis=0), None
+
+    def tell(self, state, aux, fitness, descriptors=None):
+        centroid_fitness, fitness = fitness[-1], fitness[:-1]
+        evaluated = aux[:-1]
+        # Ranked on the standardized score rather than the raw one; the order
+        # is the same up to float rounding, and this is the arithmetic the
+        # paper's runs used.
+        rank_score = (fitness - jnp.mean(fitness)) / (jnp.std(fitness) + 1e-12)
+        chosen = jnp.argsort(-rank_score)[:self.num_elites]
+        chosen = chosen[jnp.argsort(-fitness[chosen])]     # best first
+        kept = fitness[chosen]
+        share = jnp.mean(centroid_fitness >= kept)
+        sigma = jnp.clip(state.sigma * jnp.exp(self.sigma_rate
+                                               * (share - self.track_target)),
+                         self.sigma_min, self.sigma_init)
+        focus = jnp.clip(state.focus * jnp.exp(-self.focus_rate
+                                               * (self.track_target - share)),
+                         self.focus_min, 1.0)
+        return FocusGAState(archive=evaluated[chosen], fitness=-kept,
+                            sigma=sigma, focus=focus,
+                            generation=state.generation + 1)

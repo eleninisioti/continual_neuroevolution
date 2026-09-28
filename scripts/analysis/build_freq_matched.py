@@ -56,7 +56,7 @@ DESIGN = {50: range(1, 6), 400: range(1, 6)}
 OVERRIDE = {('ga', 'MountainCar_v0_sigma0.1'):
             'projects/iclr_2027/runs_ga_focus_freq/interval{interval}/noise_10task/'
             'gymnax/continual/ga_focus_explore_nox/MountainCar_v0_sigma0.1'}
-ARMS = ['ga', 'nes', 'ppo', 'trac', 'redo', 'cchain', 'pbt', 'pbt2']
+ARMS = ['ga', 'es', 'ppo', 'trac', 'redo', 'cchain', 'pbt', 'pbt2']
 CELLS = ['CartPole_v1_sigma1.0', 'Acrobot_v1_sigma1.0', 'MountainCar_v0_sigma0.1']
 
 

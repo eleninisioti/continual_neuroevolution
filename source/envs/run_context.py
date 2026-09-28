@@ -1,6 +1,6 @@
 """Rebuild a finished run's environment and policy, and roll its saved agents.
 
-The post-hoc passes -- zero-shot transfer (`source/studies/evaluate_continual.py`),
+The post-hoc passes -- zero-shot transfer (`scripts/analysis/evaluate_continual.py`),
 forgetting and behavioural divergence (`scripts/analysis/behavioural_divergence.py`)
 and the per-unit dormancy checkpoints (`scripts/analysis/plasticity_checkpoints.py`)
 -- all start from the same question: given a `results.json` and a
@@ -13,7 +13,7 @@ This is the one answer, for every suite the shared runners drive (MiniGrid
 now; brax and kinetix once their modules supply the three functions below).
 It goes through `source/envs/registry.make_env_for_run`, so a run's own
 recorded `task` block decides what a row of `noise_vectors` means -- an
-environment index here, a friction multiplier on the ant -- and the pass never
+environment index here, a friction multiplier on mjx -- and the pass never
 has to know.
 
 What a suite module must supply beyond the training interface:
@@ -87,7 +87,7 @@ class RunContext:
         # The hidden activation ReDo's criterion is calibrated to. The head
         # decides it for the RL arms (`actors.head_for`), and the NE policy on
         # a suite is the same network, so it is the suite's.
-        from source.studies.generalists.actors import head_for
+        from source.algorithms.rl.action_heads import head_for
         head = head_for(self.suite.name, self.suite.action_dims(env))
         self.activation = head.policy_activation
         # A Gaussian head means `policy.apply` returns an ACTION in [-1, 1]

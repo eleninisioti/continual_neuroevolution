@@ -6,21 +6,21 @@ Every continual NE trainer in this repo logs its first record of a sub-task
 AFTER that sub-task's first generation: ask -> evaluate the offspring on the NEW
 env -> tell/select, then log. And the value it logs is `max` over the whole
 population. Read as "what the learner had when the task changed" -- which is how
-it was read, in scripts/neurips_2026_rebuttal and in the ant write-ups -- that
+it was read in earlier analyses -- that
 number is inflated two ways at once:
 
   * it is a best-of-N order statistic over 512 individuals, while the RL
     trainers log a single policy's evaluation return, and
   * it is measured after a full generation of search on the new task: 512
     offspring rolled out on the new env, i.e. pop_size x num_evals x
-    episode_length env steps (1.5M at the ant settings, 3.1M for DNS, which also
-    re-measures the carried population at the boundary). The RL trainers
+    episode_length env steps (1.5M at pop 512 x 3 x 1000, 3.1M for DNS, which
+    also re-measures the carried population at the boundary). The RL trainers
     evaluate BEFORE the sub-task's first training epoch, at 0 steps.
 
-On the damage-only ant block that made GA+Novelty look like it retained 0.53 of
-the new sub-task's performance across a leg switch against PPO's 0.06. Measured
-properly -- the carried best individual, unchanged, on the new leg -- it retains
-0.15 against PPO's 0.04, and the effect it was being credited with is one-
+That made GA+Novelty look like it retained 0.53 of the new sub-task's
+performance across a switch against PPO's 0.06. Measured properly -- the
+carried best individual, unchanged, on the new sub-task -- it retained 0.15
+against PPO's 0.04, and the effect it was being credited with is one-
 generation recovery, not zero-shot transfer.
 
 What the trainers log now

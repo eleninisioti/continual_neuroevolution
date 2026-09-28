@@ -51,7 +51,7 @@ from matplotlib.lines import Line2D                        # noqa: E402
 from scipy.stats import mannwhitneyu, spearmanr            # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 sys.path.insert(0, str(REPO / 'scripts/analysis'))
 from make_lineplot import FAMILY, METHOD_STYLE             # noqa: E402
 import plot_generalist_outcomes as pgo                     # noqa: E402

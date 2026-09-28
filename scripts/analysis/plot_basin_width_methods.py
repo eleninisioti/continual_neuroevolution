@@ -12,9 +12,9 @@ final paper figure.
        paper/visuals/landscape/basin_width_table.{pdf,png}   (appendix draft: every panel)
 
 Panels, runs and arms are generalist_scores_centroid's (plot_generalist_scores.GRID
-and its data file): ES = NES, the PBT-PPO it kept, the same trials. Figure 2's
+and its data file): the PBT-PPO it kept, the same trials. Figure 2's
 panels that the grid lacks (SEQUENCES: the 10-sub-task noise runs and Kinetix)
-follow Figure 2 instead: its kept ES and PBT arm, its trial count. Each panel's
+follow Figure 2 instead: its kept PBT arm, its trial count. Each panel's
 width comes from the `curvature_width.json` pass over its data root (WIDTH_PASS).
 The extract refuses a pass that scored other runs than the data root links to,
 or other trials than the figure it follows shows.
@@ -72,7 +72,7 @@ from matplotlib.transforms import blended_transform_factory  # noqa: E402
 from scipy.stats import mannwhitneyu, wilcoxon             # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 sys.path.insert(0, str(REPO / 'scripts/analysis'))
 from make_lineplot import METHOD_STYLE                     # noqa: E402
 import plot_generalist_outcomes as pgo                     # noqa: E402
@@ -161,8 +161,8 @@ def figure2_arms():
         kept = blob['kept'][tree]
         rows = {}
         for row in METHODS:
-            # the kept one of es/nes for the ES row, of pbt/pbt2 for the PBT row
-            arm = next((k for k in kept if k.rstrip('2') == row or {row, k} <= {'es', 'nes'}), row)
+            # the kept one of pbt/pbt2 for the PBT row
+            arm = next((k for k in kept if k and k.rstrip('2') == row), row)
             key = f'{tree}|{cell}|{row}|curves'      # the npz names the kept arm by its row
             if key in curves.files:
                 rows[row] = (arm, curves[key].shape[0])

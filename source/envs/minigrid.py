@@ -54,8 +54,8 @@ illegal-address faults); with them off (``XLA_FLAGS=
 because a conditional executed outside a graph reads its predicate on the
 host at every scan step. The RL step (``rl_env_fns``) still carries both
 environments' timesteps and switches per step, as PPO's rollout is 50 steps
-and ran at speed either way. ``scripts/outdated/generalists/check_minigrid_tasks.py``
-asserts on the CPU that a switched rollout on environment i returns exactly
+and ran at speed either way. A check script in the earlier codebase asserted
+on the CPU that a switched rollout on environment i returns exactly
 what xminigrid's own environment i returns under the same keys.
 
 ## No solved threshold

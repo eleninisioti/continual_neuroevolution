@@ -1,0 +1,101 @@
+# What the gymnax study runs: the cells, the methods, their settings, the budget.
+# The logic that reads this file is `source/utils/config.py:Gymnax`.
+#
+# ## Cells
+#
+#     stationary   CartPole-v1, Acrobot-v1, MountainCar-v0 -- one sub-task, the
+#                  unperturbed environment.
+#     continual    <env>_sigma<S> -- num_phases phases, the first the unperturbed
+#                  environment and every later one a fixed observation offset
+#                  drawn at width S from the trial index alone, so every method
+#                  at a given trial meets the same sub-tasks in the same order.
+#                  `--task_type param|actions` swaps the offset for a physics
+#                  multiplier or a reversed action map; the cell name keeps its
+#                  sigma so the run tree reads the same.
+#
+# The cell name is the run directory's name once `scripts/train/run.sh` has
+# sanitised it (`CartPole_v1_sigma1.0`), exactly as the old trainers' trees.
+#
+# ## Budget
+#
+# Compute-matched in environment steps, as on every benchmark:
+#
+#     stationary   NE 600 generations x 512 x 3 x 500   = 4.608e8
+#                  RL 4500 updates x 2048 envs x 50 steps = 4.608e8
+#     continual    NE 2000 generations (10 x 200)       = 1.536e9
+#                  RL 15000 updates (10 x 1500)          = 1.536e9
+#
+# RL updates are derived from the NE generations, never set here. A stationary
+# run is cut into ten phases of the same sub-task so it is checkpointed on the
+# same grid as the continual one.
+
+envs: [CartPole-v1, Acrobot-v1, MountainCar-v0]
+sigmas: [0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0]
+
+num_phases: 10
+ne_pop_size: 512
+ne_num_evals: 3
+episode_length: 500
+eval_episodes: 10                    # the reported score, fresh keys
+ne_generations: 600                  # stationary
+ne_task_interval_continual: 200      # generations per continual phase
+rl_num_envs: 2048
+rl_num_steps: 50
+redo_interval: 50                    # updates between ReDo passes
+
+
+# Settings several NE arms share; not an arm.
+shared:
+  # AURORA descriptors, as the gymnax DNS runs used.
+  dns: &dns {k: 3, init_around_mean: false, descriptor: aurora, traj_steps: 50,
+             aurora_latent_dim: 6, aurora_train_ratio: 8}
+
+# The NE methods. The widths are the old gymnax trainers' (their ENV_CONFIGS
+# and command lines); `init_around_mean: false` is their archive / repertoire
+# initialisation, N(0, 0.1) on every weight with no seed policy.
+ne_arms:
+  ga:
+    method: ga
+    sigma: 0.5
+    searcher_kwargs: {elite_ratio: 0.5, init_around_mean: false}
+  dns:
+    method: dns
+    searcher_kwargs: {iso_sigma: 0.05, line_sigma: 0.5, <<: *dns}
+  # DNS bred with the GA's gaussian operator at the GA's width.
+  dns_gaussian:
+    method: dns_gaussian
+    sigma: 0.5
+    searcher_kwargs: *dns
+  # ES: standardized fitness + plain SGD.
+  es: {method: es, sigma: 0.1, learning_rate: 0.05, optimizer: sgd, shaping: zscore}
+
+# Per-environment arms. An entry REPLACES the arm above whole -- nothing of it
+# (e.g. `init_around_mean: false`) carries over.
+ne_by_env:
+  MountainCar-v0:
+    # The paper's MountainCar GA is the Kinetix one: `ga_focus`, no crossover,
+    # a quarter of the offspring always exploring at sigma 0.5. What its
+    # results.json records on every MountainCar cell (noncontinual,
+    # noise_2task, noise_10task, physics, actions). CartPole and Acrobot run
+    # the plain `ga` above.
+    ga:
+      method: ga_focus
+      sigma: 0.5
+      searcher_kwargs: {elite_ratio: 0.5, cross_over_rate: 0.0, focus_rate: 0.3,
+                        sigma_rate: 0.1, track_target: 0.9, sigma_min: 1.0e-5,
+                        explore_fraction: 0.25}
+
+# PPO and the three continual-RL baselines, plus PBT populations of PPO.
+rl_arms: [ppo, trac, redo, cchain, pbt, pbt2,
+          pbt_weights, pbt2_weights, pbt_hp, pbt2_hp]
+
+# The paper's gymnax PPO, on top of the runner's PPO_CONFIGS gymnax entry
+# (which already has its batch, epochs, gamma, GAE, clip, entropy, value net
+# and C-CHAIN controller): plain Adam with no gradient clipping, and ReDo's
+# dormancy measured on 512 samples. MountainCar's learning rate is 3e-4, where
+# PPO_CONFIGS has 1e-4.
+ppo: {max_grad_norm: 0.0, redo_batch_size: 512}
+ppo_by_env:
+  MountainCar-v0: {learning_rate: 3.0e-4}
+
+reported_arms: [ga, es, dns, ppo, trac, redo, cchain, pbt, pbt2]

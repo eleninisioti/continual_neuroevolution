@@ -33,7 +33,7 @@ is drawn empty and named on stdout, so the grid does not reflow when it lands;
 a row a family cannot fill (BD on Kinetix, or a post-hoc pass not run yet) is
 `n/a` there.
 
-ES/NES and PBT-PPO N=8/N=2 are each ONE method drawn once, the arm with the
+PBT-PPO N=8/N=2 is ONE method drawn once, the arm with the
 higher Cum. elite over the column's family (`keep_one_arm`), so the figure has
 the same rows as the lineplot figures and their legends agree.
 
@@ -56,11 +56,10 @@ from matplotlib.lines import Line2D                        # noqa: E402
 from matplotlib.ticker import FuncFormatter, MaxNLocator   # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 import make_lineplot as lp                                 # noqa: E402
 from make_metrics_figure import ROWS, draw_panel           # noqa: E402
 import es_arm                                              # noqa: E402
-from es_arm import dropped_arm                             # noqa: E402
 
 PAPER = REPO / 'projects/iclr_2027/paper'
 OUT = PAPER / 'visuals'
@@ -104,15 +103,11 @@ SETS = {
     'more': ('metrics_overview', _gymnax('10task') + [                          # noise, physics
         ('cheetah-noise',   'Brax', 'mjx/cheetah/noise/10task',   'cheetah_noise',    'HalfCheetah', 'noise'),     # cheetah_noise05_t10
         ('cheetah-physics', 'Brax', 'mjx/cheetah/physics/10task', 'cheetah_friction', 'HalfCheetah', 'friction'),  # cheetah_friction
-        ('ant-noise',       'Brax', 'mjx/ant/noise/10task_warmup', 'ant_noise',       'Ant',         'noise'),     # ant_noise025_t10
-        ('ant-physics',     'Brax', 'mjx/ant/physics/10task',     'ant_friction',     'Ant',         'friction'),  # ant
         ('kinetix',      'Kinetix', 'kinetix/kinetix',            'Kinetix20',        '20 levels',   'level chain'),  # kinetix
     ]),
     'two': ('metrics_overview_2task', _gymnax('2task') + [                      # noise_2task, physics_2task
         ('cheetah-noise',   'Brax', 'mjx/cheetah/noise/2task',    'cheetah_noise',    'HalfCheetah', 'noise'),     # cheetah_noise025
         ('cheetah-physics', 'Brax', 'mjx/cheetah/physics/2task',  'cheetah_friction', 'HalfCheetah', 'friction'),  # cheetah_friction_2task
-        ('ant-noise',       'Brax', 'mjx/ant/noise/2task_warmup', 'ant_noise',        'Ant',         'noise'),     # ant_noise025
-        ('ant-physics',     'Brax', 'mjx/ant/physics/2task_warmup', 'ant_friction',   'Ant',         'friction'),  # ant_friction_2task
         ('minigrid',    'MiniGrid', 'minigrid/minigrid',          'MiniGrid_8x8_16x16', '8x8 / 16x16', 'room size'),  # minigrid
     ]),
 }
@@ -128,7 +123,7 @@ NOT_REPORTED = {'dns_gaussian', 'dns', 'ga_isoline'}
 # is performance and transfer only (2026-09-16): the F and BD it would add are
 # in stability_plasticity, which draws the same ten tasks.
 SET_ROWS = {('main', 'centroid'): ['cum', 'ZT']}
-PAIRS = (es_arm.ARMS, es_arm.PBT_ARMS)          # ('es', 'nes'), ('pbt', 'pbt2')
+PAIRS = (es_arm.PBT_ARMS,)                      # ('pbt', 'pbt2')
 PAIR_ARMS = {a for pair in PAIRS for a in pair}
 MUTED = '#6b6a65'
 LEFT_IN = 0.92          # method labels and the row label
@@ -166,24 +161,16 @@ def _cum_elite(sub):
 
 def keep_one_arm(sub, present):
     """`({arm: canonical name or None}, [kept arm a pair])` for one paper
-    directory. ES vs NES and PBT-PPO N=8 vs N=2 are one method at two
-    settings, so a column draws ONE of each pair -- the higher Cum. elite
-    summed over that family's cells (es_arm.pick) -- filed under the pair's
-    first name, `es` and `pbt`, exactly as plot_continual_lineplots.py and
-    plot_noncontinual_solve.py do. One row a method, and the same arm as the
-    family's own figures: the ES pair reads the `es_arm.json` finish_iclr.sh
-    wrote at build time, so a column cannot disagree with the directory it
-    came from; the PBT pair is not filed, so it is picked here. `present` (the
-    JSON's methods) breaks the tie when neither is available."""
+    directory. PBT-PPO N=8 vs N=2 are one method at two settings, so a
+    column draws ONE of the pair -- the higher Cum. elite summed over that
+    family's cells (es_arm.pick) -- filed under the pair's first name, `pbt`,
+    exactly as plot_continual_lineplots.py and plot_noncontinual_solve.py do.
+    `present` (the JSON's methods) breaks the tie when neither is
+    available."""
     per_cell = _cum_elite(sub)
     remap, kept = {}, []
     for pair in PAIRS:
-        arm = None
-        if pair == es_arm.ARMS:
-            dropped = dropped_arm(PAPER / sub)
-            arm = next((a for a in pair if a != dropped), None) if dropped else None
-        if arm is None:
-            arm = es_arm.pick(per_cell, pair)[0]
+        arm = es_arm.pick(per_cell, pair)[0]
         if arm is None:
             arm = next((a for a in pair if a in present), None)
         kept.append(arm)
@@ -318,7 +305,7 @@ def write_markdown(stem, agent, table):
           f'`metrics_{agent}` figure draws. Mean over trials [95% bootstrap '
           'CI], n, NE-vs-RL mark (`*` p<.05, `**` p<.01, `***` p<.001: better '
           'than EVERY method of the other family, one-sided Mann-Whitney U, '
-          'Holm). See the docstring of `scripts/make_metrics_figure.py` for '
+          'Holm). See the docstring of `scripts/plotting/make_metrics_figure.py` for '
           'each row.', '',
           '| Row | Task | Perturbation | Method | mean | lo | hi | n | mark |',
           '|---|---|---|---|---|---|---|---|---|']

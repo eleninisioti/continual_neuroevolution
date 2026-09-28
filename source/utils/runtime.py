@@ -23,7 +23,7 @@ def select_gpus():
 
     Returns the device string that was applied, or None if `--gpus` was absent.
     Preallocation is off because several trainers share a GPU in every sweep in
-    `scripts/outdated/train/`; with it on the first process claims the whole card.
+    `scripts/train/`; with it on the first process claims the whole card.
     """
     gpu = _get_gpu_arg()
     if gpu:
@@ -55,7 +55,7 @@ def write_run_config(output_dir, config, policy_arch=None):
     """Write `config.json` next to a run, so the run says what it trained.
 
     The RL trainers already did this; the NE ones recorded their config only
-    inside the checkpoint pickles, so a finished GA run on cheetah or ant had no
+    inside the checkpoint pickles, so a finished GA run on the cheetah had no
     cheap, readable record of the network it searched. That is what
     `scripts/check_architectures.py` needs to confirm that every method compared
     on a task used the same policy -- and it could not check the NE side.

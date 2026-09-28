@@ -1,20 +1,12 @@
 """ReDo -- Recycling Dormant Neurons (Sokar et al., ICML 2023).
 
-The one ReDo every suite uses. Port of `inspiration/redo/src/redo.py`, the
-reference implementation released with the paper, from PyTorch to JAX/optax.
-
-There used to be three of these -- `source/studies/gymnax/redo.py`,
-`third_party/kinetix/kinetix/models/redo.py` and the `_apply_redo` inside
-`source/studies/brax/my_brax/ppo_train.py` -- and they did not agree on what a dormant
-neuron is, on whether the threshold was configurable, or on whether the
-optimizer state was reset. See `docs/unify_implementations.md` Sect. 8.
+The one ReDo every suite uses. 
 
 ## What ReDo does, in the order this module does it
 
 1. Score every hidden neuron on a batch of observations, normalised by the
    layer's mean score so one threshold works for layers of different widths
-   (`neuron_dormancy_score`). This normalisation is the reference's, taken in
-   turn from Dopamine's weight recycler.
+   (`neuron_dormancy_score`).
 2. Neurons scoring <= tau are dormant (`dormant_masks`). `tau=0` degenerates to
    "exactly zero", the strict dead-unit count the paper also reports and which
    this module logs alongside the real count.
@@ -23,8 +15,7 @@ optimizer state was reset. See `docs/unify_implementations.md` Sect. 8.
    essentially unchanged at the moment of the reset (`_reinit_params`).
 4. Zero the Adam moments of every weight touched, and restart bias correction
    (`_reset_adam_state`). The reference's own comment on this is "Step count
-   resets are key to the algorithm's performance" -- it is not optional, and
-   the brax path skipping it was one of the ways the suites disagreed.
+   resets are key to the algorithm's performance".
 
 ## The criterion, and why it depends on the activation
 
@@ -146,8 +137,8 @@ def hidden_activations(params, obs, num_hidden, activation_fn=jax.nn.relu,
 
     `activation_fn` must be the activation the network was *trained* with. It
     used to be hardcoded to relu here, which was right for gymnax and wrong for
-    everyone else -- the same class of bug as the evaluators rebuilding brax
-    policies with swish (see source/studies/brax/evaluate_continual.py).
+    everyone else -- the same class of bug as the old evaluators rebuilding brax
+    policies with swish.
     """
     p = params['params']
     x = obs

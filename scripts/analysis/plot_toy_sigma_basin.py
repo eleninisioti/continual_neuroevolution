@@ -10,7 +10,7 @@ sigma, and does that depend on the landscape?
        paper/visuals/final/data/toy_sigma_basin.{json,npz}
     (paper = projects/iclr_2027/paper)
 
-The runs are `scripts/train/queue_toy.sh`'s `sigma_*` stages: ES (NES) and
+The runs are `scripts/train/queue_toy.sh`'s `sigma_*` stages: ES and
 the GA at sigma 0.01 .. 0.8 on three two-sub-task toys (`source/envs/
 toy_landscapes.py`), 24 seeds, pop 64, a switch every 100 generations for
 1000, the full centroid saved every 10 generations (`--record_centroid`):
@@ -72,7 +72,7 @@ RUNS = ptl.RUNS
 STEM = 'toy_sigma_basin'
 OUT = ptl.OUT
 DATA = ptl.pcl.FINAL / 'data' / STEM
-ARMS = {'es': 'nes', 'ga': 'ga'}           # figure name -> sweep method
+ARMS = {'es': 'es', 'ga': 'ga'}            # figure name -> sweep method
 # (landscape, row title, level drawn, level axis label, level symbol)
 ROWS = [('smooth', 'Smooth', 0.1, 'Shared region $h$', 'h'),
         ('rugged', 'Local optima', 0.8, 'Barrier depth $a$', 'a'),
@@ -406,7 +406,7 @@ def tables(meta):
           + " (`scripts/train/queue_toy.sh`, stage sigma). Built by "
           "`scripts/analysis/plot_toy_sigma_basin.py`.", '',
           'Two sub-tasks alternate every 100 generations for 1000; pop 64, 24 seeds, '
-          'd = 2. ES = NES, GA with archive re-scoring, both at every sigma. '
+          'd = 2. ES and the GA with archive re-scoring, both at every sigma. '
           'Every number is for the CENTROID (the ES mean; the mean of the GA elite '
           'archive).', '',
           f"- width: the radius of isotropic gaussian perturbation at which half the "

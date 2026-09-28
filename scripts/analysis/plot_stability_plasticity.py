@@ -64,17 +64,16 @@ figure of the paper (make_lineplot.bootstrap_ci says why). The tables add
 rliable's probability of improvement on LA - F.
 
 Arms are continual_main's (plot_continual_lineplots.py): superseded arms
-dropped, an arm left out while any of its trials still trains, ES = NES except
-on Kinetix (OpenES, `es`, plain OpenES since 2026-09-24), and PBT N=8 or N=2 by the higher Cum.
-elite (es_arm.py).
+dropped, an arm left out while any of its trials still trains, and PBT N=8 or
+N=2 by the higher Cum. elite (es_arm.py).
 
 gymnax and MiniGrid read the reward matrix from the home forgetting pass
 (PASS). Kinetix and HalfCheetah read it from the training records instead
 (`load_records`), which log the centroid on every sub-task: Kinetix's pass runs
-on the GH200 only (CLAUDE.md), and the records gave its LA and F exactly on
+on the GH200 only, and the records gave its LA and F exactly on
 all 45 runs it scored (2026-09-15); the cheetah's RL arms (and its noise GA)
-are the CLUSTER ant-PPO-shape runs, which the home pass never scored, so every
-cheetah arm is read the same way. On the cheetah NES runs both sources score,
+are the CLUSTER brax-PPO-shape runs, which the home pass never scored, so every
+cheetah arm is read the same way. On the cheetah ES runs both sources score,
 mean LA agrees to 0.1% and a run's F to within 0.07 of the rescaled axis (MJX
 evaluation noise, 2026-09-17). Their BD, where present, is a CLUSTER centroid
 pass over three trials an arm (BD_PASS).
@@ -122,8 +121,8 @@ GYMNAX_ENVS = ('CartPole_v1', 'Acrobot_v1', 'MountainCar_v0')
 PASS = {'paper/gymnax/data/noise_10task': 'gymnax/noise/10task',
         'paper/gymnax/data/actions_2task': 'gymnax/actions/2task',
         'paper/gymnax/data/noise_2task': 'gymnax/noise/2task',
-        # The family pass ran on runs_param_2task, where es_arm kept OpenES and
-        # PBT does not exist (the paper tree links it per cell from CLUSTER):
+        # The family pass ran on runs_param_2task, where PBT does not exist
+        # (the paper tree links it per cell from CLUSTER):
         # posthoc_paper_forgetting.sh scores the paper tree's arms instead.
         'paper/gymnax/data/physics_2task': 'gymnax/data/physics_2task',
         'paper/minigrid/data': 'minigrid/minigrid'}
@@ -149,9 +148,6 @@ FLOOR = {'CartPole_v1': 10.0, 'Acrobot_v1': -500.0, 'MountainCar_v0': -500.0,
 # and Kinetix in the last column. Each panel's title names its task, so the
 # figure needs no suite headers.
 NCOLS = 5
-# CLAUDE.md (2026-09-16): ES and NES are ONE method, reported as ES -- NES
-# everywhere but Kinetix, which keeps plain OpenES. One label, one colour and one
-# legend entry here, whichever of the two a family kept.
 ES_LABEL, ES_COLOUR = 'ES', lp.METHOD_STYLE['es']['color']
 N_BOOT = 2000
 ISO = '0.86'
@@ -169,22 +165,16 @@ MIN_SPAN = 0.5
 MIN_EFFECT = 0.05
 
 
-def reported_arms(root, cells, es_kept=None):
-    """The arms plot_continual_lineplots.py draws for `cells` of one tree;
-    `es_kept` fixes the ES variant as its main figure does."""
+def reported_arms(root, cells):
+    """The arms plot_continual_lineplots.py draws for `cells` of one tree."""
     cell_filter = lp.cell_selector(cells, None)[0]
     arms = [m for m in pcl.complete_arms(root, cells)
             if m not in lp.SUPERSEDED or lp.defect_state(
                 root, 'continual', m, cell_filter, lp.SUPERSEDED[m][0]) == 'none']
-    pairs = (es_arm.ARMS, es_arm.PBT_ARMS)
-    cum = es_arm.load(root, 'continual', cells, arms=sum(pairs, ()))
-    for pair in pairs:
-        if es_kept and pair == es_arm.ARMS:
-            assert es_kept in arms, f'{es_kept} has no finished runs under {root}'
-            arms = [m for m in arms if m not in pair or m == es_kept]
-        elif set(pair) <= set(arms):
-            kept = es_arm.pick(cum, pair)[0]
-            arms = [m for m in arms if m not in pair or m == kept]
+    pair = es_arm.PBT_ARMS
+    if set(pair) <= set(arms):
+        kept = es_arm.pick(es_arm.load(root, 'continual', cells, arms=pair), pair)[0]
+        arms = [m for m in arms if m not in pair or m == kept]
     return arms
 
 
@@ -446,13 +436,7 @@ def draw(panels, headers, shape, stem, stability, methods, axes_in=(1.85, 1.7),
         fig.add_artist(Line2D([a.x0, b.x1], [y, y], lw=0.6, color='0.3'))
         fig.text((a.x0 + b.x1) / 2, y + 2 * pt, text, ha='center', va='bottom',
                  fontsize=plt.rcParams['font.size'] + 1)
-    # ES and NES share a label, so whichever of them a family kept is one entry.
-    shown, seen = [], set()
-    for m in methods:
-        key = 'es' if m in es_arm.ARMS else m
-        if key not in seen:
-            seen.add(key)
-            shown.append(m)
+    shown = list(dict.fromkeys(methods))
     handles = [Line2D([], [], ls='', marker='o' if lp.FAMILY.get(m) == 'ne' else 's',
                       ms=6, color=_colour(m)) for m in shown]
     labels = [_label(m) for m in shown]
@@ -478,11 +462,11 @@ def _ci(p, digits=2):
 
 
 def _label(m):
-    return ES_LABEL if m in es_arm.ARMS else lp.METHOD_STYLE[m]['label']
+    return ES_LABEL if m == es_arm.ES else lp.METHOD_STYLE[m]['label']
 
 
 def _colour(m):
-    return ES_COLOUR if m in es_arm.ARMS else lp.METHOD_STYLE[m]['color']
+    return ES_COLOUR if m == es_arm.ES else lp.METHOD_STYLE[m]['color']
 
 
 def summary(points):
@@ -656,8 +640,7 @@ def extract():
     meta = {'arms': {}, 'source': {}, 'links': {}, 'panels': {}}
     for tree, tree_cells in cells.items():
         root = PROJECT / tree
-        arms = reported_arms(root, tree_cells,
-                             es_kept='es' if tree.startswith('paper/kinetix') else 'nes')
+        arms = reported_arms(root, tree_cells)
         meta['arms'][tree] = arms
         meta['source'][tree] = (f'forgetting pass, paper/{PASS[tree]}/results/centroid'
                                 if tree in PASS else 'training records')
@@ -708,8 +691,7 @@ def frozen_methods(key):
     """The frozen specialists of a panel by the generalist figure's rule, from
     its saved data (`plot_generalist_scores.py --extract` writes it); empty for
     a panel that figure does not have (the ten-sub-task and Kinetix families,
-    where two sub-tasks do not alternate). Its `es` is whichever ES arm the
-    family kept, so it names every ES arm here."""
+    where two sub-tasks do not alternate)."""
     import plot_generalist_scores as pgs   # it imports FLOOR from this module
     if not pgs.DATA.exists():
         return set()
@@ -717,10 +699,7 @@ def frozen_methods(key):
     if not panel or not panel['arms']:
         return set()
     classes = pgs.classify(panel, key.split('|')[1])
-    out = {m for m, k in classes.items() if k == 'frozen'}
-    if 'es' in out:
-        out |= set(es_arm.ARMS)
-    return out
+    return {m for m, k in classes.items() if k == 'frozen'}
 
 
 def main() -> int:

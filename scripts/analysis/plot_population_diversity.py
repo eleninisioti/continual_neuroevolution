@@ -15,10 +15,10 @@ Built in two steps, like the other final figures: `--extract` reads the runs
 through the symlink tree paper/diversity/data/population/<family>/continual/
 <arm>/<cell> (README.md there says where every link points and why);
 without it only the saved data is read. The tasks are continual_main's and so
-are the runs, except where those runs log no diversity: the MiniGrid GA/NES
-and the HalfCheetah NES/GA runs are the diversity re-runs
-(submit_population_diversity.sh, queue_cheetah_div_nes.sh). ES = NES except on
-Kinetix (plain OpenES, `es`), PBT-PPO = the N continual_main keeps. HalfCheetah
+are the runs, except where those runs log no diversity: the MiniGrid GA/ES
+and the HalfCheetah ES/GA runs are the diversity re-runs
+(submit_population_diversity.sh, queue_cheetah_div_nes.sh). PBT-PPO = the N
+continual_main keeps. HalfCheetah
 action reversal has no PBT-PPO (continual_main has none).
 
 One row a task, one column a quantity; each panel is the mean over trials with
@@ -98,7 +98,7 @@ PANELS = [
 # them on both counts (2026-09-19).
 MAIN_ROW = ('actions_2task', 'CartPole_v1_sigma1.0', 'CartPole, action reversal')
 # Link name -> the method it is drawn as: one ES and one PBT-PPO entry.
-ARM_METHOD = {'ga': 'ga', 'nes': 'es', 'es': 'es', 'pbt': 'pbt', 'pbt2': 'pbt'}
+ARM_METHOD = {'ga': 'ga', 'es': 'es', 'pbt': 'pbt', 'pbt2': 'pbt'}
 METHODS = ('ga', 'es', 'pbt')
 
 # key: (column title, record columns in preference order, shared y down the column, log y)

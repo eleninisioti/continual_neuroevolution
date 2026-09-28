@@ -13,7 +13,7 @@ the final `generalist_scores_centroid` figure. An appendix paper figure.
        paper/visuals/final/appendix/landscape_slices_centroid.{pdf,png,md}
 
 Panels, runs, trials and arms are generalist_scores_centroid's (its data file,
-so run its extract first): ES = NES, the PBT-PPO it kept. Rows are methods,
+so run its extract first): the PBT-PPO it kept. Rows are methods,
 columns the panels, grouped by what the switch changes.
 
 The slice is the plane through the centroid checkpoint k-1 (circle),
@@ -64,7 +64,7 @@ from matplotlib.lines import Line2D                         # noqa: E402
 from matplotlib.patches import Patch                        # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 sys.path.insert(0, str(REPO / 'scripts/analysis'))
 import landscape_slices as ls                               # noqa: E402
 import plot_generalist_outcomes as pgo                      # noqa: E402

@@ -18,10 +18,9 @@ the `metrics_<agent>_values.json` each of those writes, exactly as
 plot_metrics_overview.py does, so the points, the CIs and the marks are the
 per-family figure's own.
 
-ES/NES and PBT-PPO N=8/N=2 are ONE method each. The arm kept is the one the
-PAPER'S family kept (`noise/10task`), not a per-interval pick: the appendix
-has to discuss the same ES the main text does, and an interval that flipped
-the pair would be comparing two different methods along one line.
+PBT-PPO N=8/N=2 is ONE method. The arm kept is the one the PAPER'S family
+kept (`noise/10task`), not a per-interval pick: an interval that flipped the
+pair would be comparing two different methods along one line.
 
 `F` IS THE SAME MEASUREMENT AT EVERY INTERVAL, although at 400 no task is
 revisited. With ten distinct tasks the tables report `final_forgetting`
@@ -46,7 +45,7 @@ from matplotlib.lines import Line2D                        # noqa: E402
 from matplotlib.ticker import NullFormatter                # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 sys.path.insert(0, str(REPO / 'scripts' / 'analysis'))
 import make_lineplot as lp                                 # noqa: E402
 from plot_metrics_overview import keep_one_arm             # noqa: E402
@@ -244,8 +243,8 @@ def draw_plane(stem):
     os.chdir(REPO)          # load_divergence finds runs by repo-relative path
     ref_tree = PLANE_TREES[200][1]
     cells = [c for c in psp.pcl._cells(lambda f: f == 'main')[ref_tree]]
-    # The paper family's arms (ES = NES, its PBT pick), used at every length.
-    arms = psp.reported_arms(psp.PROJECT / ref_tree, cells, es_kept='nes')
+    # The paper family's arms (its PBT pick), used at every length.
+    arms = psp.reported_arms(psp.PROJECT / ref_tree, cells)
     print(f'plane: arms {" ".join(arms)}')
     envs = [c.split('_sigma')[0] for c in cells]
     merged = {env: {} for env in envs}           # {env: {(method, length): arrays}}

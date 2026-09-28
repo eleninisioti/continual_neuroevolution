@@ -5,7 +5,7 @@ how much the policy's outputs move per update. Neither sees the parameters
 themselves, and the failure mode they miss is the well-documented one: weight
 norms that grow without bound over a long non-stationary run, so the network
 becomes progressively harder to move and loses plasticity while every unit is
-still nominally active. That is why CLAUDE.md asks for all three.
+still nominally active. That is why all three are recorded.
 
 Nothing in this repository measured this before -- not gymnax, not brax, not
 mujoco, not kinetix -- so these keys are new everywhere rather than a brax
@@ -127,8 +127,8 @@ def population_weight_stats(population, prefix="weight"):
 # These mirror the numpy definitions EXACTLY -- same NEAR_ZERO, same keys, same
 # arithmetic -- so a kinetix column and a brax column mean the same thing. They
 # live here rather than in the kinetix trainer for that reason: one definition,
-# two execution paths, which is what CLAUDE.md's "single part of the code
-# responsible" requires. Change a formula above and change it here.
+# two execution paths, so a single part of the code is responsible for
+# each metric. Change a formula above and change it here.
 #
 # The returned values are traced scalars, not floats; the caller converts them
 # when it converts the rest of its metrics.

@@ -1,23 +1,19 @@
-"""The MJX task family -- CheetahRun and the brax ant -- for this study.
+"""The MJX task family -- CheetahRun (brax halfcheetah) -- for this study.
 
 The mujoco/brax counterpart of ``tasks.py``, and deliberately the same shape:
 a *task* is one environment plus a fixed vector drawn from the trial index
 alone, so every method at a given trial faces identical sub-tasks. What the
-vector IS differs by body, and that is the one thing this module adds over the
-gymnax side:
+vector IS depends on the task family (``task_mod``), and that is the one thing
+this module adds over the gymnax side:
 
-    obs_noise   CheetahRun. The vector is an offset on the observation and the
-                policy sees ``obs + vector`` -- section C's construction and the
-                paper's cheetah obs-noise block.
-    friction    the ant. The vector is one number, a multiplier on the ground
-                friction, and the PHYSICS changes while the observation does
-                not -- the paper's own ant continual block
-                (``source/envs/brax_ant.py``), whose sub-tasks are
-                friction rescalings on a healthy ant at a target speed.
+    obs_noise   The vector is an offset on the observation and the policy sees
+                ``obs + vector`` -- section C's construction and the paper's
+                cheetah obs-noise block.
+    friction    The vector is one number, a multiplier on the ground friction,
+                and the PHYSICS changes while the observation does not.
 
 Everything env-facing is imported rather than re-implemented. The environment
-comes from the paper's own factories (``source.envs.brax_common`` /
-``source.envs.brax_ant``), the policy is
+comes from the paper's own factory (``source.envs.brax_common``), the policy is
 ``source.algorithms.networks.ContinuousMLPPolicy`` -- the one the
 paper's four NE trainers and its PPO share -- the offset draw is
 ``tasks.task_noise_vectors``, the same function the gymnax side calls, and the
@@ -44,41 +40,26 @@ restored after. That is brax's own idiom -- its
 batched Systems -- and it is what makes the multiplier a traced *argument*, so
 the whole switching run compiles once and the joint schedule can ``vmap`` a
 population's rollout over the two sub-tasks' frictions. ``check_friction`` in
-``scripts/outdated/generalists/check_mjx_tasks.py`` asserts that a rollout under a
+the earlier codebase asserted that a rollout under a
 traced multiplier returns exactly what a statically rescaled env returns.
 
-## The ant's reward is the paper's continual ant reward
+## The reward is speed tracking
 
-``target_speed`` 2.0, the value ``continual_ant_friction_t24`` pins for every
-sub-task. brax ant's stock reward is unbounded forward velocity, and the
-paper's own measurement is that under it an ant re-routes around a friction
-change -- four legs and many gaits walk forward -- so friction alone was not a
-shift. Speed-tracking (``TargetSpeedWrapper``) is what made the paper's ant
-friction block a benchmark, and the ant's sub-tasks here are read against
-that block, so it carries the same reward. ``target_speed`` is a per-env
-config field; None is brax's stock reward.
+``TargetSpeedWrapper`` replaces brax's stock unbounded forward-velocity reward
+with a bounded credit peaking at ``target_speed``. ``target_speed`` is a
+per-env config field; None is brax's stock reward.
 
 ## No solved threshold
 
 ``evaluation_metrics.py`` says it outright: CheetahRun has no threshold to
-compare against, and neither does the ant. So ``solved_threshold`` is None
+compare against. So ``solved_threshold`` is None
 here, and the analysis for this suite reports the generalist SCORE rather than
-a found/held count -- see ``scripts/outdated/generalists/analysis/summarize_2task.py``
-``schedule_stats_scores``. Nothing downstream invents a constant.
+a found/held count. Nothing downstream invents a constant.
 
-## Sigma does not transfer between bodies
+## Sigma is relative to the observation spread
 
-``source/envs/brax_common.ObsOffsetWrapper`` measured it: the ant's 27
-observation dims have a median per-dim std of 1.05 and dm_control's CheetahRun
-had 0.36, so the ant block's sigma 2.0 was ~2x the ant's spread and ~5.5x that
-cheetah's, and 0.7 was the cheetah value matching the ant's
-perturbation-to-spread ratio.
-
-THOSE TWO CHEETAH NUMBERS ARE STALE and describe a body this file no longer
-builds. Re-measured on 2026-09-09 over 200 random-action steps, brax's
-halfcheetah has a median per-dim std of 0.803 against the brax ant's 0.804 --
-the two bodies now have essentially the SAME observation spread, so sigma 2.0
-is ~2.5x it on both and needs no per-body correction. That is why
+Measured on 2026-09-09 over 200 random-action steps, brax's halfcheetah has a
+median per-dim observation std of 0.803, so sigma 2.0 is ~2.5x it. That is why
 ``CheetahRun`` keeps `noise_range` 2.0, which is also the value
 ``runs_repro2/mujoco/continual`` was made at.
 
@@ -116,29 +97,25 @@ __all__ = [
 # Per-environment settings, pinned to what the paper's own runs used so the two
 # sets of numbers stay comparable. `hidden_dims` is POLICY_ARCH's for the body;
 # `noise_range` is the sigma that body's obs-noise runs were made at
-# (`projects/neurips_2026_rebuttal/runs_repro2/{mujoco/continual,
-# brax/continual_obsnoise}/*/config.json`).
+# (the earlier mujoco/continual and brax/continual_obsnoise run configs).
 #
 # `task_mod` says what a sub-task vector means -- see the module docstring.
-# `friction` is the paper's ant friction grid (`source/envs/brax_ant.py`):
-# `mults` is its cycle default -> low -> high, so two sub-tasks are unperturbed
-# ground and the slippery x0.2; `range` is the Slippery-Ant log-uniform draw its
-# repro2 block used (`ANT_FRICTION_LOW_MULT=0.05` in
-# `scripts/outdated/train/queue_repro2.sh`), reached with `--task_options
+# `friction` is the friction grid (`source/envs/brax_common.py`): the cycle is
+# default -> low -> high, so two sub-tasks are unperturbed ground and the
+# slippery x0.2; `range` is the log-uniform draw reached with `--task_options
 # friction_order=random`.
 #
 # `activation` is NOT a knob here: ContinuousMLPPolicy is tanh-hidden and it is
-# what all four of the paper's NE trainers search on both bodies, so the study
-# searches the same network they do. (POLICY_ARCH['brax'] records 'swish',
-# which is the RL side's and what the dormancy criterion is chosen from -- the
-# ant NE runs on disk record `activation: tanh` for exactly this reason.)
+# what all four of the paper's NE trainers search, so the study searches the
+# same network they do. (POLICY_ARCH['brax'] records 'swish', which is the RL
+# side's and what the dormancy criterion is chosen from.)
 ENV_CONFIGS = {
     "CheetahRun": {
         # brax's `halfcheetah` since 2026-09-08, on the same MJX physics. It ran
         # on mujoco_playground's dm_control CheetahRun until then; moving it
-        # deleted `source/studies/mujoco/` and `source/envs/mjx_cheetah.py` and
+        # deleted the per-method mujoco trainers and `source/envs/mjx_cheetah.py` and
         # dropped the `mujoco_playground` dependency, which nothing else used.
-        # Both bodies are 17-dim observation, 6 actuators, so the policy, the
+        # Both are 17-dim observation, 6 actuators, so the policy, the
         # searchers and the analysis are unchanged -- but the REWARD is not, so
         # no cheetah number from before that date is comparable and the block
         # is being re-run.
@@ -151,13 +128,13 @@ ENV_CONFIGS = {
         # dm_control's own `_RUN_SPEED` for CheetahRun, so the objective still
         # asks for the speed the replaced task asked for. Their credit is
         # ONE-sided (full marks at or above 10, linear ramp from 0); ours is
-        # a two-sided Gaussian peaking AT the target, the ant's convention --
-        # see `source/envs/brax_common.py` on why both bodies share it.
+        # a two-sided Gaussian peaking AT the target -- see
+        # `source/envs/brax_common.py`.
         #
         # PROVISIONAL: 10 is dm_control's number for dm_control's cheetah xml,
-        # and brax's halfcheetah is a different model. It needs the same
-        # treatment the ant's 2.0 got -- a specialist run confirming the target
-        # is reachable and not trivially so -- before the block is read.
+        # and brax's halfcheetah is a different model. It needs a specialist
+        # run confirming the target is reachable and not trivially so before
+        # the block is read.
         "target_speed": 10.0,
         # The friction grid, so a cheetah sub-task can be the GROUND as well as
         # the observation. `scale_friction` is body-agnostic -- it rescales
@@ -166,26 +143,12 @@ ENV_CONFIGS = {
         # raised KeyError on `f['low']` and the cheetah had one family only.
         #
         # The values are the ones the deleted `source/envs/mjx_cheetah.py`
-        # cycled (x1.0 -> x0.2 -> x5.0, see block_mujoco_continual) and the
-        # ant's `range` for the log-uniform draw. The cheetah is a planar body
-        # with two feet and cannot re-route around a slippery ground the way
-        # four legs can, so if anything this is a STRONGER shift here than on
-        # the ant -- which is the open question, since the mujoco_playground
-        # cheetah showed no RL degradation under it.
+        # cycled (x1.0 -> x0.2 -> x5.0, see block_mujoco_continual), plus a
+        # `range` for the log-uniform draw. Whether this is a strong shift is
+        # the open question, since the mujoco_playground cheetah showed no RL
+        # degradation under it.
         "friction": {"order": "cycle", "default": 1.0, "low": 0.2, "high": 5.0,
                      "range": (0.05, 5.0)},
-        "solved_threshold": None,
-    },
-    "ant": {
-        "backend": "brax",
-        "body": "ant",
-        "hidden_dims": (128, 128),
-        "episode_length": 1000,
-        "task_mod": "friction",
-        "friction": {"order": "cycle", "default": 1.0, "low": 0.2, "high": 5.0,
-                     "range": (0.05, 5.0)},
-        "noise_range": 2.0,
-        "target_speed": 2.0,
         "solved_threshold": None,
     },
 }
@@ -204,7 +167,7 @@ class TaskSpec:
     ``base_sys`` is the System as built -- unperturbed ground -- and is what a
     friction multiplier is applied to, exactly once, at every trace. Applying
     it to whatever `sys` the env currently holds would compound, which is the
-    hazard `source/envs/brax_ant.py` documents for the paper's static version.
+    hazard `brax_common.scale_friction` documents for the static version.
     """
 
     def __init__(self, env_name, task_mod, options=None, base_sys=None,
@@ -224,11 +187,10 @@ class TaskSpec:
         # (`_MJX_PPO`) and the NE path normalised nothing, so the two families
         # were reading differently-scaled inputs -- an asymmetry outside
         # everything `check()` polices, since the environment-step budgets are
-        # identical. Measured on the ant, 600 random-action steps: per-dim std
-        # runs 0.125 to 4.80, a 38x spread, with eight velocity dims at ~4-4.8
-        # against thirteen at 0.13-0.40. Through a tanh first layer the large
-        # dims dominate the pre-activations and the small ones do almost
-        # nothing.
+        # identical. Per-dim observation std on these bodies spans more than
+        # an order of magnitude, velocity dims against joint angles. Through a
+        # tanh first layer the large dims dominate the pre-activations and the
+        # small ones do almost nothing.
         #
         # STATIC, NOT RUNNING, AND THAT IS THE POINT. The standard OpenES
         # recipe keeps running statistics, but those make the objective
@@ -328,6 +290,7 @@ class TaskSpec:
                 raise ValueError(
                     "task_mod 'speed' needs a TargetSpeedWrapper in the stack; "
                     'this cell was built with target_speed=None')
+            from source.envs.brax_common import DEFAULT_SPEED_MARGIN_RATIO
             old_t, old_m = w._target_speed, w._margin
             ratio = abs(old_m / old_t) if old_t else DEFAULT_SPEED_MARGIN_RATIO
             tgt = jnp.reshape(task, (-1,))[0]
@@ -380,23 +343,10 @@ def build_env(env_name, episode_length, task_options=None):
     if isinstance(target_speed, str) and target_speed.lower() == 'none':
         target_speed = None
     body = cfg["body"]
-    if body == 'ant':
-        # The ant, through the paper's own factory. With `target_speed` set this
-        # is `source/envs/brax_ant.create_env_with_damaged_leg` on a healthy ant
-        # at default friction and gravity -- the continual block's reward
-        # wrapper, literally its code path -- and with None it is the stock brax
-        # reward every noncontinual ant run used.
-        from source.envs.brax_ant import create_env
-        env = create_env(body, episode_length,
-                         target_speed=(None if target_speed is None
-                                       else float(target_speed)))
-    else:
-        # Every other brax body goes through the shared factory: no limb to
-        # damage, so the ant's leg wrappers are not in the stack at all.
-        from source.envs.brax_common import create_env
-        env = create_env(body, episode_length,
-                         target_speed=(None if target_speed is None
-                                       else float(target_speed)))
+    from source.envs.brax_common import create_env
+    env = create_env(body, episode_length,
+                     target_speed=(None if target_speed is None
+                                   else float(target_speed)))
     speed_targets = options.pop('speed_targets', cfg.get('speed_targets'))
     friction = dict(cfg.get('friction', {}))
     for key in ('order', 'low', 'high', 'default'):
@@ -409,7 +359,7 @@ def build_env(env_name, episode_length, task_options=None):
     # `obs_norm` arrives as an option from `registry.make_env_for_run` when a
     # FINISHED run recorded `obs_norm: true`, so the post-hoc passes rebuild
     # the same whitened input the NE arm was trained on. The training CLI
-    # asks for it through NE_OBS_NORM instead (`source/studies/mjx/cli.py`),
+    # asks for it through NE_OBS_NORM instead (`source/run.py --suite mjx`),
     # because there one process may build the env for an RL arm that must
     # not whiten. Either route measures the same fixed-seed statistics.
     obs_norm = bool(options.pop('obs_norm', False))
@@ -417,7 +367,7 @@ def build_env(env_name, episode_length, task_options=None):
     # Rebuilding from them is exact; re-measuring them is not: the fixed-seed
     # random-policy rollout in `_measure_obs_stats` does not reproduce on MJX,
     # not even on one machine (std range 0.118-4.729 recorded vs 0.124-4.783
-    # re-measured in the next process, home server, 2026-09-13). A whitened ant
+    # re-measured in the next process, home server, 2026-09-13). A whitened
     # NE agent rebuilt on re-measured statistics re-scored ~8% low.
     recorded_mean = options.pop('obs_mean', None)
     recorded_std = options.pop('obs_std', None)
@@ -486,16 +436,15 @@ def friction_multipliers(spec, trial, num_tasks, first_task_clean=True):
     two-sub-task experiment is unperturbed ground against the slippery x0.2 and
     every trial faces the same pair -- a trial differs in its seed only, which
     is what makes eight trials eight seeds on ONE task pair rather than eight
-    pairs of unknown separation. ``random`` is the paper's Slippery-Ant draw,
-    ``random_friction_sequence`` on a key folded from the trial exactly as its
-    trainers fold it from their seed, so a trial is its own multiplier and
-    every method at that trial shares it.
+    pairs of unknown separation. ``random`` is the log-uniform draw,
+    ``random_friction_sequence`` on a key folded from the trial, so a trial is
+    its own multiplier and every method at that trial shares it.
 
     ``first_task_clean`` pins sub-task 0 to the default multiplier, which is
     what both paper functions already do; False lets the random draw perturb
     sub-task 0 as well.
     """
-    from source.envs.brax_ant import friction_cycle, random_friction_sequence
+    from source.envs.brax_common import friction_cycle, random_friction_sequence
     f = spec.options['friction']
     default = float(f.get('default', 1.0))
     if f.get('order', 'cycle') == 'cycle':
@@ -546,8 +495,7 @@ def speed_sequence(spec, num_tasks):
     The generalist here is genuine and graded, which is the point of this family:
     with targets 2.0 and 8.0 a policy running at either extreme is far outside
     the other's Gaussian window, while an intermediate gait scores moderately on
-    both and so wins the worst case. Friction has no such trade-off -- four legs
-    re-route around it -- which is why its retention is near zero.
+    both and so wins the worst case.
     """
     raw = spec.options.get('speed_targets')
     if raw is None:
@@ -608,7 +556,7 @@ def build_policy(key, obs_dim, action_dim, hidden_dims):
 
     Same signature and same contract as ``continual_common.build_policy`` on
     the gymnax side, so ``train_nes`` calls one thing. The network is the
-    shared ``ContinuousMLPPolicy``, i.e. the paper's cheetah/ant NE policy.
+    shared ``ContinuousMLPPolicy``, i.e. the paper's cheetah NE policy.
     """
     policy, param_template = create_continuous_policy_network(
         key, obs_dim, action_dim, tuple(hidden_dims))
@@ -659,7 +607,7 @@ def _rollout(env, spec, policy, param_template, episode_length, collect=False,
                 # off branch compiles to exactly the pre-whitening rollout.
                 #
                 # A PARAMETER, NOT A PROPERTY OF `spec`. It used to be the
-                # latter, and that broke every RL row of runs_ant_v2 (ppo 4919
+                # latter, and that broke every whitened RL row (ppo 4919
                 # -> 220): run_ppo scores its policy through this same
                 # function, on purpose, so both families share one ruler --
                 # and its normaliser is already FOLDED into Dense_0 by
@@ -953,12 +901,9 @@ def handcrafted_descriptor(last_obs, env_name):
     is the default and is what the paper's own cheetah DNS runs used
     (`descriptor: aurora` in their configs).
 
-    The proper selection descriptor for the ant is the torso's final x/y, which
-    the paper's DNS reads off the pipeline state rather than the observation;
-    that is not reachable from ``obs`` alone, so ``--descriptor handcrafted``
-    on the ant falls back to the first two observation coordinates and is an
-    ablation rather than a reproduction. On the cheetah the paper's DNS has no
-    hand-crafted descriptor at all.
+    ``--descriptor handcrafted`` uses the first two observation coordinates
+    and is an ablation rather than a reproduction: on the cheetah the paper's
+    DNS has no hand-crafted descriptor at all.
     """
     return last_obs[:2]
 

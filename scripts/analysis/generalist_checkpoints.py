@@ -3,14 +3,14 @@ outcomes, from `evaluation.json`, for any continual tree.
 
     .venv/bin/python scripts/analysis/generalist_checkpoints.py \\
         projects/iclr_2027/runs_centroid/minigrid --cells MiniGrid_8x8_16x16 \\
-        --threshold 0.8 --agent centroid --methods ga es nes ... \\
+        --threshold 0.8 --agent centroid --methods ga es ... \\
         --out projects/iclr_2027/paper/minigrid/rooms/generalist_checkpoints_centroid
 
 Writes `<out>.md` (the tables) and `<out>.json` (per-trial returns).
 
 The sub-task-resolution analogue of `scripts/analysis/actions_generalist.py`,
 which re-rolls the gymnax action-reversal agents under both action orders.
-This one re-rolls nothing: `source/studies/evaluate_continual.py` already
+This one re-rolls nothing: `scripts/analysis/evaluate_continual.py` already
 scores every saved end-of-sub-task agent on its OWN sub-task (`returns`), on
 the PREVIOUS one (`prev_returns`) and on the NEXT one
 (`zero_shot_next_returns`), and those three are what the classification needs.
@@ -171,7 +171,7 @@ def main() -> int:
                       f'retention {rows[-1]["retention"]:.2f}  '
                       + ' '.join(f'{c[:4]} {frac[c]:.2f}' for c in OUTCOMES))
     if not rows:
-        sys.exit('no evaluation.json found; run source.studies.evaluate_continual first')
+        sys.exit('no evaluation.json found; run scripts/analysis/evaluate_continual.py first')
 
     out = pathlib.Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

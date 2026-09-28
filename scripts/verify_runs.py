@@ -9,7 +9,7 @@ cell, and refuses to be vague about any of them:
                silently lost a run.
 
   compute-matched   every method in a cell saw the SAME number of environment
-               steps. CLAUDE.md rule (c). NE spends
+               steps. NE spends
                `generations x pop_size x num_evals x episode_length`; PPO
                spends `num_updates x num_envs x num_steps`, and the two are
                only comparable once both are written in steps.

@@ -44,7 +44,7 @@ from matplotlib.transforms import blended_transform_factory  # noqa: E402
 from scipy.stats import spearmanr                          # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 sys.path.insert(0, str(REPO / 'scripts' / 'analysis'))
 from make_lineplot import METHOD_ORDER, METHOD_STYLE       # noqa: E402
 

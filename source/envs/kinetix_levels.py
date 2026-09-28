@@ -13,7 +13,7 @@ Nothing here is duplicated there -- it imports these names.
 from __future__ import annotations
 
 # The twenty hand-designed MEDIUM levels, in the order the previous codebase's
-# continual chain visited them (`source/studies/kinetix/ga.py:ENVIRONMENTS`).
+# continual chain visited them.
 # The order matters for the continual cell and nowhere else.
 LEVELS = (
     'h0_unicycle',

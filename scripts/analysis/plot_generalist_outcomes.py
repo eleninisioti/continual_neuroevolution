@@ -19,7 +19,7 @@ a dash when none did. The method with the longest generalist segment in a
 panel is outlined (every one, on a tie; none when no method has a generalist
 checkpoint): unlike retention, it counts the trials that never found one.
 
-Arms are the other paper figures': one of ES/NES (drawn as ES) and one of PBT
+Arms are the other paper figures': the one ES arm and one of PBT
 N=8/N=2 a paper directory (`plot_metrics_overview.keep_one_arm`), no novelty
 arm.
 
@@ -55,7 +55,7 @@ from matplotlib.patches import Patch                        # noqa: E402
 from matplotlib.transforms import blended_transform_factory  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 sys.path.insert(0, str(REPO / 'scripts/analysis'))
 from make_lineplot import METHOD_STYLE                     # noqa: E402
 import plot_metrics_overview as pmo                        # noqa: E402

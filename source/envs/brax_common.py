@@ -1,30 +1,24 @@
-"""What every brax body in this study shares: the reward, the offset, the build.
+"""The brax body in this study: the reward, the offset, the friction, the build.
 
-Split out of ``source/envs/brax_ant.py`` on 2026-09-08, when the cheetah moved
-from mujoco_playground's dm_control ``CheetahRun`` onto brax's ``halfcheetah``
-and the two bodies stopped being one body plus a special case. What is here is
-everything that mentions no limb: the speed-tracking reward, the observation
-offset, the sub-task revisit rule, and the factory that composes them.
-``brax_ant.py`` keeps the leg damage, the motor flip and the friction/leg
-cycles, and imports the rest from here.
+The cheetah moved from mujoco_playground's dm_control ``CheetahRun`` onto
+brax's ``halfcheetah`` on 2026-09-08. What is here is everything a sub-task
+does to it: the speed-tracking reward, the observation offset, the
+ground-friction sequences, the sub-task revisit rule, and the factory that
+composes them.
 
-## One reward convention across bodies
+## The reward
 
-Both bodies run ``TargetSpeedWrapper``, so an ant return and a cheetah return
-mean the same thing: bounded per-step credit in [0, 1] scaled by
-``DEFAULT_SPEED_WEIGHT``, peaking at the sub-task's target speed. That is what
-makes a figure with both bodies on it readable, and it is why the cheetah did
-not simply inherit brax's stock ``halfcheetah`` reward, which is unbounded
-forward velocity minus a control cost and would put the two bodies on
-incomparable scales.
+The cheetah runs ``TargetSpeedWrapper``: bounded per-step credit in [0, 1]
+scaled by ``DEFAULT_SPEED_WEIGHT``, peaking at the sub-task's target speed,
+rather than brax's stock ``halfcheetah`` reward, which is unbounded forward
+velocity minus a control cost.
 
-The substitution ``reward - x_velocity + speed_reward`` is exact on both, and
-that is a fact about brax rather than an approximation: the ant's
-``reward_forward`` and the cheetah's ``reward_run`` are each *exactly*
-``x_velocity`` (verified 2026-09-08 -- ``reward_run == x_velocity`` to float
-equality, and ``reward == reward_run + reward_ctrl``), so subtracting the
-velocity removes the whole forward term and leaves the survival bonus and the
-control cost untouched.
+The substitution ``reward - x_velocity + speed_reward`` is exact, and that is a
+fact about brax rather than an approximation: the cheetah's ``reward_run`` is
+*exactly* ``x_velocity`` (verified 2026-09-08 -- ``reward_run == x_velocity``
+to float equality, and ``reward == reward_run + reward_ctrl``), so subtracting
+the velocity removes the whole forward term and leaves the control cost
+untouched.
 """
 
 from __future__ import annotations
@@ -35,29 +29,35 @@ import jax.numpy as jnp
 from brax import envs
 
 
-# The physics backend passed to envs.create. See the module docstring: 'mjx'
-# rather than brax's 'generalized' default, so the ant and the cheetah share a
-# contact model, and so the friction sub-tasks measure the ground rather than
-# the solver. Every ant tree dated on or before 2026-07-30 predates this.
+# The physics backend passed to envs.create: 'mjx' rather than brax's
+# 'generalized' default, so the friction sub-tasks measure the ground rather
+# than the solver -- the generalized backend's coarse contact model returned
+# NaN at x5.0 friction and let a policy slide at implausible speeds at x0.2.
 DEFAULT_BACKEND = 'mjx'
+
+
+# Friction multipliers, cycled default -> low -> high. Finite at every
+# multiplier from x0.2 to x5.0 on mjx.
+DEFAULT_FRICTION_MULT = 1.0
+
+DEFAULT_LOW_MULT = 0.2      # slippery
+
+DEFAULT_HIGH_MULT = 5.0     # sticky; NaNs on the generalized backend, not on mjx
 
 
 
 class TargetSpeedWrapper:
     """Rewards running at `target_speed` rather than as fast as possible.
 
-    brax ant's reward is `v_x + healthy - ctrl_cost`, i.e. unbounded in forward
-    speed. This replaces the `v_x` term with `-|v_x - target|`, so the objective
-    peaks AT the target and falls off on both sides.
+    brax halfcheetah's reward is `v_x - ctrl_cost`, i.e. unbounded in forward
+    speed. This replaces the `v_x` term with a bounded credit peaking AT the
+    target and falling off on both sides.
 
-    Why a target speed and not more friction or more damage
-    ------------------------------------------------------
-    Friction and single-leg damage both turned out to be weak shifts for this
-    robot, and the reason is the same for both: an ant has four legs and many
-    gaits that walk forward, so it re-routes around a change to the ground or to
-    one limb. In the 2026-07-30 12-sub-task run PPO's per-cycle retention was
-    1.30 -- no degradation at all. Speed is a scalar the body cannot re-route
-    around: four legs do not let a 1 m/s gait run at 5 m/s.
+    Why a target speed
+    ------------------
+    Speed is a scalar the body cannot re-route around: a gait tuned for one
+    speed does not run at another, where a change to the ground can be
+    absorbed by a different gait that still moves forward.
 
     Precedent, in two places:
       * C-CHAIN (Tang et al., ICML 2025 -- inspiration/C-CHAIN) builds its
@@ -65,7 +65,7 @@ class TargetSpeedWrapper:
         speed (walker stand/walk/run, quadruped walk/run/walk). That paper is
         about mitigating plasticity loss, so PPO demonstrably loses plasticity on
         a speed sequence -- and `cchain` is already a baseline in this repo.
-      * MAML/PEARL's HalfCheetah-Vel and Ant-Vel use exactly `-|v - v_target|`.
+      * MAML/PEARL's HalfCheetah-Vel uses exactly `-|v - v_target|`.
 
     Symmetric, deliberately. dm_control's walk/run reward is one-sided: full
     credit at or above the target, so a run-capable policy also satisfies walk
@@ -75,10 +75,10 @@ class TargetSpeedWrapper:
     re-adaptation rather than a freebie.
 
     Implemented by correcting the reward rather than by forking the env: brax
-    ant puts `x_velocity` in `state.metrics` and its `reward_forward` term is
+    puts `x_velocity` in `state.metrics` and the cheetah's `reward_run` term is
     exactly `x_velocity`, so subtracting one and adding the other is exact. That
-    keeps the healthy bonus, the control cost and the termination rule untouched,
-    so this composes with LegDamageWrapper and with the friction scaling.
+    keeps the control cost untouched, so this composes with the friction
+    scaling.
     """
 
     def __init__(self, env, target_speed, margin=None, weight=None):
@@ -87,16 +87,12 @@ class TargetSpeedWrapper:
         # Gaussian width. Proportional to the target by default, so both
         # sub-tasks are equally forgiving: standing still earns 0.135 of the
         # credit whether the target is 0.5 or 2.0. A FIXED width cannot do that
-        # -- at sigma 1.0 a standing ant already earned 0.882 of the maximum for
-        # target 0.5, leaving only 0.118/step to be gained by actually tracking,
-        # against a survival bonus of 1.0/step. Standing still was close to
-        # optimal and PPO found it.
+        # -- at sigma 1.0 a standing body already earns 0.882 of the maximum for
+        # target 0.5, leaving only 0.118/step to be gained by actually tracking.
         self._margin = float(margin) if margin is not None else (
             DEFAULT_SPEED_MARGIN_RATIO * abs(float(target_speed)))
-        # How much the tracking term is worth relative to the survival bonus.
-        # At weight 1 the whole speed objective is worth no more per step than
-        # simply staying upright, so the reward barely distinguishes a policy
-        # that tracks from one that survives. See DEFAULT_SPEED_WEIGHT.
+        # How much the tracking term is worth relative to the rest of the
+        # reward. See DEFAULT_SPEED_WEIGHT.
         self._weight = float(weight) if weight is not None else DEFAULT_SPEED_WEIGHT
 
     def __getattr__(self, name):
@@ -115,10 +111,8 @@ class TargetSpeedWrapper:
         # Only keys the body already has. brax's EpisodeWrapper accumulates
         # `episode_metrics` by iterating state.metrics against a dict built at
         # reset, so introducing a key mid-episode raises KeyError on the first
-        # step. The ant names its forward term `reward_forward` (and mirrors it
-        # as `forward_reward`); the cheetah names it `reward_run`. Guarding on
-        # presence is what lets one wrapper serve both without a body flag.
-        for key in ('reward_forward', 'forward_reward', 'reward_run'):
+        # step. The cheetah names its forward term `reward_run`.
+        for key in ('reward_run',):
             if key in metrics:
                 metrics[key] = speed_reward
         return state.replace(reward=reward, metrics=metrics)
@@ -149,10 +143,9 @@ class TargetSpeedWrapper:
         Gaussian rather than the linear ramp this started with, and that choice
         is what makes the fast sub-task learnable at all. A linear kernel hits
         exactly zero at `margin` and stays there, so with target 3.0 and margin
-        1.0 a standing ant saw credit 0 AND gradient 0 for every velocity below
-        2.0 -- an exploration dead zone. PPO duly converged to standing still and
-        collecting the survival bonus, scoring 983/983/983 across five revisits
-        of the slow target and a flat 500 on the fast one. A Gaussian is never
+        1.0 a standing body saw credit 0 AND gradient 0 for every velocity below
+        2.0 -- an exploration dead zone, and PPO duly converged to standing
+        still. A Gaussian is never
         exactly zero, so there is always a gradient pointing at the target from
         anywhere, while the peak stays sharp enough to separate the two
         sub-tasks. It is also dm_control's own default sigmoid.
@@ -171,27 +164,8 @@ class TargetSpeedWrapper:
 
 
 
-# Target speeds, cycled alongside the leg cycle exactly as the friction
-# multipliers are. Period 3 against the leg cycle's 4: coprime, so 12 sub-tasks
-# visit each (leg, target) pair once and every figure and metric built for the
-# friction sequence applies unchanged.
-#
-# Two targets, not three: with two the cycle has period 2, which shares a factor
-# with the 4-leg cycle, so the speed sequence is run on the healthy ant
-# (--leg_order none) to keep the two axes from locking in phase. That also
-# matches C-CHAIN's Continual Quadruped, which alternates walk/run on one body.
-#
-# Both are reachable. A PPO policy from the friction sweep sustained a measured
-# 7.99 m/s mean (median 8.16, max 10.9) over a full 1000-step episode, so 3.0 is
-# well inside the ant's range -- the earlier belief that 3.0 was unreachable was
-# wrong, and the -11 scores it produced came from the unbounded reward paying
-# -2.0/step for standing still against a +1 healthy bonus, which made falling
-# over immediately the optimal policy. The bounded form cannot do that.
-#
-# 0.5 is a walk; 2.0 is roughly what a brax ant reaches when it maximises speed
-# under the default unbounded reward (~3000 return = ~1000 survival + ~2000
-# forward over 1000 steps). Both are far inside the ~8 m/s a trained policy was
-# measured to sustain, so neither is a ceiling.
+# Target speeds, cycled through by `speed_cycle`. Two targets alternating on one
+# body, as C-CHAIN's Continual Quadruped alternates walk/run.
 #
 # DEFAULT_SPEED_MARGIN is the Gaussian's sigma, fixed rather than proportional so
 # the two sub-tasks are equally forgiving. At sigma 1.0 a policy sitting at one
@@ -205,12 +179,9 @@ DEFAULT_SPEED_TARGETS = (0.5, 2.0)
 # optimal on the slow sub-task.
 DEFAULT_SPEED_MARGIN_RATIO = 0.5
 
-# Weight on the tracking term, against a survival bonus of 1.0/step. At weight 1
-# the per-step gain from tracking perfectly rather than standing still was
-# 0.86 against a 1.0 survival bonus, so the reward paid roughly as much for
-# staying upright as for doing the task; at 5 it is 4.32, and the objective is
-# unambiguously the speed. The episode ceiling becomes
-# episode_length * (1 + weight) rather than 2 * episode_length.
+# Weight on the tracking term. At 5 the per-step gain from tracking perfectly
+# rather than standing still is 4.32, so the objective is unambiguously the
+# speed.
 DEFAULT_SPEED_WEIGHT = 5.0
 
 
@@ -225,20 +196,20 @@ def speed_cycle(num_tasks, targets=DEFAULT_SPEED_TARGETS):
 def effective_task_idx(task_idx, task_period):
     """`task_idx` folded into the first `task_period` sub-tasks.
 
-    The ant counterpart of `cycle_task_sequence` in
-    source/studies/gymnax/continual_common.py, and the same design for the same reason:
+    The brax counterpart of `cycle_task_sequence` in
+    source/utils/task_sequence.py, and the same design for the same reason:
     a sub-task the learner has already solved has to come back if forgetting is
     to be measured at all, and a flat modulo makes the gap between a sub-task
     and its revisit a constant of the design (`task_period`) rather than a
     per-task nuisance.
 
-    Only the observation offset needs this. The leg, friction, gravity and
-    speed sequences are already cycles over a handful of values, so they
-    revisit on their own; the offset is drawn fresh per (seed, task_idx) and
-    would otherwise never repeat.
+    Only the observation offset needs this. The friction and speed sequences
+    are already cycles over a handful of values, so they revisit on their own;
+    the offset is drawn fresh per (seed, task_idx) and would otherwise never
+    repeat.
 
     A period of 0, None, or one at least as long as the run leaves the index
-    untouched, so the default reproduces every existing ant tree.
+    untouched.
     """
     if not task_period or int(task_period) <= 0:
         return int(task_idx)
@@ -249,8 +220,8 @@ def effective_task_idx(task_idx, task_period):
 class ObsOffsetWrapper:
     """Wrapper that adds a fixed per-sub-task offset vector to the observation.
 
-    The brax-ant port of the gymnax continual protocol (source/studies/gymnax/
-    continual_common.py): every sub-task after the first perturbs the
+    The brax port of the gymnax continual protocol: every sub-task after the
+    first perturbs the
     observation with a FIXED vector drawn once per (trial, sub-task) --
     sensor miscalibration, not noise. The policy's inputs shift; the physics,
     the reward and the optimal behaviour do not. Nothing in the observation
@@ -259,7 +230,7 @@ class ObsOffsetWrapper:
     its inputs is a perturbation it can condition on.
 
     The offset is seeded off (seed, task_idx) alone -- the same guarantee the
-    friction and leg sequences give: every method at a trial faces the same
+    friction sequence gives: every method at a trial faces the same
     offsets at the same point in its budget. Sub-task 0 is unperturbed, so it
     reproduces the noncontinual control.
 
@@ -293,6 +264,47 @@ class ObsOffsetWrapper:
         state = self._env.step(state, action)
         return state.replace(obs=state.obs + self._offset)
 
+def friction_cycle(num_tasks, default_mult=DEFAULT_FRICTION_MULT,
+                   low_mult=DEFAULT_LOW_MULT, high_mult=DEFAULT_HIGH_MULT):
+    """The friction multiplier of each sub-task, cycling default -> low -> high.
+
+    Deterministic and identical for every method, trial and seed, so two
+    methods at the same trial face the same ground at the same point in their
+    budget. Sub-task 0 is the default multiplier, so the ground of the first
+    sub-task is the noncontinual control's ground.
+    """
+    cycle = [float(default_mult), float(low_mult), float(high_mult)]
+    return [cycle[i % len(cycle)] for i in range(int(num_tasks))]
+
+
+
+def random_friction_sequence(rng_key, num_tasks, low_mult=DEFAULT_LOW_MULT,
+                             high_mult=DEFAULT_HIGH_MULT,
+                             default_mult=DEFAULT_FRICTION_MULT):
+    """Log-uniformly sampled friction multiplier per sub-task.
+
+    The Dohare et al. (Nature 2024) protocol: every sub-task's ground is a
+    fresh sample rather than a revisit of three fixed values. With 3 recurring
+    multipliers a revisit is a task the weights have already covered, and the
+    learner can settle into one compromise policy for the whole cycle.
+
+    Log-uniform rather than uniform because the multiplier acts as a scale:
+    x0.2 and x5.0 are equally far from x1.0, while uniform sampling on
+    [0.2, 5.0] would make four in five sub-tasks stickier than default.
+
+    Sub-task 0 is pinned to `default_mult`, so the run starts on the
+    unperturbed ground of the noncontinual control.
+    """
+    lo, hi = jnp.log(low_mult), jnp.log(high_mult)
+    mults = jnp.exp(jax.random.uniform(
+        rng_key, (int(num_tasks),), minval=lo, maxval=hi))
+    sequence = [float(m) for m in mults]
+    if sequence:
+        sequence[0] = float(default_mult)
+    return sequence
+
+
+
 def scale_friction(env, mult):
     """Rescale ground friction on the System, once, in place.
 
@@ -314,17 +326,15 @@ def create_env(env_name, episode_length, backend=DEFAULT_BACKEND,
                task_idx=0, obs_task_period=0, wrap=True):
     """A brax body with this study's reward and sub-task perturbations.
 
-    The body-agnostic half of ``brax_ant.create_env_with_damaged_leg``, and the
-    factory the cheetah uses outright. Wrapper order is that function's, for the
-    same reasons: the speed correction reads the velocity of the state the
-    physics actually produced, and the observation offset lands outermost, on
-    the final observation.
+    Wrapper order matters: the speed correction reads the velocity of the state
+    the physics actually produced, and the observation offset lands outermost,
+    on the final observation.
 
     ``wrap=False`` for the RL trainer, which runs the env through brax's own
     ``training.wrap``. With ``wrap=True`` on both sides the stack carries two
     EpisodeWrappers and two AutoResetWrappers, and brax's Evaluator then
     averages over twice the true episode count -- which silently halved every
-    reported RL return relative to NE until it was found on the ant.
+    reported RL return relative to NE until it was found.
     """
     if wrap:
         env = envs.create(env_name, episode_length=episode_length,

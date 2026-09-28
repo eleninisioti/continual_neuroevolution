@@ -1,0 +1,95 @@
+# What the MiniGrid study runs: the arms, their settings, and the budget.
+# The logic that reads this file is `source/utils/config.py:MiniGrid`.
+
+env_name: MiniGrid                   # the suite entry in source/envs/minigrid.py
+rooms: [EmptyRandom-8x8, EmptyRandom-16x16]
+
+# cell -> the schedule over `rooms`
+#
+# A stationary cell still names BOTH rooms and then pins the schedule to one of
+# them, rather than naming one room twice. `build_env` refuses a single-element
+# pair, and -- more importantly -- it keeps the observation encoding, the
+# episode scan length and the policy identical across all three cells, so a
+# stationary run and a switching run are the same experiment minus the switch.
+cells:
+  MiniGrid_8x8_16x16: switch
+  MiniGrid_8x8: task0
+  MiniGrid_16x16: task1
+
+num_phases: 20
+num_tasks: 2
+
+# NE half of the matched budget. A phase is ne_generations / num_phases = 200.
+ne_generations: 4000
+ne_pop_size: 512
+ne_num_evals: 3                      # pinned across arms
+episode_length: 1024
+
+# RL half. `train_ppo.PPO_CONFIGS['MiniGrid']` owns these; repeated only so
+# the loader can assert the two halves agree. A phase is 3072 updates.
+rl_updates: 61440
+redo_interval: 50                    # updates between ReDo passes
+
+# THE REPORTED CURVE, which is not the number either family selects on. The
+# centroid and the population mean are re-scored on FRESH keys over this many
+# episodes with argmax actions, every generation, on every sub-task.
+#
+# 10, matching the gymnax tree's `--report_episodes`, so a MiniGrid curve and a
+# gymnax curve are the same estimator at the same episode count. The MiniGrid
+# runs of 2026-09-07/08 used 16 (the shared runner's default) and the figures
+# here do not mix with those.
+#
+# NOT `num_evals`, and the distinction is the point: the search's own column is
+# a max over the population of a `num_evals` mean whose FIRST draw did the
+# selecting, so it carries the winner's curse -- by a different amount per
+# method, which does not cancel in a comparison. This evaluation feeds nothing
+# back into the search.
+#
+# It is also not part of the matched budget: 2 genomes x 2 sub-tasks x 10
+# episodes x 1024 steps is 40,960 steps a generation against the 1,572,864 the
+# population costs, so 2.6% (a third genome, ES's elite, where it applies).
+eval_episodes: 10
+
+
+# The arms. `searcher_kwargs` goes to `ne.build_searcher`, which is the one
+# place that knows which knobs define which method.
+ne_arms:
+  # ES: standardized fitness, plain SGD.
+  es: {method: es, sigma: 0.1, learning_rate: 0.05, optimizer: sgd, shaping: zscore}
+  # The gaussian pair. Identical mutation (sigma_init 0.01, no crossover),
+  # so `ga` vs `dns_gaussian` isolates the SELECTION RULE and nothing else.
+  # `sigma` is the top-level name, NOT `sigma_init` in searcher_kwargs:
+  # `run_nes` already forwards its own `sigma` as `sigma_init`, so passing
+  # both is a duplicate keyword and the run dies at construction. It is also
+  # the name a finished run's config records the mutation width under, which
+  # is how the sweep's value is read back.
+  ga:
+    method: ga
+    sigma: 0.01
+    searcher_kwargs: {elite_ratio: 0.1}
+  dns_gaussian:
+    method: dns_gaussian
+    sigma: 0.01
+    # `descriptor` and the aurora knobs are searcher_kwargs too -- `run_nes`
+    # pops them out of that dict rather than taking them as arguments, which
+    # is also how they appear in a finished run's config.
+    #
+    # AURORA descriptors, as the gymnax dns_gaussian runs use, at this body's
+    # trajectory length: a MiniGrid episode is 1024 steps against gymnax's 500
+    # and the encoder sees a 1225-value view, so 10 steps rather than 50. Both
+    # from the 2026-09-07 minigrid_dnsprobe runs.
+    searcher_kwargs: {cross_over_rate: 0.0, k: 3, descriptor: aurora,
+                      traj_steps: 10, aurora_latent_dim: 6, aurora_train_ratio: 8}
+
+# ppo and the three continual-RL baselines, all on `run_ppo`'s one loop. No
+# per-arm settings: they differ in the mechanism the runner switches on
+# (TRAC's rescaling, ReDo's recycling, C-CHAIN's regulariser), never in the
+# budget or the optimizer, or the comparison would not be about the mechanism.
+# `pbt` (N = 8) and `pbt2` (N = 2): a population of the plain PPO learner over
+# PPO's own budget, at two sizes (source/runners/train_ppo.py, the PBT block).
+# `pbt_weights` / `pbt2_weights`: the same populations WITHOUT explore
+# (--pbt_mode weights_only, 2026-09-19); the paper's PBT rows are `full`.
+rl_arms: [ppo, trac, redo, cchain, pbt, pbt2, pbt_weights, pbt2_weights]
+
+# The order the figures list them in: NE first, then RL.
+reported_arms: [ga, es, dns_gaussian, ppo, trac, redo, cchain, pbt, pbt2]

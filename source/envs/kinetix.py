@@ -8,7 +8,7 @@ gymnax's (a sub-task is an offset added to one environment's observation).
 
 ## This reproduces a configuration that worked, and says where it does not
 
-The previous codebase's `source/studies/kinetix/ga_continual.py` found a
+The previous codebase's per-method Kinetix GA trainer found a
 setting under which the GA solved all twenty levels in the continual chain
 (`projects/kinetix/budget_g200_r3_gafinal`). Everything the environment side
 of that setting decides is reproduced here EXACTLY, and the parameter count is
@@ -61,7 +61,7 @@ four motor bindings with three choices (reverse / off / forward) and two
 thruster bindings with two (off / on) -- emitted as one flat vector of 16
 logits. `action_dim` is therefore the LOGIT count, 16, and `action_dims` is
 the per-dimension choice count, `(3, 3, 3, 3, 2, 2)`; PPO's head is built
-from the latter (`source/studies/generalists/actors.py:multi_discrete_head`).
+from the latter (`source/algorithms/rl/action_heads.py:multi_discrete_head`).
 
 ## Descriptors
 
@@ -98,7 +98,6 @@ from jax import random
 
 from source.algorithms.networks import (
     create_kinetix_pixels_policy_network,
-    create_kinetix_transformer_policy_network,
     unflatten_params,
 )
 from source.envs.kinetix_levels import CELL_ALL, CELLS, LEVELS
@@ -130,24 +129,6 @@ ACTION_DIMS = (3,) * NUM_MOTOR_BINDINGS + (2,) * NUM_THRUSTER_BINDINGS
 ACTION_DIM = int(sum(ACTION_DIMS))      # 16 logits
 PARAM_COUNT = 1_128_256                 # the working GA configuration's
 
-# The SECOND observation, since 2026-09-23: Kinetix's `symbolic_entity`, which
-# its transformer network reads (`configs/env/entity.yaml` +
-# `configs/model/model-transformer.yaml`). One row per circle / polygon /
-# directed joint / thruster, their masks, a (4, 9, 9) attention mask and the
-# joint/thruster -> shape indexes, at the medium env size (3 circles, 6
-# polygons, 2 joints seen from both ends, 2 thrusters). Flattened in THIS
-# order, which `KinetixTransformerPolicy` reads back; `build_env` checks every
-# shape against a real reset.
-ENTITY_LAYOUT = (
-    ('circles', (3, 19)), ('polygons', (6, 27)), ('joints', (4, 22)),
-    ('thrusters', (2, 8)), ('circle_mask', (3,)), ('polygon_mask', (6,)),
-    ('joint_mask', (4,)), ('thruster_mask', (2,)),
-    ('attention_mask', (4, 9, 9)), ('joint_indexes', (4, 2)),
-    ('thruster_indexes', (2,)),
-)
-ENTITY_OBS_DIM = int(sum(np.prod(shape) for _, shape in ENTITY_LAYOUT))  # 672
-OBSERVATIONS = ('pixels', 'entity')
-
 # The AURORA input width and the hand-designed descriptor width, from
 # `kinetix.util.behaviour`. Constants rather than imports so this module can be
 # read (and `check()` run) without pulling in jax2d.
@@ -173,9 +154,11 @@ _BASE = {
     # 128 steps of frame-skip 2. The working GA configuration ran 256, and
     # nothing happens after 128: every solving incumbent scores the same at
     # 96/128/160/192/256 and the GA trained at 128 solves the same 20 of 20
-    # levels (source/studies/kinetix/settings.py, 2026-09-13). Not a cap the
+    # levels (source/configs/kinetix.yaml, 2026-09-13). Not a cap the
     # reward depends on (unlike MiniGrid's), just the scan length; a solved
-    # level ends in 19-150 steps. `settings.check()` asserts the two agree.
+    # level ends in 19-150 steps. `build_env` sets the levels' `max_timesteps` to
+    # it, so PPO's episodes end here too; `Kinetix.matched_steps` in
+    # source/utils/config.py asserts it equals configs/kinetix.yaml.
     'episode_length': 128,
     # POLICY_ARCH['kinetix'] -- fc_layer_depth 5 x fc_layer_width 128, tanh.
     'hidden_dims': (128,) * 5,
@@ -206,9 +189,8 @@ class TaskSpec:
     environment can be rebuilt from its config (``registry.make_env_for_run``).
     """
 
-    def __init__(self, levels, observation='pixels'):
+    def __init__(self, levels):
         self.levels = tuple(levels)
-        self.observation = observation
         self.task_mod = 'level'
 
     @property
@@ -219,13 +201,7 @@ class TaskSpec:
         return 0.0
 
     def describe(self):
-        options = {'levels': list(self.levels)}
-        # Recorded only off the default, so every pixel run's config is what
-        # it always was; `registry.make_env_for_run` hands it back to
-        # `build_env`, which is how a post-hoc pass rebuilds the right body.
-        if self.observation != 'pixels':
-            options['observation'] = self.observation
-        return {'task_mod': 'level', 'options': options}
+        return {'task_mod': 'level', 'options': {'levels': list(self.levels)}}
 
 
 # ---------------------------------------------------------------------------
@@ -235,14 +211,6 @@ class TaskSpec:
 def _flat_obs(obs):
     """``PixelsObservation`` -> the flat vector every consumer here takes."""
     return jnp.concatenate([obs.image.reshape(-1), obs.global_info])
-
-
-def _flat_entity_obs(obs):
-    """``EntityObservation`` -> one float vector in ``ENTITY_LAYOUT`` order.
-    Masks and indexes are small exact integers, so float32 carries them."""
-    return jnp.concatenate([
-        jnp.asarray(getattr(obs, name), jnp.float32).reshape(-1)
-        for name, _ in ENTITY_LAYOUT])
 
 
 class LevelSet:
@@ -260,17 +228,14 @@ class LevelSet:
     returns to the level the rollout is on rather than to a sampled one.
     """
 
-    def __init__(self, levels, env, env_params, init_states, episode_length,
-                 observation='pixels'):
+    def __init__(self, levels, env, env_params, init_states, episode_length):
         self.levels = tuple(levels)
         self.env = env
         self.env_params = env_params
         # One pytree whose every leaf has a leading axis of len(levels).
         self.init_states = init_states
         self.episode_length = int(episode_length)
-        self.observation = observation
-        self._flatten = _flat_entity_obs if observation == 'entity' else _flat_obs
-        self.obs_dim = ENTITY_OBS_DIM if observation == 'entity' else OBS_DIM
+        self.obs_dim = OBS_DIM
         self.action_dim = ACTION_DIM
         self.action_dims = ACTION_DIMS
 
@@ -280,7 +245,7 @@ class LevelSet:
     def reset(self, level, key):
         obs, state = self.env.reset(key, env_params=self.env_params,
                                     override_reset_state=self.initial(level))
-        return self._flatten(obs), state
+        return _flat_obs(obs), state
 
     def step(self, level, state, action, key):
         obs, state, reward, done, _info = self.env.step(
@@ -289,17 +254,14 @@ class LevelSet:
             # SAME level. Without it there is no reset function at all and the
             # step raises.
             override_reset_state=self.initial(level))
-        return self._flatten(obs), state, reward, done
+        return _flat_obs(obs), state, reward, done
 
 
 def build_env(env_name, episode_length, task_options=None):
     """``(env, spec)``: the level set behind one step, and what a sub-task is.
 
     ``task_options`` takes ``levels`` (a comma-separated string, or the list a
-    recorded config carries) and ``observation``: ``pixels`` (the default, and
-    every run before 2026-09-23) or ``entity``, Kinetix's symbolic-entity
-    observation that its transformer reads. The observation decides the
-    network (`build_policy`), as in Kinetix's own `make_network_from_config`.
+    recorded config carries).
     """
     from kinetix.environment.env import make_kinetix_env
     from kinetix.environment.utils import ActionType, ObservationType
@@ -312,10 +274,6 @@ def build_env(env_name, episode_length, task_options=None):
     if isinstance(levels, str):
         levels = [x.strip() for x in levels.split(',') if x.strip()]
     levels = tuple(levels)
-    observation = options.pop('observation', 'pixels')
-    if observation not in OBSERVATIONS:
-        raise ValueError(f'unknown Kinetix observation {observation!r}; '
-                         f'have {OBSERVATIONS}')
     unknown = [x for x in levels if x not in LEVELS]
     if unknown:
         raise ValueError(f'unknown Kinetix level(s) {unknown}; have {LEVELS}')
@@ -346,6 +304,14 @@ def build_env(env_name, episode_length, task_options=None):
             raise ValueError(f'level {name!r} has different EnvParams from '
                              f'{levels[0]!r}; this suite stacks levels')
 
+    # The horizon is this suite's `episode_length`, not the level files'
+    # `max_timesteps` (256 on every level). The NE scan stops at
+    # `episode_length`, but PPO trains through Kinetix's own auto-reset, which
+    # ends an episode at `max_timesteps`; left at 256, the two families trained
+    # at different horizons. Only `done` reads it -- the pixel observation
+    # does not.
+    params = env_params[0].replace(max_timesteps=int(episode_length))
+
     static = static_params[0]
     if (int(static.num_motor_bindings) != NUM_MOTOR_BINDINGS
             or int(static.num_thruster_bindings) != NUM_THRUSTER_BINDINGS):
@@ -360,30 +326,17 @@ def build_env(env_name, episode_length, task_options=None):
     # function to do and `train_levels_list` plays no part.
     env = make_kinetix_env(
         action_type=ActionType.MULTI_DISCRETE,
-        observation_type=(ObservationType.SYMBOLIC_ENTITY
-                          if observation == 'entity'
-                          else ObservationType.PIXELS),
+        observation_type=ObservationType.PIXELS,
         reset_fn=None,
-        env_params=env_params[0],
+        env_params=params,
         static_env_params=static,
     )
-    if observation == 'entity':
-        # The layout the policy unflattens is a constant; check it against
-        # what the renderer actually emits rather than trust it.
-        obs, _ = env.reset(jax.random.key(0), env_params=env_params[0],
-                           override_reset_state=states[0])
-        got = tuple((name, tuple(getattr(obs, name).shape))
-                    for name, _ in ENTITY_LAYOUT)
-        if got != ENTITY_LAYOUT:
-            raise ValueError(f'Kinetix entity observation is {got}, not the '
-                             f'ENTITY_LAYOUT {ENTITY_LAYOUT}')
     init_states = jax.tree.map(lambda *xs: jnp.stack(xs), *states)
     if len(levels) == 1:
         # `tree.map(f, x)` with one tree does not stack; give it the axis.
         init_states = jax.tree.map(lambda x: x[None], states[0])
-    return (LevelSet(levels, env, env_params[0], init_states, episode_length,
-                     observation),
-            TaskSpec(levels, observation))
+    return (LevelSet(levels, env, params, init_states, episode_length),
+            TaskSpec(levels))
 
 
 def env_dims(env):
@@ -418,23 +371,11 @@ def _level_index(task):
 def build_policy(key, obs_dim, action_dim, hidden_dims):
     """``(policy, param_template, num_params)``: the actor-only network.
 
-    The OBSERVATION decides the network, as it does in Kinetix: the flat pixel
-    vector (46,876) gets the conv policy, the flat entity vector (672) gets
-    Kinetix's transformer (`KinetixTransformerPolicy`). The two sizes cannot
-    collide, and anything else raises.
-
     The pixel parameter count is asserted, not reported: it is the one number
     that says this is still the network the working GA configuration evolved.
     """
-    if int(obs_dim) == ENTITY_OBS_DIM:
-        policy, param_template = create_kinetix_transformer_policy_network(
-            key, ENTITY_LAYOUT, int(action_dim), tuple(hidden_dims))
-        num_params = int(
-            jax.flatten_util.ravel_pytree(param_template)[0].shape[0])
-        return policy, param_template, num_params
     if int(obs_dim) != OBS_DIM:
-        raise ValueError(f'expected obs_dim {OBS_DIM} (pixels) or '
-                         f'{ENTITY_OBS_DIM} (entity), got {obs_dim}')
+        raise ValueError(f'expected obs_dim {OBS_DIM}, got {obs_dim}')
     policy, param_template = create_kinetix_pixels_policy_network(
         key, IMAGE_SHAPE, GLOBAL_INFO_DIM, int(action_dim),
         tuple(hidden_dims))

@@ -1,1 +1,0 @@
-# Gymnax training scripts

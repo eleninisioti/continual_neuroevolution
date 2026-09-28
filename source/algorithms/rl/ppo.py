@@ -2,37 +2,25 @@
 
 PPO, ReDo-PPO, TRAC-PPO and C-CHAIN differ in what they do *around* the update,
 not in the update itself, and the PBT trainer runs this same step for each
-population member. One copy is what makes "the RL arm differs only in its
-continual-learning mechanism" true by construction rather than by four files
-happening to agree.
+population member.
 
-Every symbol here was verified identical between the stationary and continual
-gymnax trainers before it was lifted, so importing it cannot move a number.
-
-One of them belongs to a specific method rather than to PPO itself, and lives
-here because it is a hook the shared update exposes:
-
-  run_redo_pass  ReDo (Sokar et al., ICML 2023) -- re-initialises neurons whose
-                 normalised activation score has collapsed. The mechanism is in
-                 `source/algorithms/rl/redo.py`; this is the pass over the selected
-                 networks.
-
-TRAC has no hook here. It is an optimiser wrapper (`start_trac`), so it is
-applied where the trainer builds its optax chain and is invisible to the update.
-There used to be an `update_entropy_coef` in this file that `--method trac`
-called; it was an adaptive entropy coefficient, which is not TRAC and not what
-the brax, mujoco or kinetix `trac` arms ran. It is gone.
-
-`collect_rollout` is deliberately NOT here: the stationary and continual
-trainers hold the only two genuinely different versions of it, because the
-continual one has to know where a sub-task boundary falls.
+`make_rollout_fn` collects one window of experience from a batch of
+environments and computes GAE advantages; `make_update_fn` runs PPO's epochs
+of minibatch updates over it. Both are independent of which suite the
+environment comes from: the sub-task enters only through the `env_step` and
+`offset_fn` the caller passes. The loop around them -- schedule, evaluation,
+checkpoints, the continual-RL mechanisms and PBT -- is
+`source/runners/train_ppo.py:run_ppo`.
 """
+
+from functools import partial
 
 import jax
 import jax.numpy as jnp
 import optax
 from jax import random
 
+from source.algorithms.rl import action_heads as actors
 from source.algorithms.rl import redo
 from source.algorithms.networks import ACTIVATIONS, POLICY_ARCH
 
@@ -41,24 +29,6 @@ from source.algorithms.networks import ACTIVATIONS, POLICY_ARCH
 # relu by construction.
 GYMNAX_POLICY_ACTIVATION = POLICY_ARCH['gymnax']['activation']
 GYMNAX_VALUE_ACTIVATION = 'relu'
-
-
-def categorical_sample(key, logits):
-    """Sample from categorical distribution."""
-    return jax.random.categorical(key, logits)
-
-
-def categorical_log_prob(logits, action):
-    """Log probability of action under categorical distribution."""
-    log_probs = jax.nn.log_softmax(logits)
-    return log_probs[action]
-
-
-def categorical_entropy(logits):
-    """Entropy of categorical distribution."""
-    log_probs = jax.nn.log_softmax(logits)
-    probs = jax.nn.softmax(logits)
-    return -jnp.sum(probs * log_probs, axis=-1)
 
 
 def gae_advantages(rewards, values, dones, gamma=0.99, gae_lambda=0.95, last_value=0.0):
@@ -88,19 +58,6 @@ def gae_advantages(rewards, values, dones, gamma=0.99, gae_lambda=0.95, last_val
     return advantages_reversed[::-1]
 
 
-def make_vec_env_fns(env, env_params, num_envs):
-    """Create vectorized reset and step functions."""
-
-    def vec_reset(key):
-        keys = random.split(key, num_envs)
-        return jax.vmap(lambda k: env.reset(k, env_params))(keys)
-
-    def vec_step(keys, states, actions):
-        return jax.vmap(lambda k, s, a: env.step(k, s, a, env_params))(keys, states, actions)
-
-    return jax.jit(vec_reset), jax.jit(vec_step)
-
-
 def compute_ppo_loss(
     policy_params,
     value_params,
@@ -118,11 +75,11 @@ def compute_ppo_loss(
     `log_prob_fn` / `entropy_fn` act on ONE timestep's logits and default to the
     single-categorical pair, which is what every gymnax/brax/kinetix caller
     wants. The generalists study's Gaussian head passes its own pair
-    (`source/studies/generalists/actors.py`). Both are vmapped over the batch
+    (`source/algorithms/rl/action_heads.py`). Both are vmapped over the batch
     here, so a network whose logits have extra axes needs no other change.
     """
-    log_prob_fn = categorical_log_prob if log_prob_fn is None else log_prob_fn
-    entropy_fn = categorical_entropy if entropy_fn is None else entropy_fn
+    log_prob_fn = actors.categorical_log_prob if log_prob_fn is None else log_prob_fn
+    entropy_fn = actors.categorical_entropy if entropy_fn is None else entropy_fn
     obs = batch['obs']
     actions = batch['actions']
     old_log_probs = batch['log_probs']
@@ -212,9 +169,9 @@ def train_step_joint(
     Identical arithmetic to `train_step` for any per-parameter optimiser -- the
     same gradients reach the same adam -- but it exists for TRAC, which is not
     per-parameter. TRAC's tuner is a handful of scalars over whatever pytree it
-    is given, and giving it the policy alone is what breaks the gymnax `trac`
-    arm: see the block in `source/studies/gymnax/train_RL_gymnax.py` where the joint
-    optimiser is built. Every other suite is joint already because it has one
+    is given, and giving it the policy alone is what broke the gymnax `trac`
+    arm (the old per-method gymnax trainer had to build a joint optimiser for
+    it). Every other suite is joint already because it has one
     actor-critic network and therefore one optimiser.
 
     `policy_state.tx` and `value_state.tx` are unused on this path; `opt_state`
@@ -303,3 +260,159 @@ def run_redo_pass(policy_state, value_state, obs, key, args, hp,
     return policy_state, value_state, stats
 
 
+def make_rollout_fn(env_step, head, actor, value_net, hp, offset_fn):
+    """Return ``rollout(policy_params, value_params, carry, task, stats)``.
+
+    ``carry`` is ``(obs, state, key)`` and is threaded across updates, so the
+    environments are never reset at an update boundary -- a rollout is a window
+    over episodes that keep running, which is what the GAE bootstrap assumes.
+
+    The sub-task enters in two places and only two: ``offset_fn(task)`` is
+    added to the observation before the networks read it (the sub-task vector
+    on gymnax and under obs_noise, 0 for a friction sub-task), and ``env_step``
+    runs the environment under the sub-task's physics (a no-op on gymnax). The
+    returns remain comparable with NES's.
+
+    ``stats`` are the observation normaliser's running statistics, or None.
+    Inputs are normalised with the statistics as they stood when the policy
+    ACTED, and the statistics are updated with this window's observations for
+    the next one, so the stored log-probabilities and the update's forward
+    pass see the same inputs.
+    """
+    num_steps = hp['num_steps']
+    reward_scale = float(hp.get('reward_scale', 1.0))
+
+    def rollout(policy_params, value_params, carry, task, stats):
+        offset = offset_fn(task)
+
+        def inputs(obs):
+            shifted = obs + offset
+            return shifted, (actors.normalize(shifted, stats)
+                             if stats is not None else shifted)
+
+        def env_step_fn(carry, _):
+            obs, state, key = carry
+            shifted, inp = inputs(obs)
+            logits = actor.apply(policy_params, inp)
+            values = value_net.apply(value_params, inp)
+
+            key, action_key, step_key = random.split(key, 3)
+            actions = jax.vmap(head.sample, in_axes=(0, 0))(
+                random.split(action_key, obs.shape[0]), logits)
+            log_probs = jax.vmap(head.log_prob)(logits, actions)
+
+            next_obs, next_state, reward, done = env_step(
+                step_key, state, actions, task)
+            if reward_scale != 1.0:
+                reward = reward * reward_scale
+
+            transition = {'obs': inp, 'actions': actions,
+                          'log_probs': log_probs, 'values': values,
+                          'rewards': reward, 'dones': done.astype(jnp.float32)}
+            if stats is not None:
+                # Only when there is a normaliser to update. An extra scan
+                # output changes XLA's fusion of the rollout and with it the
+                # float32 rounding, and a gymnax run has to stay bit-identical
+                # to the runs on disk.
+                transition['raw_obs'] = shifted
+            return (next_obs, next_state, key), transition
+
+        (obs, state, key), traj = jax.lax.scan(
+            env_step_fn, carry, None, length=num_steps)
+
+        # V(s_T) for the bootstrap, on the state the window stopped on.
+        last_value = value_net.apply(value_params, inputs(obs)[1])
+
+        # Explicit wrapper rather than functools.partial: vmap passes its
+        # arguments positionally, and last_value is the sixth parameter of
+        # gae_advantages, so a partial over the keyword arguments would receive
+        # it as `gamma`.
+        def gae(rewards, values, dones, bootstrap):
+            return gae_advantages(
+                rewards, values, dones, gamma=hp['gamma'],
+                gae_lambda=hp['gae_lambda'], last_value=bootstrap)
+
+        advantages = jax.vmap(gae, in_axes=(1, 1, 1, 0), out_axes=1)(
+            traj['rewards'], traj['values'], traj['dones'], last_value)
+        returns = advantages + traj['values']
+
+        flat = lambda x: x.reshape((-1,) + x.shape[2:])
+        batch = {'obs': flat(traj['obs']), 'actions': flat(traj['actions']),
+                 'log_probs': flat(traj['log_probs']),
+                 'advantages': flat(advantages), 'returns': flat(returns)}
+        if stats is not None:
+            stats = actors.update_norm_stats(stats, traj['raw_obs'])
+        return (obs, state, key), batch, stats
+
+    return rollout
+
+
+def make_update_fn(actor, value_net, hp, head, joint_tx=None):
+    """Return ``update(policy_state, value_state, batch, key, opt_state=None)``.
+
+    ``num_epochs`` passes over the batch, reshuffled each epoch and split into
+    ``num_minibatches``. Advantages are normalised per minibatch, the usual PPO
+    convention.
+
+    With ``joint_tx`` the two parameter sets are updated by ONE optax
+    transformation over both, threading ``opt_state`` through. That is only
+    needed for TRAC, whose tuner is a handful of scalars over whatever pytree it
+    is handed -- give it the policy alone and it is tuning half the model. Every
+    other optimiser here is per-parameter, so the two paths are arithmetically
+    identical for them. See `train_step_joint`.
+    """
+    num_minibatches = hp['num_minibatches']
+    if joint_tx is not None:
+        step_joint = partial(train_step_joint, actor, value_net,
+                             hp['clip_eps'], hp['vf_coef'], joint_tx)
+    step = partial(train_step, actor, value_net, hp['clip_eps'],
+                   hp['vf_coef'])
+    dist = dict(log_prob_fn=head.log_prob, entropy_fn=head.entropy)
+
+    def update(policy_state, value_state, batch, key, opt_state=None,
+               ent_coef=None):
+        # A per-member entropy coefficient under PBT, the config's
+        # otherwise. None keeps the Python constant every other method
+        # compiles in, so their traces are unchanged.
+        ec = hp['ent_coef'] if ent_coef is None else ent_coef
+        batch_size = batch['obs'].shape[0]
+        minibatch_size = batch_size // num_minibatches
+
+        def epoch(carry, epoch_key):
+            policy_state, value_state, opt_state = carry
+            perm = random.permutation(epoch_key, batch_size)
+            shuffled = jax.tree.map(lambda x: x[perm], batch)
+            minibatches = jax.tree.map(
+                lambda x: x.reshape((num_minibatches, minibatch_size)
+                                    + x.shape[1:]), shuffled)
+
+            def minibatch(carry, mb):
+                policy_state, value_state, opt_state = carry
+                mb = dict(mb)
+                mb['advantages'] = ((mb['advantages'] - mb['advantages'].mean())
+                                    / (mb['advantages'].std() + 1e-8))
+                if joint_tx is not None:
+                    (policy_state, value_state, opt_state, loss,
+                     metrics) = step_joint(policy_state, value_state,
+                                           opt_state, mb, ec,
+                                           **dist)
+                else:
+                    policy_state, value_state, loss, metrics = step(
+                        policy_state, value_state, mb, ec, **dist)
+                return (policy_state, value_state, opt_state), (loss, metrics)
+
+            carry, out = jax.lax.scan(
+                minibatch, (policy_state, value_state, opt_state), minibatches)
+            return carry, out
+
+        carry, (losses, metrics) = jax.lax.scan(
+            epoch, (policy_state, value_state, opt_state),
+            random.split(key, hp['num_epochs']))
+        policy_state, value_state, opt_state = carry
+        return policy_state, value_state, opt_state, {
+            'loss': jnp.mean(losses),
+            'entropy': jnp.mean(metrics['entropy']),
+            'approx_kl': jnp.mean(metrics['approx_kl']),
+        }
+
+    return update

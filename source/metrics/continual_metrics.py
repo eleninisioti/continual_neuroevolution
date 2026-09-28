@@ -1,9 +1,9 @@
 """The continual metrics the paper reports, as arithmetic on training curves.
 
-Extracted from `scripts/outdated/compare.py` on 2026-09-08 so the figure script
+Extracted from an earlier comparison script on 2026-09-08 so the figure script
 and the table script cannot come to define the same column differently -- the
 failure this repo keeps guarding against. Every definition below is that
-file's, unchanged; what is new is only that it lives somewhere importable.
+script's, unchanged; what is new is only that it lives somewhere importable.
 
     Cum. max    the area under the training curve over the whole sequence, in
                 reward x generations. Integrated rather than summed, because NE

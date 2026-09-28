@@ -6,7 +6,7 @@
 
 Four of the paper's five plasticity panels are logged per record by the
 trainers themselves (`training_metrics.json`: dormant fraction, churn, weight
-magnitude, NTK rank) and `scripts/make_plasticity_figure.py` reads them
+magnitude, NTK rank) and `scripts/plotting/make_plasticity_figure.py` reads them
 straight. Two are NOT functions of a scalar time series, because they need the
 IDENTITY of a unit or of a parameter vector across time:
 
@@ -65,12 +65,10 @@ CPU-only, and it is safe to run beside training.
     dormancy is and a LOWER bound on how persistent it is: if a unit is not
     dormant across a 200-generation gap it is certainly not permanently dead.
   * `step_norm` is the distance moved over a whole sub-task, so it may be
-    compared across methods (they spend the same steps per sub-task, CLAUDE.md
-    rule (c)) but NOT read as a per-update step size.
+    compared across methods (they spend the same steps per sub-task) but NOT read as a per-update step size.
 
 Finer resolution needs runs saved with a checkpoint interval, which the
-generalists study did (`scripts/outdated/generalists/analysis/dormancy_persistence.py`
-reads those, at 5 generations) and this tree does not.
+earlier generalists study did (at 5 generations) and this tree does not.
 
 ## The probe batch
 
@@ -123,7 +121,7 @@ and the persistence figure is worth drawing under each.
 
 ## The lineage caveat
 
-For NES, OpenES and the RL arms the saved agent is a point that moves
+For ES and the RL arms the saved agent is a point that moves
 continuously, so unit `i` at consecutive checkpoints is the same unit of the
 same network. For GA and DNS the saved agent is an argmax over a population
 and can jump lineage between sub-tasks, so low persistence there may be the
@@ -170,13 +168,13 @@ from source.metrics.ntk import rank_stats                    # noqa: E402
 # NETWORK THE CENTROID LINEPLOT SCORES -- `centroid_fitness` is the score of
 # the coordinate-wise mean of the population's weights, and this is that mean.
 # Per arm: `archive.mean(0)` for the GA, `population.mean(0)` for DNS,
-# `es_state.mean` for ES/NES.
+# `es_state.mean` for ES.
 #
 # `incumbent` is the FALLBACK and is a different object: what the optimizer
 # would hand back, which is `archive[0]` for the GA (this trainer sets
 # `ga_state.mean = archive[0]` every generation -- the best archive member, not
 # any mean) and the repertoire best for DNS. It coincides with the centroid
-# only for ES/NES. Runs written before the `centroid` key existed therefore
+# only for ES. Runs written before the `centroid` key existed therefore
 # give a GA or DNS row that is NOT a centroid row, and the loader says so.
 # Two further caveats belong in the caption rather than being silently
 # absorbed:
@@ -198,7 +196,7 @@ AGENT_SOURCES = {
 # fallback to it under `--agent centroid` silently plots a different network
 # from the curve beside it.
 #
-#   ES, NES    `incumbent` IS `centroid`; both are `es_state.mean`.
+#   ES         `incumbent` IS `centroid`; both are `es_state.mean`.
 #   GA         `incumbent` is `ga_state.mean`; `centroid_fitness` scores
 #              `ga_state.archive.mean(axis=0)`, which is `centroid`.
 #   DNS        `incumbent` is the repertoire BEST -- an argmax, not a mean --
@@ -322,7 +320,7 @@ def subtask_sequence(env_name, blob, cfg, num_tasks, obs_dim):
     RNG, but it is the fallback and not the path: the stored arrays are what
     the run actually used.
 
-    This reads the sub-task schedule, which no TRAINER may see (CLAUDE.md (d)).
+    This reads the sub-task schedule, which no TRAINER may see.
     That rule is about information reaching the search. This is a measurement
     pass over finished checkpoints that gains nothing for any method; it is the
     analysis knowing which environment an agent was in when it scores that

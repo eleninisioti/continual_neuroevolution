@@ -20,9 +20,8 @@ the ten continual tasks of the main text, one row a task, one column a metric.
 Built in two steps, like the other final figures: `--extract` reads the runs
 through the symlink trees under paper/<suite>/data; without it only the saved
 data is read. The tasks, trees and arms are continual_main's
-(plot_continual_lineplots.PANELS, `main`): ES = NES except on Kinetix (OpenES,
-`es`, plain OpenES since 2026-09-24), PBT-PPO = N=8 or N=2 by the higher Cum. elite. Both pairs are
-filed under `es` and `pbt`.
+(plot_continual_lineplots.PANELS, `main`): PBT-PPO = N=8 or N=2 by the higher
+Cum. elite, filed under `pbt`.
 
 Columns, all for the CENTROID unless named otherwise (make_metrics_figure.py's
 docstring has the long form):
@@ -113,7 +112,7 @@ def column_order(panels):
     """The noise columns, then the action-reversal ones, then the rest."""
     rank = {g: i for i, g in enumerate(GROUPS.values())}
     return sorted(panels, key=lambda p: rank.get(header(p[0])[0], len(rank)))
-PAIRS = (es_arm.ARMS, es_arm.PBT_ARMS)          # ('es', 'nes'), ('pbt', 'pbt2')
+PAIRS = (es_arm.PBT_ARMS,)                      # ('pbt', 'pbt2')
 MUTED = '#6b6a65'
 LEFT_IN, TOP_IN, BOTTOM_IN = 0.85, 0.36, 0.28
 TEXT_WIDTH_IN = 5.5     # ICLR
@@ -204,8 +203,7 @@ def extract():
     posthoc = json.loads(spp.DATA.read_text())['panels']
     meta = {'arms': {}, 'zt_source': {}, 'panels': {}}
     for tree, cells in pcl._cells(lambda f: f in FIGS).items():
-        arms = spp.reported_arms(PROJECT / tree, cells,
-                                 es_kept='es' if tree.startswith('paper/kinetix') else 'nes')
+        arms = spp.reported_arms(PROJECT / tree, cells)
         meta['arms'][tree] = arms
         meta['zt_source'][tree] = ('training records' if tree in ZT_FROM_RECORDS
                                    else 'evaluate pass (evaluation.json)')
@@ -416,8 +414,7 @@ def write_markdown(meta, table, out=OUT, stem=STEM):
           f'`data/{STEM}.json` (extracted {meta["extracted"]}); its docstring defines '
           'each column. Mean over trials [95% bootstrap CI], n, and the NE-vs-RL mark '
           '(`*` p<.05, `**` p<.01, `***` p<.001: better than EVERY method of the other '
-          'family, one-sided Mann-Whitney U, Holm). ES is NES except on Kinetix '
-          '(OpenES); PBT-PPO is the N kept below.', '',
+          'family, one-sided Mann-Whitney U, Holm). PBT-PPO is the N kept below.', '',
           '| Tree | Arms | ZT from |', '|---|---|---|']
     md += [f'| `{t}` | {" ".join(a)} | {meta["zt_source"][t]} |' for t, a in meta['arms'].items()]
     md += ['', '| Task | Metric | Method | mean | lo | hi | n | mark |',

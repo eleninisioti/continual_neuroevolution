@@ -1,24 +1,17 @@
 """The variation operators the population-based methods breed with.
 
-The GA and DNS are the same (mu + lambda) loop under two independent
-substitutions: *how offspring are produced* (this file) and *what survivors are
-ranked by* (fitness for the GA, dominated novelty for DNS -- see
-`source/algorithms/ne/dns.py`). Until 2026-09-08 those two axes were welded
-together: the GA could only mutate a single parent with isotropic gaussian
-noise and DNS could only use Iso+LineDD, so "DNS beats the GA" was a statement
-about novelty selection AND recombination AND the operator's width all at once,
-and no run in the tree separated them.
-
-They are separated here. Both operators live behind one signature
+The GA and DNS are the same (mu + lambda) loop under two substitutions: *how
+offspring are produced* (this file) and *what survivors are ranked by*
+(fitness for the GA, dominated novelty for DNS). Both operators live behind one
+signature
 
     op(genotypes, key, num_offspring, ..., return_parents=False)
         -> offspring                        (num_offspring, num_params)
         -> (offspring, base_parents)        if return_parents
 
-so a searcher picks one by name and nothing else about it changes. That makes
-the 2x2 -- GA/gaussian, GA/isoline, DNS/gaussian, DNS/isoline -- four runs of
-one implementation rather than four implementations, and the diversity claim
-can be read off the selection axis with the operator held fixed.
+so a searcher picks one by name and nothing else about it changes: `dns` and
+`dns_gaussian` are one implementation with the operator swapped, and
+`ga` vs `dns_gaussian` differs in the selection rule alone.
 
 ## base_parents, and why it is not the same column for both
 

@@ -13,13 +13,13 @@ just trained on, score on the one before it). A final paper figure.
 The runs are read through the paper's symlink trees (GRID), one root a family:
 gymnax `{noise,physics,actions}_2task`, MiniGrid, and HalfCheetah
 `{noise,physics,actions}_2task`. The HalfCheetah noise cell is offset 0.5, the
-width continual_main's 10-sub-task panel uses, with the RL arms at the ant PPO
+width continual_main's 10-sub-task panel uses, with the RL arms at the brax PPO
 shape as there. The HalfCheetah friction cell has only the repro2-shape RL
 runs, and no PBT.
 
 Scores for the centroid saved at the end of each phase:
 
-    gymnax, MiniGrid   `evaluation.json` (source.studies.evaluate_continual,
+    gymnax, MiniGrid   `evaluation.json` (scripts/analysis/evaluate_continual.py,
                        100 fresh episodes): `returns` on the sub-task just
                        trained, `prev_returns` on the previous one, as
                        generalist_checkpoints.py reads them
@@ -27,7 +27,7 @@ Scores for the centroid saved at the end of each phase:
                        generation of each phase, as plot_stability_plasticity.py
                        reads them (the CLUSTER runs were never post-evaluated)
 
-Arms: ES is NES (CLAUDE.md: NES on every suite but Kinetix); PBT-PPO is
+Arms: ES is the one ES arm (`es`); PBT-PPO is
 whichever of N=8 and N=2 has the higher Cum. elite over the family's cells
 (es_arm.pick), as in continual_main. No DNS. MiniGrid keeps only the
 checkpoints that end an 8x8 phase (plot_generalist_outcomes.ONE_DIRECTION), one
@@ -116,7 +116,7 @@ DATA = FINAL / 'data' / 'generalist_scores_centroid.json'
 PROFILES = FINAL / 'data' / 'generalist_profiles.json'   # the drawn profiles, for Figure 2
 STEM = FINAL / 'generalist_scores_centroid'          # the two profiles (main text)
 STEM_GRID = FINAL / 'generalist_scores_centroid_grid'  # the 3 x 5 grid + profiles (appendix)
-ES = 'nes'
+ES = es_arm.ES
 READ = ['ga', ES, 'ppo', 'trac', 'redo', 'cchain', *es_arm.PBT_ARMS]
 # (row label, [(data root, cell, what the switch changes) or None] a column),
 # columns as pgo.COLUMNS. Rows are what the switch touches; values are the run
@@ -217,7 +217,7 @@ def extract():
             for m in arms:
                 if m in es_arm.PBT_ARMS and m != kept['pbt']:
                     continue
-                row = {ES: 'es', kept['pbt']: 'pbt'}.get(m, m)
+                row = {kept['pbt']: 'pbt'}.get(m, m)
                 trials = []
                 for trial in sorted((root / 'continual' / m / cell).glob('trial_*'),
                                     key=lambda p: int(p.name.split('_')[1])):
@@ -226,7 +226,7 @@ def extract():
                     got = reader(trial)
                     if got is None:
                         sys.exit(f'{trial} has no evaluation.json: run '
-                                 'source.studies.evaluate_continual on it')
+                                 'scripts/analysis/evaluate_continual.py on it')
                     trials.append({'shown': got[0], 'previous': got[1],
                                    'run': str(trial.resolve().relative_to(PROJECT))})
                 if trials:
@@ -412,7 +412,7 @@ def main() -> int:
           'learned by direction = the same share for the checkpoints ending a sub-task-1 / '
           'sub-task-2 phase; frozen = one direction below the learned bar while its previous '
           'sub-task is above it and the other direction learned. '
-          'ES = NES; PBT-PPO = the N with the higher Cum. elite. '
+          'PBT-PPO = the N with the higher Cum. elite. '
           'See the docstring of `scripts/analysis/plot_generalist_scores.py`. '
           f'Data extracted {meta["extracted"]}.', '',
           '| Row | Task | Change | Method | Arm | n | Scores | untrained | shown | previous '

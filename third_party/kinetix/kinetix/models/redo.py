@@ -8,7 +8,7 @@ neurons -- there was no resampling anywhere in the tree, so `use_redo=True`
 trained exactly the same network as `use_redo=False` and the "ReDo" column was
 vanilla PPO under another name. This module is the missing half.
 
-It is a port of `source/studies/gymnax/redo.py` (itself a port of
+It is a port of the gymnax ReDo (now `source/algorithms/rl/redo.py`; itself a port of
 `inspiration/redo/src/redo.py`) onto this repo's Kinetix network, and keeps the
 same four steps:
 
@@ -120,7 +120,7 @@ def _masks_from_scores(scores, tau):
 def _reinit_stack(params, pairs, masks, key):
     """Resample dormant neurons' incoming weights, zero their outgoing ones.
 
-    Mirrors `_reinit_params` in source/studies/gymnax/redo.py, but draws replacements
+    Mirrors the gymnax ReDo's `_reinit_params`, but draws replacements
     from `orthogonal(sqrt(2))` because that is what these Dense layers are built
     with (gymnax's use flax's default lecun_normal). Resampling from a different
     distribution than the layer was initialised with would put recycled units on

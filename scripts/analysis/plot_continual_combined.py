@@ -97,9 +97,8 @@ def panel_title(title):
 
 
 def _key(m):
-    """ES and NES are one method (`es`), PBT N=8 and N=2 one (`pbt`), whichever
-    a family kept."""
-    return 'es' if m in es_arm.ARMS else 'pbt' if m in es_arm.PBT_ARMS else m
+    """PBT N=8 and N=2 are one method (`pbt`), whichever a family kept."""
+    return 'pbt' if m in es_arm.PBT_ARMS else m
 
 
 def _legend(fig, methods, height):

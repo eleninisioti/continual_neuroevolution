@@ -20,13 +20,13 @@ The final figures (`--set main`) are built in two steps, as the
 other figures in paper/visuals/final: `--extract` reads the checkpoint passes
 of the runs continual_main shows and saves one curve a (task, row, arm, trial);
 without it only the saved data is read. Its arms are continual_main's kept arms
-(ES = NES, OpenES on Kinetix; its PBT size), not `keep_one_arm`'s, and its
+(its PBT size), not `keep_one_arm`'s, and its
 cheetah columns read the passes of paper/mjx/cheetah/data/<family>
 (`scripts/analysis/posthoc_paper_cheetah.sh`), whose RL arms and noise GA are
-the CLUSTER ant-PPO-shape runs.
+the CLUSTER brax-PPO-shape runs.
 
 Columns are `plot_metrics_overview.SETS` (the same tasks, in the same order,
-as the metrics overview), and so are the arms: one of ES/NES (drawn as ES) and
+as the metrics overview), and so are the arms: the one ES arm and
 one of PBT N=8/N=2 a column (`plot_metrics_overview.keep_one_arm`). Every panel is `make_metrics_figure.draw_panel`: the
 mean over trials with a 95% bootstrap CI, and the mark when a method beats
 every method of the other family. All values describe the CENTROID agent,
@@ -89,7 +89,7 @@ from matplotlib.ticker import (FixedLocator, FuncFormatter, LogLocator,  # noqa:
 
 REPO = pathlib.Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO))
-sys.path.insert(0, str(REPO / 'scripts'))
+sys.path.insert(0, str(REPO / 'scripts' / 'plotting'))
 sys.path.insert(0, str(REPO / 'scripts' / 'analysis'))
 import make_lineplot as lp                                 # noqa: E402
 from make_metrics_figure import draw_panel                 # noqa: E402
@@ -131,20 +131,14 @@ FINAL_RESULTS = {
 def out_path(stem):
     return IN_FINAL.get(stem, OUT) / stem
 # Bodies without a registry threshold: the values the paper's other visuals use
-# (finish_iclr.sh for MiniGrid, the cheetah generalist tables, the ant's
-# learner-vs-floor gap in plot_noncontinual_solve.py).
-THRESHOLD = {'minigrid': 0.8, 'cheetah': 2000.0, 'ant': 3000.0, 'kinetix': 1.0}
+# (finish_iclr.sh for MiniGrid, the cheetah generalist tables).
+THRESHOLD = {'minigrid': 0.8, 'cheetah': 2000.0, 'kinetix': 1.0}
 # The scatter draws a task hollow when either family learns the sub-task it is
 # shown in fewer than this fraction of its post-switch checkpoints.
 LEARNED_MIN = 0.5
 # Tasks the scatter adds to a set's columns without a row in the overview
-# figures: the ant task of the main continual figure (paper/visuals
-# continual_main), at the same threshold as the other ant columns.
+# figures.
 SCATTER_EXTRA = {}
-# Columns of `plot_metrics_overview.SETS` these figures leave out. The ant
-# (2026-09-15): the GA does not solve it and ES/NES learn the shown sub-task in
-# at most 60% of checkpoints, so the paper does not report it.
-DROPPED = {'ant-noise', 'ant-physics'}
 # Columns the two plasticity figures add to a set: Kinetix is a twenty-level
 # chain, not a two-sub-task schedule, but it is the one body where the
 # dormancy picture reverses (NE dormant, PPO not), so it is drawn beside them.
@@ -252,8 +246,7 @@ FIGURES = {
 # Columns a figure is restricted to; every other figure draws the whole set.
 # Only a bounded activation saturates: Kinetix and HalfCheetah are tanh,
 # gymnax and MiniGrid ReLU.
-TANH_COLUMNS = {'kinetix', 'cheetah-noise', 'cheetah-physics', 'cheetah-actions',
-                'ant-noise', 'ant-physics'}
+TANH_COLUMNS = {'kinetix', 'cheetah-noise', 'cheetah-physics', 'cheetah-actions'}
 # The main figure (2026-09-19): representative columns, the rest is in `all`.
 # Acrobot left out (flat on every row, under both changes); HalfCheetah
 # dropped 2026-09-21 and Kinetix 2026-09-24 (tanh units are rarely dormant);
@@ -424,7 +417,7 @@ def outcomes(root, method, cell, col_id):
 
 def load_column(col, results=None, kept=None):
     """{row: {method: [per-trial values]}} for one column, or None. `results`
-    replaces PAPER/<sub>/results; `kept` = [ES arm, PBT arm] replaces
+    replaces PAPER/<sub>/results; `kept` = [PBT arm] replaces
     `keep_one_arm`'s choice."""
     col_id, _suite, sub, env = col[:4]
     res = PAPER / (results or f'{sub}/results') / 'centroid'
@@ -439,7 +432,7 @@ def load_column(col, results=None, kept=None):
     rows = {k: {} for k in ROWS}
     # Per-checkpoint curves for the line figure: {LINES key: {method: [array]}}.
     rows['series'] = {k: {} for k in LINES}
-    # One arm a pair (ES/NES, PBT N=8/N=2), filed under the pair's first name,
+    # One arm of the pair PBT N=8/N=2, filed under the pair's first name,
     # as in the metrics overview and stability_plasticity.
     present = set((vals or {}).get('methods', []))
     for blob in (ck, cw):
@@ -865,7 +858,7 @@ def main() -> int:
     })
     (OUT / 'main').mkdir(parents=True, exist_ok=True)
     suffix = SUFFIX.get(args.set, f'_{args.set}')
-    cols = [c for c in pmo.SETS[args.set][1] if c[0] not in DROPPED]
+    cols = list(pmo.SETS[args.set][1])
     if args.set == 'main' and set(args.figure) <= set(FINAL_FIGURES):
         # The final figures: continual_main's arms, from the saved data only.
         if args.extract:
