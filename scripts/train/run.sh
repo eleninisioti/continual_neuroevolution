@@ -165,9 +165,7 @@ wants_pbt() {
 #
 # CartPole, Acrobot and MountainCar through `source/run.py --suite gymnax`, the
 # shared runners every benchmark uses. What a method, a cell and a budget ARE
-# lives in `source/configs/gymnax.yaml`; nothing here sets a hyperparameter. The
-# per-method gymnax trainers these blocks used to call were retired on
-# 2026-09-28 -- see that config's docstring for what changed.
+# lives in `source/configs/gymnax.yaml`; nothing here sets a hyperparameter.
 #
 # A cell is an environment (`CartPole-v1`, stationary) or an environment at an
 # observation-noise width (`CartPole-v1_sigma1.0`, continual), and names the

@@ -62,9 +62,9 @@ import plot_metrics_overview as pmo                        # noqa: E402
 
 PAPER = pmo.PAPER
 OUT = pmo.OUT
-# The figures the paper includes go to visuals/main.
-# generalist_scores_centroid (plot_generalist_scores.py) replaced this one
-# there on 2026-09-17: the outcome split moves with the solved threshold.
+# The figures the paper includes go to visuals/main. None of this script's do:
+# the outcome split moves with the solved threshold, so the paper uses
+# generalist_scores_centroid (plot_generalist_scores.py).
 IN_PAPER: set[str] = set()
 
 # Columns: the body a panel title starts with.

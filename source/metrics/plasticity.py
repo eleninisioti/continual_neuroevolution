@@ -9,8 +9,7 @@ single table can carry all eight methods:
                 score, so "how dormant is this network" means one thing here.
 
   **churn**     how much one update moved the policy's output on a frozen batch
-                of states. Reported for every method, which is what the
-                reference does -- see below.
+                of states. Reported for every method -- see below.
 
 ## The measure is per suite; the pairing is per family
 
@@ -18,13 +17,9 @@ Tang et al. measure churn with a different estimator per action space, and this
 module follows them rather than inventing a single one:
 
   discrete (gymnax)     cross-entropy H(pi_before, pi_after)
-                        `crl_procgen/vis_train_procgen_c_chain.py:192`
   continuous (cheetah)  mean squared difference of action means
-                        `crl_dmc/crl_run_ppo_c_chain_dmc.py:339`
 
-Both are logged for EVERY method, not just C-CHAIN: the reference's own
-vanilla-PPO scripts log the identical quantity (`crl_run_ppo_dmc.py:318`), so
-churn-for-all-methods is its practice and not an extension of it.
+Both are logged for EVERY method, not just C-CHAIN.
 
 The one deliberate departure: the gymnax **NE** policies report
 `action_disagreement` -- the fraction of probe states whose argmax action
@@ -35,8 +30,7 @@ cross-entropy, because its policies really are categorical distributions.
 
 ## What counts as "one update"
 
-  RL      one gradient step. The reference keeps a buffer of historical policies
-          and compares against `[-2]`; here C-CHAIN reads its own
+  RL      one gradient step. C-CHAIN reads its own
           `chain_state.ref_policy_params` and the other methods read a
           `prev_params` threaded out of the minibatch scan.
 
@@ -132,15 +126,8 @@ def action_disagreement_continuous(actions_a, actions_b, action_range=2.0):
 def action_churn_mse(actions_a, actions_b):
     """C-CHAIN's own continuous churn: mean squared difference of action means.
 
-    This is the published definition, verbatim. The reference computes
-
-        policy_churn = ((cur_ref_action_means - ref_action_means) ** 2).mean()
-
-    on the DeepMind Control suite -- see
-    `inspiration/C-CHAIN/crl_dmc/crl_run_ppo_c_chain_dmc.py:339`, and note that
-    `crl_run_ppo_dmc.py:318` logs the identical quantity for VANILLA PPO. So
-    churn-for-every-method is the reference's own practice, not an extension of
-    it, and this is the function every continuous-control method here reports.
+    This is the published definition for the DeepMind Control suite, and the
+    function every continuous-control method here reports.
 
     Both arguments are (batch, action_dim) action means -- the distribution's
     scale half already dropped -- evaluated on the same states.
@@ -158,12 +145,10 @@ def action_churn_mse(actions_a, actions_b):
 def policy_churn_cross_entropy(logits_before, logits_after):
     """C-CHAIN's discrete churn: H(pi_before, pi_after), per sample.
 
-    The published estimator for discrete control --
-    `inspiration/C-CHAIN/crl_procgen/vis_train_procgen_c_chain.py:192` -- and
-    its vanilla-PPO script logs the identical quantity, which is why every
-    gymnax RL method reports it and not only C-CHAIN.
+    The published estimator for discrete control; every gymnax RL method
+    reports it, not only C-CHAIN.
 
-    Cross-entropy rather than KL, matching the reference: the two differ by the
+    Cross-entropy rather than KL: the two differ by the
     constant entropy of pi_before, so the gradient is identical and the reported
     value stays on the scale the coefficient controller is calibrated against.
     `stop_gradient` on the reference so this is a pull towards the old policy
@@ -395,11 +380,9 @@ class NEPlasticityTracker:
             actions = greedy_actions(outputs)                 # (n, batch, ...)
             disagree = (actions[:, None] != actions[None, :]).astype(jnp.float32)
             # Reshape before the mean so this also handles a policy whose action
-            # is a VECTOR: the scheduling policy (dropped 2026-09-08) emitted
-            # one job per machine, so
-            # `actions` is (n, batch, num_machines) and averaging over the last
-            # axis alone would leave a per-state matrix instead of a scalar per
-            # pair. Identical arithmetic for the (n, batch) case.
+            # is a VECTOR: `actions` is then (n, batch, action_dim) and averaging
+            # over the last axis alone would leave a per-state matrix instead of
+            # a scalar per pair. Identical arithmetic for the (n, batch) case.
             pair = disagree.reshape(disagree.shape[0], disagree.shape[1], -1).mean(axis=-1)
         return float(jnp.sum(pair * mask) / jnp.sum(mask))
 

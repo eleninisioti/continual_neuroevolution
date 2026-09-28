@@ -291,7 +291,7 @@ LAG_ROWS = {'persistence_lag'}
 # `dormancy_ckpt` and `dormant_age` lead, and in that order: the fraction says
 # how much of the network is quiet and the age says for how long it has been
 # the same part, which is the only pairing from which "lost plasticity" can be
-# read. `dormant_age` replaced `persistence_lag` as the default on 2026-09-10:
+# read. `dormant_age` rather than `persistence_lag` is the default:
 # both separate the families the same way (PPO/C-CHAIN long-lived, GA/DNS/ReDo
 # a sub-task or two) and the age is in sub-tasks on the figure's own time axis
 # where the index is a lag curve on its own. `persistence_lag` is still
@@ -606,9 +606,7 @@ def summary_table(path, dense, checkpoints, persist, results_dir, rows, args,
     # part of its churn and its low persistence is that hop rather than any
     # plasticity loss. The centroid is a mean over the whole population: it
     # cannot hop, which is why its persistence reads higher and its step lower
-    # in the table beside this one. Printing the caveat unconditionally, as
-    # this did until 2026-09-09, told the reader of the CENTROID table that its
-    # numbers carry an artefact they do not.
+    # in the table beside this one.
     if args.agent == 'centroid':
         lines.append(
             'The NE columns describe the coordinate-wise MEAN of the '
@@ -761,9 +759,9 @@ def main() -> int:
     present |= {m for row in checkpoints.values() for env in row for m in row[env]}
     dropped_methods: set[str] = set()
     # `--methods` restricts the DATA, for the same reason the lineplot does it
-    # there: applied at plot time only it filtered the panel grid but not the
-    # table and not the persistence figure, so one figure reported arms the
-    # other did not show. Folding it into `dropped_methods` reuses the single
+    # there: applied at plot time only it would filter the panel grid but not
+    # the table and not the persistence figure, so one figure would report arms
+    # the other did not show. Folding it into `dropped_methods` reuses the single
     # drop below.
     if args.methods:
         selectable = present
@@ -865,7 +863,7 @@ def main() -> int:
         for c in range(1, len(envs)):
             if rows[r] in LAG_ROWS:
                 axes[r][c].sharex(axes[r][0])
-    # `sharex='col'` used to hide the inner x tick labels for us.
+    # Without `sharex='col'` the inner x tick labels are hidden by hand.
     last_time = time_rows[-1] if time_rows else None
     drawn: dict[str, object] = {}
     for r, row in enumerate(rows):

@@ -36,7 +36,7 @@ same arms, same cells, same estimator. The flags are the lineplot's
            credit for speed (Cum. has that) and no charge for what is
            forgotten afterwards (F has that). Not drawn under `--metric
            centroid` unless `--rows` names it (the paper's centroid figure
-           omits it, 2026-09-15).
+           omits it).
     FT     forward transfer against the method's OWN stationary run: read it
            beside Cum. and Final, because a weak stationary run has little to
            lose.

@@ -34,9 +34,8 @@ table counts, per trial, whether ANY checkpoint is a generalist, whether the
 LAST one is, and the fraction after the first discovery that still are; the
 last checkpoint's "other" score comes from `prev_returns`.
 
-`prev_returns` was added to the evaluator on 2026-09-10. On an older
-`evaluation.json` without it, this falls back to `zero_shot_next_returns` of
-the SAME checkpoint -- valid only when the run alternates between exactly two
+On an older `evaluation.json` without `prev_returns`, this falls back to
+`zero_shot_next_returns` of the SAME checkpoint -- valid only when the run alternates between exactly two
 sub-tasks, so that the next sub-task IS the previous one -- and says so; the
 last checkpoint is then unclassifiable and the tables say how many were
 dropped. Re-run the evaluator (idempotent: it re-scores what is stale) to

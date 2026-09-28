@@ -5,7 +5,7 @@ policy sees ``obs + noise_vector`` instead of ``obs``. Sub-task 0 has a zero
 offset and is the unperturbed environment; every later sub-task adds a vector
 drawn once from ``N(0, noise_range^2 I)``.
 
-Since 2026-09-05 a sub-task can instead be a change to the PHYSICS
+A sub-task can instead be a change to the PHYSICS
 (``task_mod: physics``, selected with ``--task_options task_mod=physics``):
 the vector is one number, a multiplier on a named parameter of the gymnax
 ``EnvParams`` -- the pole length on CartPole, the link masses on Acrobot, the
@@ -21,10 +21,9 @@ compiles once, and the two-sub-task experiment is the unperturbed environment
 against one rescaled one. ``PHYSICS_PARAMS`` says what each name rescales, and
 ``ENV_CONFIGS[env]['physics']`` the default name and multipliers.
 
-This construction, the offset draw, the policy architecture and the rollout are
-taken unchanged from this repo's own continual study
-(its old ``continual_common.py``, and ``source/algorithms/networks.py``).
-That is deliberate and load-bearing: this project's claims are meant to sit next
+This construction, the offset draw, the policy architecture
+(``source/algorithms/networks.py``) and the rollout are those of this repo's
+own continual study. That is deliberate and load-bearing: this project's claims are meant to sit next
 to that study's plasticity numbers, and they only do so if the tasks are the
 same tasks. In particular the offset stream is seeded from the *trial index*
 alone and never from the training RNG, which buys two things:
@@ -139,9 +138,6 @@ def make_episode_fn(env, policy, param_template, episode_length):
 # imported rather than copied: the study's claims only sit next to the
 # benchmarking paper's plasticity numbers if the tasks are literally the same
 # tasks, and an import is the only way to make that true by construction.
-# A check script in the earlier codebase pinned the values these produce, so a
-# change to them on the paper's side failed loudly instead of silently moving
-# this study's numbers.
 
 
 # What counts as solving each environment. Taken verbatim from the earlier
@@ -239,16 +235,15 @@ ENV_CONFIGS = {
         # bodies -- the mjx suite's is a different number for the same reason.
         "noise_range": 1.0,
         "solved_threshold": THRESHOLD_SETS[DEFAULT_THRESHOLD_SET]["CartPole-v1"],
-        # What a sub-task IS by default (every run made before 2026-09-05
-        # is obs_noise), and the physics variant's knob when selected:
-        # `param` names a group in PHYSICS_PARAMS and `mults[i]` is what
-        # sub-task i multiplies it by (cycled past the end). The two-sub-task
-        # experiment is therefore the stock body against `mults[1]`.
+        # What a sub-task IS by default, and the physics variant's knob when
+        # selected: `param` names a group in PHYSICS_PARAMS and `mults[i]` is
+        # what sub-task i multiplies it by (cycled past the end). The
+        # two-sub-task experiment is therefore the stock body against
+        # `mults[1]`.
         #
-        # Chosen on 2026-09-05 from `analysis/physics_zero_shot.py`, which
-        # scores section C's NES specialists (trained on the stock body)
-        # under every group at 0.25x-4x. A shift is only a sub-task if the
-        # stock specialist does NOT already solve it. On CartPole the pole
+        # Chosen by scoring section C's NES specialists (trained on the stock
+        # body) under every group at 0.25x-4x. A shift is only a sub-task if
+        # the stock specialist does NOT already solve it. On CartPole the pole
         # mass, cart mass and force change nothing at any multiplier (8/8
         # specialists at 500 from 0.25x to 4x); a pole twice as long drops
         # all eight to 38.6, a quarter as long to 284, and gravity only at 4x.
@@ -341,9 +336,7 @@ PHYSICS_PARAMS = {
         "force":         ("force",),
         "gravity":       ("gravity",),
         # The other two knobs CARL (Benjamins et al. 2023) contextualises on
-        # this body; neither is a Packer et al. parameter. Added 2026-09-07
-        # for the pilots that asked whether any MountainCar rescaling gives
-        # two sub-tasks that are not nested.
+        # this body; neither is a Packer et al. parameter.
         "max_speed":     ("max_speed",),
         "goal_position": ("goal_position",),
     },
@@ -374,8 +367,7 @@ def apply_physics(env_name, base, param, mult):
 # Reversed controls: a sub-task in the ACTION map (`task_mod: actions`)
 # ---------------------------------------------------------------------------
 #
-# Every physics rescaling of MountainCar came out NESTED on 2026-09-07: a
-# policy that pumps the swing harder solves every weaker car, and the only
+# Every physics rescaling of MountainCar comes out NESTED: a policy that pumps the swing harder solves every weaker car, and the only
 # non-transferring policies were the push-right traps on stronger ones. The
 # reason is that this body's control law, "push along the velocity", is
 # physics-agnostic. What conflicts with it is a change to what the right
@@ -524,7 +516,7 @@ def make_gymnax_env(env_name, **kwargs):
 
     Every trainer and post-hoc pass builds the environment through this, so a
     ``DeepSea<N>-bsuite`` name gets the same wrapped env everywhere; every
-    other name is ``gymnax.make(env_name)`` exactly as before.
+    other name is ``gymnax.make(env_name)``.
     """
     import gymnax
     n = deepsea_size(env_name)
@@ -570,10 +562,7 @@ def saved_task_rows(cfg, ckpt_files, stock_params, env_name=None):
     shared runners' runs keep ONE row per phase whose meaning the run's
     ``task`` block gives -- the multiplier itself under physics, the flip flag
     plus its cue under actions, the offset under obs_noise -- and their
-    ``num_tasks`` is the number of DISTINCT sub-tasks, not the phase count. The
-    post-hoc passes used to read the first convention only, and on a
-    shared-runner physics run added the multiplier to the observation and
-    counted ten bodies for twenty phases (2026-09-13, the PBT arm).
+    ``num_tasks`` is the number of DISTINCT sub-tasks, not the phase count.
     """
     env_name = env_name or cfg['env']
     rows = np.asarray(ckpt_files['noise_vectors'], dtype=np.float32)
@@ -615,15 +604,10 @@ def _legacy_task_params(cfg, ckpt_files, stock_params, env_name=None):
     it lives in ``noise_vectors`` and is added to the observation by the
     caller, as in training.
 
-    One function for the three families (one shared code path). Before this
-    existed, ``evaluate_continual.py`` resolved the family itself and
-    ``behavioural_divergence.py`` resolved nothing, so under the `actions`
-    and `param` families the latter rolled every sub-task on the stock body
-    with the stock action order, and its F and BD columns described an
-    environment no sub-task after the first was trained on.
+    One function for the three families (one shared code path).
     """
     env_name = env_name or cfg['env']
-    # Absent -- every run made before 2026-09-08 -- it is the offset family.
+    # Absent in older runs: defaults to the offset family.
     task_type = cfg.get('task_type', 'noise')
     num_tasks = int(cfg['num_tasks'])
     if task_type == 'param':
@@ -654,8 +638,7 @@ class TaskSpec:
     a sub-task row through it into ``(observation offset, EnvParams)`` --
     ``(row, base params)`` under obs_noise and ``(0, rescaled params)`` under
     physics. A bare ``EnvParams`` in that slot is accepted everywhere and means
-    obs_noise, which is how every run made before this class existed, and the
-    analysis scripts that rebuild an environment themselves, are bit-unchanged.
+    obs_noise.
     """
 
     def __init__(self, env_name, base_params, task_mod='obs_noise',
@@ -735,8 +718,7 @@ def build_env(env_name, episode_length, task_options=None):
     """The environment plus what its sub-tasks are, built once for the run.
 
     Returns ``(env, env_params)`` where ``env_params`` is gymnax's own
-    ``EnvParams`` under obs_noise -- the default, and bit-for-bit what every
-    caller received before ``task_options`` existed -- or a ``TaskSpec``
+    ``EnvParams`` under obs_noise (the default) or a ``TaskSpec``
     wrapping it under physics. ``task_options`` (``--task_options KEY=VALUE``)
     takes ``task_mod``, and for physics ``physics_param`` (a name from
     PHYSICS_PARAMS) and EITHER ``physics_mults``, the per-sub-task multipliers
@@ -829,7 +811,7 @@ def task_vectors(env_params, trial, num_tasks, obs_dim, noise_range,
     The observation-offset draw, ``task_noise_vectors``, unless ``env_params``
     is a physics ``TaskSpec``, where it is the multiplier cycle. This is what
     ``suites.Suite.task_vectors`` calls; a bare EnvParams goes down the first
-    branch with the same arguments as before, bit-unchanged.
+    branch.
     """
     if isinstance(env_params, TaskSpec) and env_params.task_mod == 'physics':
         return physics_multipliers(env_params, num_tasks, first_task_clean,
@@ -898,9 +880,8 @@ def rl_env_fns(env, env_params, num_envs):
 
     The vectorised environment interface ``train_ppo`` drives; the mjx module
     has one of the same shape. Under obs_noise ``task`` changes nothing here
-    -- the trainer adds the offset where the policy reads the observation --
-    and the arithmetic is exactly what the trainer did inline before this
-    existed, so its runs on disk are reproduced bit for bit. Under physics the
+    -- the trainer adds the offset where the policy reads the observation.
+    Under physics the
     environment steps with the sub-task's rescaled params.
     """
     def reset(key, task):
@@ -977,8 +958,7 @@ def descriptor_dim(env_name):
 def handcrafted_descriptor(last_obs, env_name):
     """Where the episode ended, as two numbers.
 
-    Taken from the reference DNS implementation:
-    the last valid observation, cut down to the two coordinates that describe
+    The last valid observation, cut down to the two coordinates that describe
     what the policy *did* rather than how well it scored.
 
         CartPole      cart position, pole angle
@@ -1011,21 +991,19 @@ def make_trajectory_scoring_fn(env, env_params, policy, param_template,
     The AURORA path. Where `make_descriptor_scoring_fn` reduces an episode to
     two hand-picked numbers, this carries the whole (sub-sampled) observation
     trajectory, ``(pop, traj_steps, obs_dim)``, and the descriptor is whatever
-    the learned encoder makes of it. That is the reference's default
-    (`--descriptor aurora`) and the one its published gymnax numbers used.
+    the learned encoder makes of it.
 
-    Sub-sampling follows `episode_relative_indices` from the reference rather
-    than spreading samples over the episode CAP. The difference is not small on
-    these environments: a 67-step Acrobot episode sampled evenly over 0..499
+    Samples are spread over the steps the episode actually ran rather than
+    over the episode CAP. The difference is not small on these environments: a 67-step Acrobot episode sampled evenly over 0..499
     gives two real states and forty-eight copies of the frozen final one, so
     the trajectory would describe termination instead of behaviour. Spreading
     the same number of samples over the steps that actually happened keeps
     every sample inside the episode.
 
-    Only the FIRST evaluation's trajectory is kept when ``num_evals > 1``,
-    matching the reference: the fitness is averaged over evaluations but the
-    descriptor is one representative rollout, since averaging trajectories from
-    different resets would describe no episode that happened.
+    Only the FIRST evaluation's trajectory is kept when ``num_evals > 1``: the
+    fitness is averaged over evaluations but the descriptor is one
+    representative rollout, since averaging trajectories from different resets
+    would describe no episode that happened.
     """
     num_traj_steps = min(traj_steps, episode_length)
 

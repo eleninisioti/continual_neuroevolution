@@ -106,19 +106,17 @@ def perturb_hyperparams(winner_hypers, key, perturb_factor=DEFAULT_PERTURB_FACTO
 #: Arm-name suffix for PBT without explore: the loser copies the winner's
 #: weights and every member trains at the config's one set of
 #: hyperparameters, no initial spread (`--pbt_mode weights_only`, Jaderberg
-#: et al. Sect. 4.1.2). Before 2026-09-28 weights_only still drew the x U(0.5,
-#: 1.5) spread and a loser took the winner's values. `pbt_weights` / `pbt2_weights`
-#: are the ablation of `pbt` / `pbt2` (2026-09-19); every earlier PBT run on
-#: disk is mode `full`, `run_ppo`'s default.
+#: et al. Sect. 4.1.2). `pbt_weights` / `pbt2_weights` are the ablation of
+#: `pbt` / `pbt2`. Mode `full` is `run_ppo`'s default.
 PBT_WEIGHTS_SUFFIX = '_weights'
-PBT_HP_SUFFIX = '_hp'            # mode hp_only: explore without exploit (2026-09-25)
+PBT_HP_SUFFIX = '_hp'            # mode hp_only: explore without exploit
 
 
 def pbt_arm(name):
     """``(runner method, pbt_pop_size, pbt_mode)`` for an ARM name.
 
     `pbt` is the N = 8 population and `pbt<N>` the same method at N members
-    (`pbt2`, 2026-09-13): two compute-matched population sizes, one method,
+    (`pbt2`): two compute-matched population sizes, one method,
     one run directory per size so the two conditions are never averaged
     together. A `_weights` suffix (PBT_WEIGHTS_SUFFIX) is the same population
     in mode `weights_only`, a `_hp` suffix (PBT_HP_SUFFIX) the same population

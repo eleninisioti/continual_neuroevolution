@@ -53,7 +53,7 @@ in `<paper dir>/results/centroid/`):
                matched probe an observation offset redraws the dormant set at
                every switch whatever the network does (scoring on the NEXT
                sub-task's states gives the same numbers), and persistence
-               then measures the input, not the network (checked 2026-09-16).
+               then measures the input, not the network.
     NTK rank   effective rank of the centred-logit NTK at the START of the
                next sub-task, last 5 sub-tasks over the first 3 (1 = no rank
                lost).
@@ -108,7 +108,7 @@ IN_FINAL = {'plasticity_main_continual': FINAL,
 # The figures `--set main` builds from the saved data, and the rows they need.
 FINAL_FIGURES = ('main', 'all', 'saturation_lines')
 # Final figures drawn to sit beside their caption, at print size: (width in,
-# row height in, font size). Figure 6 takes 0.655\linewidth (2026-09-21).
+# row height in, font size). Figure 6 takes 0.655\linewidth.
 SIDE_CAPTION = {'main': (3.6, 0.56, 6.5)}
 FINAL_DATA = FINAL / 'data' / 'plasticity_main_continual'      # .npz curves, .json the rest
 # The final figure's columns: the continual_main tree whose kept arms each
@@ -158,10 +158,10 @@ LINES = {
     # a one-off drop after the first sub-task or a rank low from the start.
     'ntk':            ('NTK rank', True),
     # Parameter RMS of the saved agent, ABSOLUTE and on a log axis shared
-    # across tasks (2026-09-16). The ratio to the first checkpoint made
-    # MountainCar look special only because ES learns little in its first
-    # sub-task (RMS 0.18 there against 0.29-0.34); in absolute terms it ends
-    # beside CartPole and Acrobot, and Kinetix is the outlier.
+    # across tasks. A ratio to the first checkpoint would make MountainCar
+    # look special only because ES learns little in its first sub-task (RMS
+    # 0.18 there against 0.29-0.34); in absolute terms it ends beside CartPole
+    # and Acrobot, and Kinetix is the outlier.
     'weight':         ('Weight RMS', False),
     # Basin width against sub-task: the relative test (10% of each tensor's
     # norm) and the absolute one (noise s.d. ABS_WIDTH_SIGMA on every weight).
@@ -171,15 +171,15 @@ LINES = {
 }
 # Line rows drawn on a log axis.
 LOG_LINES = {'weight'}
-# Line rows drawn on a symlog axis, {row: linear threshold}. The dormant
-# fraction was one for an hour on 2026-09-20: it made Kinetix (0.001-0.03)
-# readable beside the ReLU bodies (0.03-0.7) but flattened the RL climb the
-# text quotes, so the row is linear again, shared across every task.
+# Line rows drawn on a symlog axis, {row: linear threshold}. Not the dormant
+# fraction: symlog makes Kinetix (0.001-0.03) readable beside the ReLU bodies
+# (0.03-0.7) but flattens the RL climb the text quotes, so the row is linear,
+# shared across every task.
 SYMLOG_LINES = {}
 # Line rows whose scale is a property of the task (NTK rank is ~2 on gymnax,
 # ~150 on HalfCheetah): each panel keeps its own y range.
 UNSHARED_LINES = {'ntk'}
-# The rows the line figure draws (2026-09-16): the fraction and the age, BOTH
+# The rows the line figure draws: the fraction and the age, BOTH
 # on the pooled batch, so a panel pair describes the same dormant units -- the
 # age is 0 exactly where the fraction above it is 0. Silent units only, as in
 # the dot figures. The saturated fraction (a tanh unit pinned at one sign of
@@ -227,10 +227,9 @@ FIGURES = {
     # Every row against sub-task: silent units (fraction, age), then NTK rank
     # and weight RMS. Saturated units have their own figure (`saturation`).
     # The paper's figure is one block of representative columns (MAIN_COLUMNS);
-    # `all` is the ten tasks of continual_main, for the appendix (2026-09-19).
-    # Dormancy rows only since 2026-09-21: NTK rank and weight RMS are in `all`.
-    # The dormant fraction only since 2026-09-24: the age row backed one
-    # sentence and showed no family gap on MountainCar, so it is in `all`.
+    # `all` is the ten tasks of continual_main, for the appendix.
+    # The main figure draws the dormant fraction only: the age row, NTK rank
+    # and weight RMS are in `all`.
     'main':        ('plasticity_main', [('line', 'dormant_pooled')]),
     'all':         ('plasticity_all', [('line', k) for k in
                                         LINE_ROWS + ['ntk', 'weight']]),
@@ -247,13 +246,12 @@ FIGURES = {
 # Only a bounded activation saturates: Kinetix and HalfCheetah are tanh,
 # gymnax and MiniGrid ReLU.
 TANH_COLUMNS = {'kinetix', 'cheetah-noise', 'cheetah-physics', 'cheetah-actions'}
-# The main figure (2026-09-19): representative columns, the rest is in `all`.
+# The main figure: representative columns, the rest is in `all`.
 # Acrobot left out (flat on every row, under both changes); HalfCheetah
-# dropped 2026-09-21 and Kinetix 2026-09-24 (tanh units are rarely dormant);
-# MountainCar under noise replaced 2026-09-25, because there no RL method
-# gains dormant units (PPO 0.23 -> 0.31, PBT-PPO and TRAC-PPO fall). CartPole
-# under noise is the only noise setting with the RL rise, so the second column
-# varies the environment instead: MountainCar under action reversal (PPO
+# and Kinetix too (tanh units are rarely dormant); MountainCar under noise
+# too, because there no RL method gains dormant units (PPO 0.23 -> 0.31,
+# PBT-PPO and TRAC-PPO fall). CartPole under noise is the only noise setting
+# with the RL rise, so the second column varies the environment instead: MountainCar under action reversal (PPO
 # 0.22 -> 0.38, C-CHAIN 0.25 -> 0.33, TRAC-PPO falls, GA/ES flat at 0.4-0.5).
 # CartPole under reversal has the largest rise (PPO 0.50) but would repeat the
 # environment.
@@ -273,11 +271,9 @@ WRAP_ROW_HEIGHT_IN = 0.72
 WRAP_LABEL = {'dormant_pooled': 'Dormant\nunits', 'ntk': 'NTK\nrank', 'weight': 'Weight\nRMS'}
 ROW_HEIGHT_IN = 0.95
 # (line row, columns) that keep their own y range instead of the row's shared
-# one: on the tanh bodies a unit is rarely silent (Kinetix ~0.02 against up to
-# 0.5 on gymnax), so on the shared axis their dormant curves lie on zero.
-# Since 2026-09-20 the dormant row shares its linear axis with the tanh
-# bodies too (it used to give them their own): Kinetix and HalfCheetah then
-# read as flat near zero, which is the point.
+# one. None: the dormant row shares its linear axis with the tanh bodies too,
+# where a unit is rarely silent (Kinetix ~0.02 against up to 0.5 on gymnax), so
+# Kinetix and HalfCheetah read as flat near zero, which is the point.
 OWN_SCALE = {}
 # Dot rows that are fractions or counts: their axis starts at 0, so an
 # all-zero panel does not centre on nothing.

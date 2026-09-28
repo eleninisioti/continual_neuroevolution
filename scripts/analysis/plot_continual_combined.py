@@ -18,13 +18,13 @@ Draws from the two figures' saved data only; refresh those first with
     --part tradeoff -> paper/visuals/final/continual_tradeoff.{pdf,png,md}   (Figure 2)
     --part curves   -> paper/visuals/final/appendix/continual_curves.{pdf,png}
 
-Figure 2 (`tradeoff`, since 2026-09-24) is wider than the curves' grid: it
+Figure 2 (`tradeoff`) is wider than the curves' grid: it
 holds every continual setting of the paper on the LA vs F plane, a row a kind
 of change, in TRADEOFF_ROWS -- the multiple-task row (noise over ten tasks,
 Kinetix's twenty levels) over the two-task rows (noise, physics with MiniGrid,
 action reversal), so the generalist figure's settings and Figure 2's are one
-figure (the generalist performance profiles stayed in the appendix figure
-fig:generalist_panels; Figure 2 dropped its profiles row on 2026-09-25).
+figure (the generalist performance profiles are in the appendix figure
+fig:generalist_panels).
 Each panel's title names its environment and the change; the two groups are labelled and bracketed at the left and separated by a rule. `--rows` picks a subset of the rows
 (`--rows ten noise actions` leaves physics to the appendix). The two-task
 noise and physics panels come from plot_stability_plasticity.py's `tradeoff`

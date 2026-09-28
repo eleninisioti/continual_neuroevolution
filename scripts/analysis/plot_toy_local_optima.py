@@ -73,7 +73,7 @@ OUT = pcl.FINAL / 'appendix'
 DATA = pcl.FINAL / 'data' / STEM
 RUN_SUFFIX = ''                            # '_d128' under --dims 128
 # figure name -> sweep method, in the paper's one method order
-# (make_lineplot.METHOD_ORDER: GA before ES) since 2026-09-21.
+# (make_lineplot.METHOD_ORDER: GA before ES).
 ARMS = {'ga': 'ga', 'es': 'es'}
 # (landscape, row title, level drawn, level axis label, level symbol)
 ROWS = [('smooth', 'Smooth', 0.1, 'Shared region $h$', 'h'),
@@ -363,7 +363,6 @@ def draw(meta, arrays, args):
     width, height = args.width, args.height
     fig = plt.figure(figsize=(width, height))
     with_sigma = all('sigma_sweep' in meta['rows'][n] for n, *_ in ROWS)
-    # No centroid-over-time column since 2026-09-21: it showed one sigma only.
     gs = GridSpec(2, 3 if with_sigma else 2, figure=fig,
                   width_ratios=[1.1, 1.0, 1.0][:3 if with_sigma else 2],
                   left=0.115, right=0.99, top=0.88, bottom=0.1,

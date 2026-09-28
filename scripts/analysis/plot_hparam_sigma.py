@@ -38,7 +38,7 @@ plane, the reported setting ringed, the other four points labelled by their
 multiplier; the reported RL arms as hollow grey references. The conclusions
 hold when the GA's path stays right of (more plastic than) and below (more
 forgetting than) ES's whatever the width. The noise cells have five seeds a
-width, action reversal and MiniGrid three (2026-09-20).
+width, action reversal and MiniGrid three.
 
 The curves figure is the same data against the multiplier, one line a sweep,
 for reading which values work at all.
@@ -67,8 +67,7 @@ OUT = FINAL / 'appendix'
 STEM = 'hparam_sigma'      # not hparam_sweep: that name is plot_hparam_updates.py's figure
 DATA = FINAL / 'data' / f'{STEM}.json'
 
-# THE FAMILIES (2026-09-20: action reversal and MiniGrid joined the noise
-# cells). Per family: the reported family's forgetting pass (the reported
+# THE FAMILIES. Per family: the reported family's forgetting pass (the reported
 # arms' LA and F at the reported settings) and its arm list's key in the
 # stability figure's saved data; the sweep tree and the pass
 # finish_hparam_sigma.sh runs on it; the cells, their titles, and the
@@ -472,7 +471,7 @@ def main() -> int:
     ap.add_argument('--families', nargs='+', choices=list(FAMILIES), default=None,
                     help='draw only these families (rows); the saved data keeps all of them. '
                          'The four-hour version of D.3 is --families noise actions, because '
-                         'a MiniGrid ES trial takes ~370 min even on a GH200 (2026-09-21)')
+                         'a MiniGrid ES trial takes ~370 min even on a GH200')
     ap.add_argument('--extract', action='store_true',
                     help='re-read the forgetting passes into the saved data first')
     args = ap.parse_args()

@@ -154,8 +154,8 @@ RUNNING = 3600         # s: a trial with no results whose train.log moved this r
 def complete_arms(root, cells):
     """ncs.ARMS with finished trials in `cells` and none still training. A trial
     counts as training when it has no results and its train.log was written in
-    the last RUNNING seconds; an older one is a dead run (trac Acrobot trial_6
-    in runs_centroid, 2026-09-09) that make_lineplot skips anyway."""
+    the last RUNNING seconds; an older one is a dead run that make_lineplot skips
+    anyway."""
     arms, now = [], time.time()
     for m in ncs.ARMS:
         trials = [t for c in cells for t in (root / 'continual' / m / c).glob('trial_*')]
@@ -341,7 +341,7 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     for fig, panels in figures.items():
         ncols, panel, legend_ncol = LAYOUT[fig]
-        # One block a figure (ncs.draw's blocks API, 2026-09-19).
+        # One block a figure (ncs.draw's blocks API).
         ncs.draw([(None, [(title, col, None) for _tree, _cell, title, col in panels],
                    ncols, panel)],
                  methods, out / f'continual_{fig}', legend_ncol)

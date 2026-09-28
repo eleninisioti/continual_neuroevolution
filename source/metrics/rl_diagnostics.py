@@ -36,14 +36,12 @@ CORE_KEYS = {
     # The `training/` variants are not optional. `ppo_train` wraps everything it
     # collected during the epoch as `training/<name>` before handing it to
     # progress_fn, so the bare names only ever match the continual core. Without
-    # these the churn columns were silently None on a C-CHAIN run that had in
-    # fact computed them.
+    # these the churn columns would be silently None on a C-CHAIN run that had
+    # in fact computed them.
     #
-    # Policy churn, now present for EVERY method rather than C-CHAIN alone.
+    # Policy churn, present for EVERY method rather than C-CHAIN alone.
     # Squared difference of action means against the policy one gradient step
-    # back -- the published estimator, which the reference logs for vanilla PPO
-    # (crl_run_ppo_dmc.py:318) exactly as it does for C-CHAIN
-    # (crl_run_ppo_c_chain_dmc.py:339). C-CHAIN reads its reference off
+    # back -- the published estimator (Tang et al.). C-CHAIN reads its reference off
     # chain_state; the others get it from `prev_params` threaded out of the
     # minibatch scan. Same delta, same estimator, one column.
     'policy_churn': ('policy_churn', 'training/policy_churn'),

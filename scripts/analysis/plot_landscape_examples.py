@@ -1,9 +1,9 @@
 """The four behaviours of the intro schematic, one return-landscape slice each,
 on a two-sub-task panel where all four occur (--cell: CartPole, observation
-offset 0.5, since 2026-09-20; MountainCar, offset 0.05, before). An appendix paper figure, the chosen-example companion of
+offset 0.5, by default; MountainCar, offset 0.05). An appendix paper figure, the chosen-example companion of
 `plot_landscape_slices.py` (same slice and units, flat regions instead of its ink overlay; --zoom widens every
 panel's window by one factor, 1.5 by default, so the plateaus do not fill them). A main-paper figure: a one-line
-key of the regions and markers since 2026-09-21, and since 2026-09-20 each panel carries its role (ROLE_LABEL) under it,
+key of the regions and markers, and each panel carries its role (ROLE_LABEL) under it,
 so the caption only defines the three names.
 
     # slice the chosen checkpoints (GPU)
@@ -19,8 +19,7 @@ Every post-switch checkpoint of every trial is classed on the generalist
 figure's scale: generalist (learned >= 50% of the best gain, keeps >= 90% of it
 on the previous sub-task), switching (learned, does not keep), stuck (not
 learned, but >= 50% on the previous sub-task) or neither. Each method is shown
-in one role (ROLES; the continual RL column is ReDo-PPO since 2026-09-25, PBT-PPO
-before); its example is, among its checkpoints of that role from
+in one role (ROLES; the continual RL column is ReDo-PPO); its example is, among its checkpoints of that role from
 phase LATE on whose run had solved the previous sub-task before the switch, the
 one nearest their mean
 (shown, previous): a typical instance. A stuck example must also have solved
@@ -51,11 +50,11 @@ pgs, pgo, plm, ls = pls.pgs, pls.pgo, pls.plm, pls.ls
 PROJECT, FINAL = pls.PROJECT, pls.FINAL
 PASS = 'results/centroid/landscape_examples'
 TREE = 'paper/gymnax/data/noise_2task'
-# --cell picks the panel; CartPole (2026-09-20) is Figure 1, MountainCar the
-# 2026-09-19 version. Outputs of a non-default cell carry its name.
+# --cell picks the panel; CartPole is Figure 1. Outputs of a non-default cell
+# carry its name.
 CELLS = {'cartpole': 'CartPole_v1_sigma0.5', 'mountaincar': 'MountainCar_v0_sigma0.05',
          'acrobot': 'Acrobot_v1_sigma0.5'}
-# Per-cell roles where the default does not fit (2026-09-25 draft): on Acrobot
+# Per-cell roles where the default does not fit: on Acrobot
 # the GA keeps both tasks at 92% of switches, and TRAC-PPO is the variant that
 # un-sticks PPO (6 of 180 tasks failed against PPO's 51).
 CELL_ROLES = {'acrobot': {'es': 'generalist', 'ga': 'generalist', 'ppo': 'stuck',
@@ -78,41 +77,39 @@ def configure(which, all_methods=False):
             + ('_all' if all_methods else ''))
     STEM = FINAL / 'appendix' / NAME
     DATA = FINAL / 'data' / NAME
-# Figure 1's roles. Four columns since 2026-09-20: ES, GA, PPO and ONE continual
-# PPO variant standing for the four. ReDo-PPO since 2026-09-25: the most plastic
+# Figure 1's roles. Four columns: ES, GA, PPO and ONE continual
+# PPO variant standing for the four. ReDo-PPO: the most plastic
 # RL method (median LA 0.94 over the 18 settings, PPO 0.84) whose basin is NOT
 # wider than PPO's (x1.15, n.s., basin_width_return), so its panel shows what the
 # continual variants do: restore plasticity (it re-initialises dormant units, so
 # the network stays trainable) and switch, in a basin as narrow as PPO's. PBT-PPO
-# from 2026-09-21 (the widest RL basin, x2.0, which undercut that message);
-# TRAC-PPO on 2026-09-20. The appendix landscapes figure has every method.
+# has the widest RL basin (x2.0), which would undercut that message.
+# The appendix landscapes figure has every method.
 # --all draws the seven-column version under the _all suffix.
 ROLES = {'es': 'generalist', 'ga': 'switching', 'ppo': 'stuck', 'redo': 'switching'}
 ROLES_ALL = {**ROLES, 'pbt': 'switching', 'cchain': 'switching', 'trac': 'switching'}
 TITLE = {'pbt': 'PBT-PPO'}          # the paper's name everywhere else
 # The role goes under its panel, so the caption only has to define the three
-# names (2026-09-20); two lines each, so the first line aligns across panels.
-# Trade-off wording, not generalist/specialist (the paper drops the terms, 2026-09-22).
-# One line since 2026-09-25: the (stable)/(plastic) glosses were dropped.
+# names. Trade-off wording, not generalist/specialist (the paper does not use the terms).
 ROLE_LABEL = {'generalist': 'keeps both', 'switching': 'switches', 'stuck': 'stuck'}
 PANEL_LABEL = {}
 # Movement arrow: a green (Dark2) no region uses (light blue / orange / dark grey),
-# with a white halo (2026-09-25; violet #6a3d9a before, too dull on dark grey; magenta tried).
+# with a white halo.
 ARROW = '#1b9e77'
 # Only checkpoints from this phase on are candidates (the last five of the 20,
 # the window basin_width_main pools): the basin of PBT-PPO is 2.4x PPO's at its
 # first checkpoint and 1.45x late (basin_width_evolution), so an early example
 # misstates the converged width.
 LATE = 15
-# Pinned examples (2026-09-25): PPO and ReDo-PPO at the SAME switch of the same
+# Pinned examples: PPO and ReDo-PPO at the SAME switch of the same
 # trial (same seed, 55), one where PPO is stuck and ReDo-PPO relearns. At task 15
 # of trial 7 PPO stays at return 9 for all 150 updates with 56% dormant units
 # and zero entropy; ReDo-PPO starts from 10 with 9% dormant and reaches 500.
 # Chosen from every stuck PPO switch on the panel (at 12 of the 14 ReDo-PPO
 # relearns at the same point); the pair shows the mechanism, not a typical one.
 PICK = {'cartpole': {'ppo': (7, 15), 'redo': (7, 15)}}
-# Flat regions, markers and key: pls.regions / BEFORE / AFTER / key_handles
-# (2026-09-21), shared with the appendix landscapes figure.
+# Flat regions, markers and key: pls.regions / BEFORE / AFTER / key_handles,
+# shared with the appendix landscapes figure.
 
 
 def census():
@@ -264,7 +261,7 @@ def plot(width, fs):
                   interpolation='nearest')
         still = r['axis_phase'] != r['k']
         after = r['next_xy'] or ((0, 0) if still else (1, 0))
-        # Movement arrow (2026-09-25): the run's move over the task, circle to
+        # Movement arrow: the run's move over the task, circle to
         # diamond, curved for legibility only (the plane holds the two endpoints,
         # not the path). A stuck run does not move and gets none. No return
         # arrow: the next checkpoint lies off the plane (1.1-1.4 steps for the
@@ -280,12 +277,12 @@ def plot(width, fs):
         ax.plot(0, 0, **pls.BEFORE, zorder=5)
         ax.plot(*after, **pls.AFTER, zorder=6)
         # A stuck example's earlier solution of the new sub-task sits at (1, 0);
-        # its orange region marks it, no star (2026-09-20).
+        # its orange region marks it, no star.
         ax.set_xlim(al[0], al[-1])
         ax.set_ylim(be[0], be[-1])
         ax.set_title(TITLE.get(m, pgs.label_of(m)), fontsize=fs, pad=3)
         # On a common baseline: xlabel aligns the text box top, which moves
-        # with the letters' ascenders (2026-09-25).
+        # with the letters' ascenders.
         ax.text(0.5, -(3 + fs) / 72 / (cell * 0.75), PANEL_LABEL.get(m, ROLE_LABEL[r['role']]),
                 transform=ax.transAxes, ha='center', va='baseline', fontsize=fs - 0.5,
                 color='0.25')
@@ -317,7 +314,7 @@ def main() -> int:
     ap.add_argument('--all', action='store_true', help='all seven methods (ROLES_ALL)')
     ap.add_argument('--zoom', type=float, default=1.5,
                     help='window factor about the plane centre, same for every panel '
-                         '(1 = the appendix slices; 1.5 since 2026-09-20)')
+                         '(1 = the appendix slices)')
     args = ap.parse_args()
     configure(args.cell, args.all)
     if args.compute:

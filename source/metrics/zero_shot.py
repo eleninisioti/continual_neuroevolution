@@ -44,7 +44,7 @@ evaluates the carried best rather than the whole carried population.
 Reading it
 ----------
 `zero_shot_carried_best` is absent on sub-task 0 (there is nothing to transfer
-from) and on runs from before 2026-07-30. It is directly comparable to the RL
+from). It is directly comparable to the RL
 trainers' first evaluation of a sub-task, which is the same quantity for the
 same reason, and is tagged with the same name there.
 

@@ -177,8 +177,8 @@ def gaussian_entropy(logits):
 def gaussian_chain_churn(ref_logits, cur_logits):
     """C-CHAIN's continuous churn, per sample: MSE between action MEANS.
 
-    The reference's DMC variant regularises the mean and leaves the scale
-    alone -- regularising it would fight the entropy bonus. Per sample here,
+    The scale is left alone -- regularising it would fight the entropy
+    bonus. Per sample here,
     so it has the shape ``chain_policy_churn`` has; the epoch loop averages.
     """
     ref_mean, _ = _split(ref_logits)
@@ -236,15 +236,11 @@ def gaussian_head():
 # unused column with -inf keeps every operation one vectorised call; the mask
 # is what stops a thruster ever sampling the third option.
 
-# The padding value for the ragged block. FINITE, and that is the whole point:
-# -inf gives the right entropy VALUE and a NaN entropy GRADIENT, because
-# `jnp.where` differentiates both branches and `0 * -inf` is nan. PPO's loss
-# carries `-ent_coef * entropy`, so with -inf here the first gradient step
-# NaNs the actor, every logit becomes nan, and -- since a masked-out nan reads
-# as 0 -- the run then reports a policy entropy of exactly 0.000 and a return
-# at the floor, looking for all the world like an entropy collapse. It is not:
-# it is this line. Measured and fixed 2026-09-09; `_multi_discrete_grads_finite`
-# below is the regression test.
+# The padding value for the ragged block. It must be FINITE: -inf gives the
+# right entropy VALUE and a NaN entropy GRADIENT, because `jnp.where`
+# differentiates both branches and `0 * -inf` is nan. PPO's loss carries
+# `-ent_coef * entropy`, so with -inf here the first gradient step would NaN
+# the actor. `_multi_discrete_grads_finite` below is the regression test.
 #
 # exp(-1e9) is 0 in float32, so a padded choice has exactly zero probability
 # and cannot be sampled, which is what -inf was there for.
@@ -343,23 +339,12 @@ def multi_discrete_head(dims):
 
 
 def _multi_discrete_grads_finite(dims=(3, 3, 3, 3, 2, 2), seed=0):
-    """Regression test for the -inf padding bug. Returns True, or raises.
+    """Regression test: multi-discrete head gradients are finite. Returns True, or raises.
 
-    THE BUG THIS EXISTS FOR (2026-09-09). The ragged logit block was padded
-    with -inf. Every VALUE it produced was correct -- the entropy of a fresh
-    Kinetix policy read 5.7807, the multi-discrete maximum, to four decimals --
-    and its GRADIENT was NaN in the columns belonging to the 2-choice
-    distributions, because `jnp.where` differentiates the branch it did not
-    take and `0 * -inf` is nan.
-
-    PPO's loss carries `-ent_coef * entropy`, so the first gradient step NaN'd
-    the whole actor. The symptom did not look like a NaN: the `isfinite` guard
-    inside the old entropy read a NaN logit as a zero contribution, so the run
-    reported `H=0.000` with the return at the floor, which reads as an entropy
-    collapse. It survived a bisect over batch shape, a 10x learning rate and a
-    1000x Adam epsilon -- all reporting `H=0.023` to three decimals, which is
-    what finally gave it away, because no training effect is invariant to the
-    learning rate.
+    Padding the ragged logit block with -inf gives correct VALUES but a NaN
+    GRADIENT in the columns of the shorter distributions, because `jnp.where`
+    differentiates the branch it did not take and `0 * -inf` is nan (see
+    `_MD_PAD`).
 
     Run it by hand; it needs no GPU.
     """

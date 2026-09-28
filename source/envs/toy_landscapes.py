@@ -15,7 +15,7 @@ gymnax / mjx / kinetix runs can only be argued about.
              The level is the ripple amplitude. The search is scored on the
              rugged surface and REPORTED on the ripple-free one, so the target
              does not shrink as the amplitude grows.
-    wells    the centroid question (2026-09-13): why a GA's archive mean does
+    wells    the centroid question: why a GA's archive mean does
              not converge onto its elite. The first `relevant_dims` coordinates
              each have two gaussian wells at +-WELL_A and the score is their
              mean; every other coordinate does nothing. The level is how much
@@ -23,7 +23,7 @@ gymnax / mjx / kinetix runs can only be argued about.
              truncation selection cannot choose between them and only drift
              can; with `num_params > relevant_dims` the population also spreads
              along directions that do not change the score. One sub-task.
-    spikes   the basin-width question (2026-09-18): does the width of the basin
+    spikes   the basin-width question: does the width of the basin
              ES settles in depend on its sigma? One wide hill at the origin
              that both sub-tasks share, plus, for each sub-task, a narrow
              specialist spike on its own shoulder of the hill, ADDED to it (not
@@ -31,10 +31,6 @@ gymnax / mjx / kinetix runs can only be argued about.
              alone: a search that resolves the spike leaves the hill top for
              it at every switch, a search that smooths it over stays. The
              level is the spike's height s.
-
-`smooth` and `rugged` are ported from the earlier codebase's toy-landscape
-scripts with the same constants and formulas, so a run here and the published sweeps score
-the same point the same way.
 
 Every score function takes the FULL parameter vector `(..., num_params)` and a
 traced `task` and `level`, so a sweep over levels, seeds and generations is one
@@ -130,7 +126,7 @@ SPECIALISTS = np.array([[-1.8, 0.0], [-1.2, 1.2], [-1.2, -1.2]])
 
 
 def rugged(wavelength=0.6, specialist_peak=RUGGED_PEAK, rugged_dims=2):
-    """Two options, both added 2026-09-14 for the generalist question:
+    """Two options, for the generalist question:
 
     specialist_peak  above RUGGED_SHARED makes the generalist a trade-off: on
                      each sub-task its specialists then beat it. At the default
@@ -166,7 +162,7 @@ def rugged(wavelength=0.6, specialist_peak=RUGGED_PEAK, rugged_dims=2):
         # Beyond two coordinates the summed penalty of the start's scatter
         # alone clips every member to exactly 0 (k = 32, scatter 0.05: all of
         # them), a plateau with nothing to select on; so only the two-coordinate
-        # landscape keeps its floor at 0 (2026-09-14).
+        # landscape keeps its floor at 0.
         return jnp.clip(score, 0.0, cap) if r == 2 else jnp.minimum(score, cap)
 
     def generalist_score(x, amplitude):
@@ -210,7 +206,7 @@ def wells(relevant_dims=2, combine='mean'):
     mean  additive: every coordinate's basin choice is worth 1/k of the score,
           and averaging members from different corners only costs the split
           coordinates' share. With many coordinates the centroid even beats
-          the elite, because averaging cancels mutation damage (2026-09-13).
+          the elite, because averaging cancels mutation damage.
     min   epistatic, the weakest coordinate decides: a genome is only as good
           as its worst-placed coordinate, so a child that knocks ANY coordinate
           off its well is ruined and a centroid that sits in the valley of any
@@ -327,9 +323,9 @@ def spikes(spike_width=SPIKE_WIDTH, spike_offset=SPIKE_OFFSET):
 def manifold(stiff_dims=0, tube_width=0.1, wavelength=0.6, manifold_base='rugged'):
     """`rugged` inside a tube: the solution set as a manifold of known dimension.
 
-    `manifold_base='smooth'` (2026-09-22) puts the smooth landscape in the tube
-    instead: the shared region of width h, now with `stiff_dims` directions in
-    which every solution of both sub-tasks is narrow. The question is whether
+    `manifold_base='smooth'` puts the smooth landscape in the tube instead:
+    the shared region of width h, now with `stiff_dims` directions in which
+    every solution of both sub-tasks is narrow. The question is whether
     the search still holds the shared region when the curvature is spread
     over more directions, not only whether it crosses the ripple.
 
@@ -363,8 +359,7 @@ def manifold(stiff_dims=0, tube_width=0.1, wavelength=0.6, manifold_base='rugged
 
     # Every run starts ON the tube: the stiff coordinates of a population
     # jittered at the other toys' 0.05 / 0.1 per coordinate are exp(-c/2)-ish
-    # off it, which at c = 48 is a surface of zeros with nothing to select on
-    # (the first grid, 2026-09-13, found nothing at c >= 16 for that reason).
+    # off it, which at c = 48 is a surface of zeros with nothing to select on.
     # So the start and the searchers' initial scatter are a tenth of the tube
     # width; how far children then fall off is the mutation's business alone.
     levels = dict(levels=(0.0, 0.8, 1.6), report_levels=(0.0, 1.6),

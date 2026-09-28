@@ -20,17 +20,16 @@ The slice is the plane through the centroid checkpoint k-1 (circle),
 spanned by the run's own movement over phase k (to checkpoint k, diamond, at
 x = 1) and a random orthogonal direction of the same length
 (`landscape_slices.slice_plane`), window -1..2 x -1.5..1.5 drifts. Every grid
-point is a policy scored with common random numbers on sub-task k-1 (pink, the
+point is a policy scored with common random numbers on sub-task k-1 (the
 previous sub-task) and on sub-task k (the sub-task just trained). The
 diamond is therefore one checkpoint of the generalist figure.
 
 Colours are on the generalist figure's scale: a return is rescaled to
 (return - untrained) / (best - untrained), `untrained` the panel's FLOOR and
-`best` the highest mean shown return of any method in the panel. Since
-2026-09-21 the regions are flat (`regions`): blue where the previous sub-task
+`best` the highest mean shown return of any method in the panel. The
+regions are flat (`regions`): blue where the previous sub-task
 reaches LEARNED (half) of the best gain, orange the new one, dark both, white
-neither; before that, a threshold-free multiplied ink overlay (pink x teal =
-indigo) with contours at KEPT.
+neither.
 
 Checkpoint, the same rule for every method: the post-switch checkpoint whose
 (shown, previous) is nearest, in rescaled units, the method's point in the
@@ -86,7 +85,7 @@ CORNER = {'generalist': 'Keeps both', 'switching': 'Switches',
 # left the slice at checkpoint k visibly off the generalist figure's score.
 EPISODES = {'MiniGrid': 64, 'cheetah': 8}
 # The paper's method order (make_lineplot.METHOD_ORDER, Figure 2's), except ES
-# before GA: Figure 1 and this grid lead with the generalist (user, 2026-09-22).
+# before GA: Figure 1 and this grid lead with the generalist.
 import make_lineplot as lp                                  # noqa: E402
 ORDER = ['es'] + [m for m in lp.METHOD_ORDER
                   if m in ('ga', 'ppo', 'trac', 'redo', 'cchain', 'pbt')]
@@ -307,9 +306,7 @@ def extract(tanh):
     print(f'wrote {DATA}.json/.npz')
 
 
-# Flat regions (2026-09-21, a reviewer of Figure 1 found the continuous two-ink
-# overlay hard to read: partial returns mixed into shades no caption named).
-# A point is in a sub-task's region when its rescaled return reaches LEARNED
+# Flat regions. A point is in a sub-task's region when its rescaled return reaches LEARNED
 # (half the best gain); blue/orange stay apart under colour blindness and the
 # overlap is a neutral dark, not a third hue. No contours, no family markers.
 REGION_PREV, REGION_SHOWN, REGION_BOTH, REGION_NONE = '#9ecae1', '#fdae6b', '#404040', '#ffffff'

@@ -25,7 +25,7 @@ THE ARMS are named as the paper's run trees name them, plus one toy-only
 control:
 
     ga, es, dns, dns_gaussian    as in the paper (`es`: z-scored fitness + SGD)
-    dns_corrected                dns at the reference's line_sigma 0.05
+    dns_corrected                dns at line_sigma 0.05 (the published value)
 
 `dns` breeds at `--line_sigma` (0.5, the gymnax arms' value); `iso_sigma` and
 every gaussian width take the swept sigma.

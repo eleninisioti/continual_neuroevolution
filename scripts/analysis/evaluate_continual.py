@@ -24,7 +24,7 @@ returns by source/metrics/evaluation_metrics.py.
 Zero-shot transfer is measured here too: each sub-task's agent is also scored on
 the *next* sub-task, before any search has been done on it. It is the same agent
 that sub-task scored for success rate, so measuring it costs one extra rollout
-per sub-task and no extra checkpointing. Since 2026-09-10 each agent is ALSO
+per sub-task and no extra checkpointing. Each agent is ALSO
 scored on the *previous* sub-task (`prev_returns`): agent t+1 on sub-task t is
 the forgetting at that switch, `R[t][t] - R[t][t+1]`, and under a two-regime
 alternation it is what tells a generalist from a switching specialist
@@ -185,7 +185,7 @@ def _suite_rollout(cfg, ckpt, episodes, cache):
     sub-task `ts[i]` for every i in one jitted call, on the same episode
     seeds. The per-agent loop the gymnax path runs -- 20 agents x 3 shifts x
     up to 3 sources, 174 launches of a 1000-step scan per run -- took three
-    to fifteen minutes per MJX run on a shared card (2026-09-11),
+    to fifteen minutes per MJX run on a shared card,
     because an MJX step is launch-bound and a hundred episodes do not fill
     the GPU. Three calls per source do the same work in a fraction of it.
     """

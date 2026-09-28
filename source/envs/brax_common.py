@@ -1,7 +1,6 @@
 """The brax body in this study: the reward, the offset, the friction, the build.
 
-The cheetah moved from mujoco_playground's dm_control ``CheetahRun`` onto
-brax's ``halfcheetah`` on 2026-09-08. What is here is everything a sub-task
+The body is brax's ``halfcheetah``. What is here is everything a sub-task
 does to it: the speed-tracking reward, the observation offset, the
 ground-friction sequences, the sub-task revisit rule, and the factory that
 composes them.
@@ -15,8 +14,8 @@ velocity minus a control cost.
 
 The substitution ``reward - x_velocity + speed_reward`` is exact, and that is a
 fact about brax rather than an approximation: the cheetah's ``reward_run`` is
-*exactly* ``x_velocity`` (verified 2026-09-08 -- ``reward_run == x_velocity``
-to float equality, and ``reward == reward_run + reward_ctrl``), so subtracting
+*exactly* ``x_velocity`` (``reward_run == x_velocity`` to float equality,
+and ``reward == reward_run + reward_ctrl``), so subtracting
 the velocity removes the whole forward term and leaves the control cost
 untouched.
 """
@@ -220,14 +219,12 @@ def effective_task_idx(task_idx, task_period):
 class ObsOffsetWrapper:
     """Wrapper that adds a fixed per-sub-task offset vector to the observation.
 
-    The brax port of the gymnax continual protocol: every sub-task after the
-    first perturbs the
-    observation with a FIXED vector drawn once per (trial, sub-task) --
+    The gymnax continual protocol on brax: every sub-task after the first
+    perturbs the observation with a FIXED vector drawn once per (trial, sub-task) --
     sensor miscalibration, not noise. The policy's inputs shift; the physics,
     the reward and the optimal behaviour do not. Nothing in the observation
-    marks that a shift happened or what it is, which is the property the
-    FingerSpin probe showed matters: a perturbation the policy can read off
-    its inputs is a perturbation it can condition on.
+    marks that a shift happened or what it is: a perturbation the policy can
+    read off its inputs is a perturbation it can condition on.
 
     The offset is seeded off (seed, task_idx) alone -- the same guarantee the
     friction sequence gives: every method at a trial faces the same
@@ -334,7 +331,7 @@ def create_env(env_name, episode_length, backend=DEFAULT_BACKEND,
     ``training.wrap``. With ``wrap=True`` on both sides the stack carries two
     EpisodeWrappers and two AutoResetWrappers, and brax's Evaluator then
     averages over twice the true episode count -- which silently halved every
-    reported RL return relative to NE until it was found.
+    reported RL return relative to NE.
     """
     if wrap:
         env = envs.create(env_name, episode_length=episode_length,

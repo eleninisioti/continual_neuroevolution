@@ -7,19 +7,12 @@ with *unsupervised* descriptors learned online with AURORA, where the
 descriptor is the latent code of an auto-encoder trained on the observation
 trajectories collected during evaluation.
 
-This module is a port of the AURORA machinery used by the reference
-implementation (``inspiration/DNS/Dominated-Novelty-Search``):
+The auto-encoder is an LSTM sequence-to-sequence model (encoder final state =
+descriptor), trained periodically, with per-dimension observation
+normalisation, on the observation trajectories of the current DNS population.
 
-* ``qdax/core/neuroevolution/networks/seq2seq_networks.py`` — the LSTM
-  sequence-to-sequence auto-encoder (encoder final cell state = descriptor).
-* ``qdax/utils/train_seq2seq.py`` — periodic training of that auto-encoder on
-  the observations stored alongside the population, with per-dimension
-  observation normalisation.
-* ``qdax/tasks/environments/bd_extractors.py`` — ``get_aurora_encoding``.
-
-The only structural difference is that the population here is DNS's fixed-size
-population rather than a QDax repertoire, so the auto-encoder is trained on the
-observation trajectories of the current population.
+Seq2seq networks and training step adapted from QDax (MIT) and the Flax seq2seq
+example (Apache-2.0).
 
 Usage sketch::
 
@@ -29,11 +22,7 @@ Usage sketch::
     descriptors = aurora.encode(observations, aurora_state)
 
 ``observations`` always has shape ``(num_individuals, traj_steps, obs_size)``
-and holds the *last valid* observation after episode termination (matching
-QDax's ``last_valid_observations``).
-
-The seq2seq networks and the training step below are adapted from the Flax
-seq2seq example (Copyright 2022 The Flax Authors, Apache-2.0) via QDax.
+and holds the *last valid* observation after episode termination.
 """
 
 from __future__ import annotations
@@ -54,7 +43,7 @@ PRNGKey = Any
 
 
 # ============================================================================
-# LSTM seq2seq auto-encoder (port of qdax seq2seq_networks.py)
+# LSTM seq2seq auto-encoder
 # ============================================================================
 
 
@@ -157,14 +146,14 @@ class Seq2seq(nn.Module):
     """Sequence-to-sequence class using encoder/decoder architecture.
 
     `bounded_descriptor` selects which half of the encoder's final LSTM carry
-    becomes the descriptor. QDax (and so `False`, the default) uses the cell
-    state `c`, which has no bound and grows with the magnitude of the input
-    trajectory. That is fine in QDax's own settings but not here: on CheetahRun
+    becomes the descriptor. `False`, the default, uses the cell state `c`,
+    which has no bound and grows with the magnitude of the input trajectory.
+    On CheetahRun
     it lets a diverging genotype win dominated novelty on descriptor magnitude
     alone, which is the failure documented in docs/dns_cheetah_diagnosis.md.
     `True` returns the hidden state `h = o * tanh(c)` instead, which lies in
     (-1, 1)^latent_dim and so cannot run away -- the property every descriptor
-    space the DNS release was validated on happens to have.
+    space DNS was validated on happens to have.
     """
 
     teacher_force: bool
@@ -191,7 +180,7 @@ class Seq2seq(nn.Module):
 
 
 # ============================================================================
-# Training (port of qdax train_seq2seq.py)
+# Training
 # ============================================================================
 
 
@@ -335,21 +324,20 @@ class AuroraDescriptors:
     ) -> tuple[AuroraState, float]:
         """Train the auto-encoder on the population's observation trajectories.
 
-        Mirrors ``lstm_ae_train``: observations are normalised per dimension,
+        Observations are normalised per dimension,
         the encoder/decoder are trained to reconstruct the (shifted)
         trajectory, and the normalisation statistics are stored with the new
         parameters so that later encodings use the same scaling.
         """
         if num_epochs is None:
-            # Same schedule as the reference: cheaper re-training once the
-            # descriptor space has roughly settled.
+            # Cheaper re-training once the descriptor space has roughly settled.
             num_epochs = 100 if iteration <= 100 else 25
 
         # Normalisation statistics over the whole population of trajectories.
         mean_obs = jnp.nanmean(observations, axis=(0, 1))
         std_obs = jnp.nanstd(observations, axis=(0, 1))
-        # Dimensions with zero variance are mapped to 0 rather than dividing
-        # by zero (the reference replaces the zeros with inf).
+        # Dimensions with zero variance are mapped to 0 (std -> inf) rather
+        # than dividing by zero.
         std_obs = jnp.where(std_obs == 0, jnp.inf, std_obs)
 
         dataset = (observations - mean_obs) / std_obs

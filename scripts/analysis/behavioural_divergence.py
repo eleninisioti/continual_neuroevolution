@@ -503,7 +503,7 @@ def collect_state_sets(ctx, cfg, agents, noise, bodies, num_states, seed):
         # `done` never fires, and the trace carries inf / NaN policy inputs
         # from there to the end of the episode. One such row makes every
         # action distance on D_i NaN, and the cheetah friction family lost
-        # BD in 9 of 10 trials on every arm to it (2026-09-11). The test is
+        # BD in 9 of 10 trials on every arm to it. The test is
         # the trainer's: finite and below OBS_BLOWUP in magnitude.
         flat = visited.reshape(len(visited), -1)
         ok = np.all(np.isfinite(flat) & (np.abs(flat) < STATE_BLOWUP), axis=-1)
@@ -615,9 +615,8 @@ def rollout_matrices(ctx, cfg, agents, noise, bodies, mean_features, seed):
     if hasattr(ctx, "roll_cross"):
         # The suite contexts roll the whole T x T sweep in ONE call, under
         # the same per-sub-task keys the loop below would use. On the MJX
-        # bodies twenty serial calls of a 1000-step scan were the whole cost
-        # of this pass (2026-09-11: no run finished in an hour on a card
-        # shared eight ways); the sweep batched is one launch sequence.
+        # bodies twenty serial calls of a 1000-step scan would be the whole
+        # cost of this pass; the sweep batched is one launch sequence.
         keys = jnp.stack([run_key(cfg, seed + 1000 + i) for i in range(n)])
         occ_all, alive_all, ret_all = ctx.roll_cross(
             agents_d, keys, jnp.asarray(noise), bodies)
@@ -675,7 +674,7 @@ def summarise_run(matrices, state_counts):
     # agent on every earlier sub-task, against the agent that had just been
     # trained there. The paper tables report it when a run visits more than
     # two distinct sub-tasks, and `switch_forgetting` when it alternates two
-    # (`make_lineplot.load_divergence`, since 2026-09-11).
+    # (`make_lineplot.load_divergence`).
     forgotten = -matrices["retention"][:last, last]     # reward lost by the end
     # `switch_forgetting` is what ONE switch costs, at every switch: sub-task
     # i's own agent against the agent one sub-task later, on sub-task i. The

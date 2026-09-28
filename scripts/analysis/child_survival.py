@@ -5,7 +5,7 @@
     .venv/bin/python scripts/analysis/child_survival.py probe --panels cheetah_noise --phases 1::2 --gpus 4
     .venv/bin/python scripts/analysis/child_survival.py table
 
-The question (2026-09-17). On the rugged toy (`scripts/train/toy_sweep.py`)
+The question. On the rugged toy (`scripts/train/toy_sweep.py`)
 a GA stops finding the generalist when the ruggedness spans many coordinates,
 because an isotropic gaussian child has to land well on every rugged coordinate
 at once. The toy reads this as `q`: the share of the incumbent's gaussian
@@ -658,8 +658,8 @@ OVERLAP_PANELS = [
     ('cartpole_noise10', 'paper/gymnax/data/noise_10task', 'CartPole_v1_sigma1.0', 'CartPole, 10 noise tasks'),
     ('acrobot_noise10', 'paper/gymnax/data/noise_10task', 'Acrobot_v1_sigma1.0', 'Acrobot, 10 noise tasks'),
     ('mountaincar_noise10', 'paper/gymnax/data/noise_10task', 'MountainCar_v0_sigma0.1', 'MountainCar, 10 noise tasks'),
-    # The PBT mode probe (queue_pbt_modes_probe.sh, 2026-09-25): arms
-    # pbt_weights / pbt_hp on the paper's noise two-task cells.
+    # PBT modes: arms pbt_weights / pbt_hp on the paper's noise two-task
+    # cells.
     ('cartpole_noise2_modes', 'probe_pbt_modes/gymnax', 'CartPole_v1_sigma0.5', 'CartPole, noise (PBT modes)'),
     ('acrobot_noise2_modes', 'probe_pbt_modes/gymnax', 'Acrobot_v1_sigma0.5', 'Acrobot, noise (PBT modes)'),
     # Stationary runs (--stage noncontinual): A = B = the one task, so only
@@ -1184,7 +1184,7 @@ def main():
     def overlap_options(p, phases, copies, out):
         # Shared by `overlap` and `direction`. Not argparse `parents`: a parent
         # shares its option objects with the child, so set_defaults on the
-        # child rewrote the parent's defaults (2026-09-25).
+        # child would rewrite the parent's defaults.
         p.add_argument('--panels', nargs='+', default=[q[0] for q in OVERLAP_PANELS[:7]],
                        choices=list(OVERLAP_PANEL))
         p.add_argument('--arms', nargs='+', default=['es', 'ga', 'ppo', 'pbt'])

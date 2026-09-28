@@ -45,12 +45,11 @@ class ChainCoefController:
 
     def __init__(self, target_rel_scale=10000.0, warmup_updates=10, window=50,
                  initial_coef=1.0, floor=1.0):
-        """`initial_coef` and `floor` are the categorical reference's 1.0 and
-        1.0 by default. The continuous-control reference (crl_dmc) starts at
-        100 and has NO floor, because its churn term is an MSE between action
+        """`initial_coef` and `floor` are 1.0 and 1.0 by default, the
+        categorical setting of Tang et al. For continuous control they start at
+        100 with NO floor, because the churn term is an MSE between action
         means, orders of magnitude below the policy loss, so a floor of 1
-        would pin the coefficient forever. This class mirrors that controller
-        for the continuous PPO. Defaults reproduce every gymnax run.
+        would pin the coefficient forever. Defaults reproduce every gymnax run.
         """
         self.target_rel_scale = target_rel_scale
         self.warmup_updates = warmup_updates
@@ -100,7 +99,7 @@ def make_chain_sgd_epochs(
 
     `churn_fn(ref_logits, cur_logits) -> per-sample churn` is the regulariser
     and the diagnostic; None is the categorical cross-entropy above. A
-    continuous policy passes the reference's MSE between action means instead
+    continuous policy passes the MSE between action means instead
     (a cross-entropy over `[mean, log_std]` would be meaningless), together with its own `log_prob_fn` /
     `entropy_fn` for `compute_ppo_loss`. All three default to the gymnax
     behaviour, bit for bit.
@@ -109,8 +108,6 @@ def make_chain_sgd_epochs(
     advantages, as the shared runner's PPO update does
     (`source/runners/train_ppo.make_update_fn`). The gymnax
     trainers normalise the whole batch before calling this and leave it off.
-    Until 2026-09-17 the shared runner did not pass it, so its C-CHAIN trained
-    on raw advantages while its PPO did not.
     """
     minibatch_size = batch_size // num_minibatches
     churn_fn = chain_policy_churn if churn_fn is None else churn_fn
@@ -131,7 +128,7 @@ def make_chain_sgd_epochs(
         loss = loss + p_reg_coef * p_reg_loss
 
         # Policy loss on the scale the coefficient controller expects
-        # (clipped surrogate minus entropy bonus, as in the reference code).
+        # (clipped surrogate minus entropy bonus).
         metrics['chain_p_loss'] = metrics['pg_loss'] - ent_coef * metrics['entropy']
         metrics['chain_p_reg_loss'] = p_reg_loss
         return loss, metrics

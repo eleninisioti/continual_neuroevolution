@@ -1,7 +1,6 @@
 """One interface over the task families this study runs on.
 
-``train_nes.run_nes`` was written against gymnax and touched the environment in
-eight places -- make the env, read its obs/action dims, build the policy, draw
+``train_nes.run_nes`` touches the environment in eight places -- make the env, read its obs/action dims, build the policy, draw
 the sub-task offsets, build the training and evaluation scoring functions, and
 build the two descriptor variants DNS needs. Everything else in that file --
 the searchers, the schedule, the records, the artifacts -- never mentions an
@@ -13,25 +12,19 @@ the interface, and a *suite* is the module that answers it:
 
     gymnax   ``source/envs/gymnax_classic.py``      CartPole / Acrobot / MountainCar
     mjx      ``source/envs/mjx.py``  CheetahRun
-    minigrid ``source/envs/minigrid.py`` MiniGrid (xminigrid),
-             since 2026-09-07: the sub-task is WHICH ENVIRONMENT, on a
-             symbolic 7x7 view where the NE arms can learn
+    minigrid ``source/envs/minigrid.py`` MiniGrid (xminigrid): the sub-task
+             is WHICH ENVIRONMENT, on a symbolic 7x7 view where the NE arms
+             can learn
 
-A MinAtar suite sat between the two until 2026-09-08, where the sub-task was
-which game. It was dropped: the experiments did not separate the methods, and
-carrying a body no result rests on is a cost with no return. `GridConvPolicy`
-in `source/algorithms/networks.py` outlives it -- MiniGrid runs on that network.
-
-Since 2026-09-05 the interface has three more names, added for physics
-sub-tasks and for the RL arms: ``task_vectors`` (what a sub-task IS -- the mjx
+The interface has three more names, for physics sub-tasks and for the RL
+arms: ``task_vectors`` (what a sub-task IS -- the mjx
 suite can make it a friction multiplier rather than an observation offset),
 ``obs_offset`` (what an RL rollout adds to the observation, 0 when the
 sub-task is a change to the physics) and ``rl_env_fns`` (a vectorised
 reset/step pair for ``train_ppo``, so that trainer holds no branch on the
 backend). All three have a default that reproduces the gymnax behaviour bit
-for bit, so a suite that predates them needs no change. The gymnax suite
-answers all three itself since the same date, because it too now has a
-physics sub-task (``--task_options task_mod=physics``: a multiplier on the
+for bit, so a suite need not define them. The gymnax suite answers all three
+itself, because it too has a physics sub-task (``--task_options task_mod=physics``: a multiplier on the
 pole length, the link masses or the engine force -- ``tasks.PHYSICS_PARAMS``),
 and ``make_env_for_run`` rebuilds either kind from a finished run's config.
 
@@ -44,13 +37,11 @@ dimensions are read), and delegates the rest.
 flag anywhere -- ``--env`` alone selects the family, and the queue scripts,
 ``source/run.py`` and the analysis all keep taking one environment name.
 
-## The key stream is unchanged
+## The key stream
 
 ``make_env`` takes no key from the caller: the mjx backend needs a reset to
 read its observation width, and it uses a fixed ``random.key(0)`` for it rather
-than consuming from the run's stream. A gymnax run through this module is
-therefore bit-identical to one through the old inline code, which is what
-lets the runs already on disk stay comparable with anything run after it.
+than consuming from the run's stream.
 """
 
 from __future__ import annotations
@@ -214,20 +205,20 @@ def get_suite(name):
 # Which suite owns which environment. Written out rather than discovered by
 # importing both modules, because importing the mjx one pulls in MJX and the
 # playground registry -- seconds, and a hard dependency for anyone who only
-# wants the gymnax half. The earlier entry point read this before it set
-# CUDA_VISIBLE_DEVICES, so it must stay import-free of jax as well.
+# wants the gymnax half. It is read before CUDA_VISIBLE_DEVICES is set, so it
+# must stay import-free of jax as well.
 ENV_SUITE = {
     'CartPole-v1': 'gymnax',
     'Acrobot-v1': 'gymnax',
     'MountainCar-v0': 'gymnax',
     'CheetahRun': 'mjx',
-    # MiniGrid on xminigrid, since 2026-09-07; the pair of environments is a
-    # task option (`envs=A,B`), see tasks_minigrid.ENV_CONFIGS.
+    # MiniGrid on xminigrid; the pair of environments is a task option
+    # (`envs=A,B`), see minigrid.ENV_CONFIGS.
     'MiniGrid': 'minigrid',
     'MiniGrid-L1024': 'minigrid',      # a 1024-step scan, for the 16x16 rooms
 }
 
-# Kinetix, since 2026-09-09: a sub-task is one of the twenty hand-designed
+# Kinetix: a sub-task is one of the twenty hand-designed
 # MEDIUM levels. `Kinetix20` is the continual chain over all of them and
 # `Kinetix-<level>` the stationary run on one -- twenty-one cells, listed from
 # the suite's own table rather than retyped, because the level list is what
@@ -251,11 +242,9 @@ def make_env_for_run(config):
 
     ``(env, env_params, obs_dim, action_dim)``, exactly what ``make_env``
     returned to the trainer: the same environment, and the same meaning for a
-    row of the run's ``noise_vectors``. The analysis scripts that score saved
-    parameters -- the landscapes, the plasticity probes -- used to build a
-    gymnax env themselves and treat every row as an observation offset, which
-    is right for every run made before 2026-09-05 and silently wrong for a
-    physics run, whose rows are multipliers: ``obs + [2.0]`` broadcasts and
+    row of the run's ``noise_vectors``. Treating every row as an observation
+    offset would be silently wrong for a physics run, whose rows are
+    multipliers: ``obs + [2.0]`` broadcasts and
     scores an offset nobody trained on. This reads ``config['task']`` -- the
     suite's ``describe()``, absent on an obs-noise gymnax run -- and passes
     its options back in.
@@ -280,8 +269,7 @@ def make_env_for_run(config):
     # rebuilt un-whitened.
     if config.get('obs_norm'):
         options['obs_norm'] = True
-        # The statistics the run recorded, when it recorded them (NE runs since
-        # 2026-09-13): rebuilding from them is exact, re-measuring them does
+        # The statistics the run recorded, when it recorded them: rebuilding from them is exact, re-measuring them does
         # not reproduce (see `source/envs/mjx.py`, build_env).
         if config.get('obs_mean') is not None and config.get('obs_std') is not None:
             options['obs_mean'] = config['obs_mean']

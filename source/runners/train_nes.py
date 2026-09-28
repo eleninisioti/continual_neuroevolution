@@ -50,8 +50,8 @@ def _select_gpu_early(argv):
     """``--gpus N`` must take effect BEFORE jax initialises, which happens
     at import below (action_heads.py evaluates a jnp constant). scripts/train/run.sh
     launches four of these per node, one per card; without this every one of
-    them opened card 0 and three of four died of CUDA_ERROR_OUT_OF_MEMORY at
-    import (CLUSTER, 2026-09-13). The suite CLIs do the same in select_gpus()."""
+    them would open card 0 and run out of memory at import. The suite CLIs do
+    the same in select_gpus()."""
     for i, a in enumerate(argv):
         if a in ('--gpu', '--gpus') and i + 1 < len(argv):
             os.environ['CUDA_VISIBLE_DEVICES'] = argv[i + 1]
@@ -132,8 +132,8 @@ def aggregate_over_tasks(per_task, objective, threshold, worst_k=None):
     # different objective, and a run recording `objective: capped` that did not
     # cap is unreadable afterwards.
     # `worstk` is above the threshold guard because it does not use one: it is
-    # the mean of the k worst sub-tasks, capped by nothing. Same arithmetic as
-    # before this was hoisted -- `top_k` of the negative is the k smallest.
+    # the mean of the k worst sub-tasks, capped by nothing -- `top_k` of the
+    # negative is the k smallest.
     if objective == 'worstk':
         k = max(1, min(int(worst_k or 1), per_task.shape[0]))
         return (-jax.lax.top_k(-per_task.T, k)[0]).mean(axis=-1)
@@ -171,7 +171,7 @@ def searcher_sigma(state, es=None):
     if getattr(es, 'adapts_sigma', False):
         return float(state.sigma)
     # The operator's own width wins where there is one, which also fills this
-    # column for DNS -- it has no `state.sigma` at all and used to log NaN.
+    # column for DNS -- it has no `state.sigma` at all.
     params = getattr(es, 'variation_params', None) if es is not None else None
     if params:
         for key in ('iso_sigma', 'sigma'):
@@ -231,9 +231,8 @@ class _PRNGKeyData:
 def _to_host(x):
     """jax -> numpy for pickling. PRNG keys are TYPED arrays that np.asarray
     rejects, so they travel as raw key data: at the top level as
-    ('__prng__', data), and INSIDE a state as `_PRNGKeyData` leaves. Only the
-    top-level case was handled, and every `ga_focus_*` Kinetix20 chain -- whose
-    MergeGAState carries a key -- died at its first checkpoint (2026-09-14)."""
+    ('__prng__', data), and INSIDE a state as `_PRNGKeyData` leaves (e.g.
+    MergeGAState carries a key)."""
     import jax, numpy as np
 
     def is_key(v):
@@ -347,13 +346,12 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
     # `searcher_kwargs` carries method-specific knobs (GA's elite_ratio, DNS's
     # iso/line sigmas) that have no counterpart in this signature. build_searcher
     # filters to what each searcher accepts, so passing all of them is safe.
-    # AURORA is the reference's default descriptor for DNS and the one its
-    # published gymnax numbers used: the descriptor is the latent code of an
+    # AURORA is the default descriptor for DNS (as in Bahlous-Boldi et al.):
+    # the descriptor is the latent code of an
     # LSTM auto-encoder trained online on the population's own observation
     # trajectories, so the descriptor SPACE moves during the run. The
     # hand-crafted alternative stays available (`descriptor='handcrafted'`)
-    # because it is two interpretable numbers and a useful ablation, but it is
-    # no longer what runs by default.
+    # because it is two interpretable numbers and a useful ablation.
     kw = dict(searcher_kwargs or {})
     # `dns_gaussian` is DNS too -- it swaps the variation operator, not the
     # selection rule -- so it needs descriptors and AURORA like the rest.
@@ -410,15 +408,13 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
     # has zero gradient signal through the ReLUs and every perturbation of it
     # is symmetric, so the first generations would be wasted breaking that.
     # ---- plasticity, the gymnax columns on this body ----------------------
-    # OFF BY DEFAULT so every run made before this existed is reproduced
-    # bit-for-bit; the brax blocks turn it on. It is an OBSERVER -- its own RNG
+    # OFF BY DEFAULT; the brax blocks turn it on. It is an OBSERVER -- its own RNG
     # stream, never fed back into the search -- which is the rule everything
     # under source/metrics/ is held to.
     #
     # Without it the cheetah has no ne_centroid_*/ne_elite_* columns at
     # all, so the per-generation half of the centroid plasticity figure cannot
-    # be drawn for it while gymnax has it. `checkpoints.npz['centroid']` was
-    # already saved, so only the curve was missing.
+    # be drawn for it.
     plast = None
     if track_plasticity:
         from source.metrics import plasticity as _plast_mod
@@ -473,7 +469,7 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
 
     if use_aurora:
         # Evaluate the initial repertoire and fit the encoder to it before the
-        # first generation, as the reference does. The reason that survives
+        # first generation. The reason that holds under
         # `refresh` is the encoder: one that has never seen this environment's
         # observations produces descriptors of nothing in particular, and the
         # first selections would be run on those. The other reason applies to
@@ -511,8 +507,8 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
         """Re-descriptor the whole repertoire under a freshly trained encoder.
 
         Dominated novelty is a distance between descriptors, so mixing codes
-        from two different encoders compares nothing. The reference re-encodes
-        everything stored the moment it retrains, and so does this.
+        from two different encoders compares nothing, so everything stored is
+        re-encoded the moment the encoder retrains.
         """
         return es.reencode(
             state, aurora.encode(state.observations, aurora_state))
@@ -597,14 +593,11 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
         population, _ = es.ask(ask_key, state)
         return population
 
-    # ---- the best sampled member, which is what the reference reports -------
-    # `source/train_ES_gymnax_continual.py` logs
-    # `max(mean_fitness)` and checkpoints `population[argmax(mean_fitness)]`:
-    # its "agent" is the best member of the generation, not the distribution
-    # mean. This project reports the mean, which for ES is a
-    # different policy and is not the one the earlier study's curves are about.
-    # Both are logged here so the gap between them is readable rather than a
-    # choice made upstream of the figure.
+    # ---- the best sampled member -------------------------------------------
+    # The best member of the generation, next to the distribution mean this
+    # project reports: for ES they are different policies. Both are logged
+    # here so the gap between them is readable rather than a choice made
+    # upstream of the figure.
     # Every "score these weights on every sub-task" below maps over the
     # sub-task rows (`jax.lax.map`) instead of vmapping over them. A vmap
     # shares the weights across the row axis, which makes XLA compute the
@@ -612,9 +605,7 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
     # weights are batched along the population axis); on Kinetix's pixel
     # policy the logits moved by up to 0.066, and the chaotic physics turned
     # that into different outcomes -- a robust car_thrust solver scored 1.28
-    # one level per call and -0.08 in the 20-row vmap, and the chain's
-    # per-level records were wrong in both directions for every NE arm
-    # (2026-09-14, claude_probe/kx_kernel_batch.py). Mapping gives each row
+    # one level per call and -0.08 in the 20-row vmap. Mapping gives each row
     # exactly the numerics a stationary run of that sub-task has.
     # For ONE vector over the rows the weights are instead repeated along the
     # row axis and vmapped together with it: the policy then runs with the
@@ -796,8 +787,8 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
             state, fitness = generation_step_aurora(
                 step_key, state, noise_vectors[task_idx], aurora_state)
             # Retrain on the SURVIVORS' trajectories, then re-encode every
-            # stored descriptor -- both after selection, in that order, as the
-            # reference does. `gen + 1` because its schedule counts completed
+            # stored descriptor -- both after selection, in that order.
+            # `gen + 1` because the schedule counts completed
             # generations while this loop counts the one just run.
             if (gen + 1) in aurora_schedule:
                 key, ae_key = random.split(key)
@@ -841,23 +832,13 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
             'train_fitness_max': float(jnp.max(fitness)),
             'sigma': float(searcher_sigma(state, es)),
         }
-        # WHICH NETWORK IS CALLED `centroid_*`. Until 2026-09-09 the INCUMBENT
-        # went out under the `centroid` prefix and the population mean under
-        # `popmean`, which is the exact trap this file's checkpoint block
-        # documents and avoids ("Saving `incumbent` under the name `centroid`
-        # is what made the gymnax centroid figure measure the elite"). It was
-        # avoided for the checkpoints and not for the per-generation record.
-        #
-        # It matters because `ne_centroid_*` on the gymnax side IS the
-        # coordinate-wise mean of the population, so one figure script reading
-        # `centroid_*` across bodies compared a centroid on gymnax against a
-        # best-elite on brax. Harmless for es/nes, where `incumbent` and
-        # `population_mean` are the same point -- and wrong for exactly the two
-        # arms the gaussian pair exists to separate, ga and dns_gaussian.
-        #
-        # So: `centroid_*` is the population mean, matching gymnax and matching
-        # `ckpt_centroid` in this same loop, and the incumbent keeps its own
-        # prefix rather than being dropped.
+        # WHICH NETWORK IS CALLED `centroid_*`: the population mean, matching
+        # `ckpt_centroid` in this same loop and `ne_centroid_*` on the gymnax
+        # side (the coordinate-wise mean of the population), so a figure
+        # script reading `centroid_*` across bodies compares like with like.
+        # The incumbent keeps its own prefix. The two are the same point for
+        # es/nes and differ for exactly the two arms the gaussian pair exists
+        # to separate, ga and dns_gaussian.
         record_scores(record, per_task, prefix='incumbent')
         record_centroid_scores(record, popmean_per_task)
 
@@ -931,12 +912,11 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
                 record[f'best_task{t}'] = float(best_task[t])
             record['best_generalist'] = float(best_task.min())
             record['best_mean_over_tasks'] = float(best_task.mean())
-        # THE ELITE: the best-performing agent, always (decided 2026-09-13).
+        # THE ELITE: the best-performing agent.
         # On GA and DNS that is the incumbent scored above (the best archive
         # member). On ES the incumbent is the distribution MEAN, the
         # same point as the centroid, so the elite is the best member this
-        # generation sampled, re-scored on held-out episodes -- what the gymnax
-        # trainers' `elite_eval_fitness` always was. The member key is folded
+        # generation sampled, re-scored on held-out episodes. The member key is folded
         # off `eval_key` exactly as `--track_members` does, so the search is
         # the same run with or without this column.
         if getattr(es, 'has_population', True):
@@ -1049,11 +1029,9 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
             'pool_size': pool_size, 'pair_repeats': pair_repeats,
             'expand_every': expand_every,
             'searcher_kwargs': dict(searcher_kwargs or {}),
-            # What build_searcher RESOLVED, not what the caller passed.
-            # `refresh` has a default that changed on 2026-08-27, so a
-            # run recording only the caller's kwargs cannot be read back
-            # later: `{'elite_ratio': 0.5}` means two different
-            # algorithms either side of that date.
+            # What build_searcher RESOLVED, not what the caller passed, so
+            # the run does not depend on defaults (e.g. `refresh`) to be
+            # read back.
             'searcher_resolved': searcher_resolved(es),
             'objective': objective, 'worst_k': worst_k,
             'tasks_per_batch': tasks_per_batch,
@@ -1079,16 +1057,15 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
             'track_plasticity': bool(track_plasticity),
             'track_diversity': bool(track_diversity),
             # `elite_*` = the best-performing agent (best sampled member on
-            # ES, archive best on GA/DNS). Absent on runs before
-            # 2026-09-13, whose ES elite curve is the distribution mean.
+            # ES, archive best on GA/DNS). Absent on older runs, whose ES
+            # elite curve is the distribution mean.
             'elite_convention': 'best_member',
             'plasticity_interval': int(plasticity_interval) if track_plasticity else None,
             'num_params': num_params, 'solved_threshold': threshold,
             **({'arch': arch} if arch else {}),
             # What a row of `noise_vectors` IS on this suite, and the options
             # it was drawn under. Absent on gymnax, where it is always an
-            # observation offset and a run made before this key existed
-            # means the same thing as one made after.
+            # observation offset.
             **({'task': env_params.describe()}
                if hasattr(env_params, 'describe') else {}),
         },
@@ -1097,7 +1074,7 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
         **summarise_records(records, num_tasks, threshold),
         # `joint` scores every member on EVERY sub-task, so one generation costs
         # num_tasks times as many episodes as a schedule that scores one
-        # sub-task. Counting that here (as train_ppo.py already did) rather than
+        # sub-task. Counting that here (as train_ppo.py does) rather than
         # reporting the single-sub-task figure for every arm: without the
         # factor, joint's runs claim the same budget as switch's while spending
         # num_tasks times more. It makes joint an upper bound on what is
@@ -1151,10 +1128,8 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
 def build_parser():
     p = argparse.ArgumentParser(description='NE (ES/GA/DNS) on gymnax, switching sub-tasks')
     p.add_argument('--env', default='CartPole-v1', choices=ENV_NAMES)
-    # `run_nes` has run all four searchers since the ne.py interface landed,
-    # but this parser could not select one, so the module was NES-only from the
-    # command line while its function was not. source/run.py is the entry
-    # point for anything with trials and schedules; this is for a single run.
+    # source/run.py is the entry point for anything with trials and
+    # schedules; this is for a single run.
     p.add_argument('--method', default='es',
                    choices=list(NE_METHODS))
     p.add_argument('--searcher_kwargs', nargs='*', default=None,

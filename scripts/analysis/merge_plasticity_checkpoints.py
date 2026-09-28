@@ -7,7 +7,7 @@ The dormancy pass jits one probe program per (environment, body) and keeps
 every compiled program alive for the run. On the gymnax physics family with
 nine arms -- 270 runs, twenty bodies each -- the CPU JIT ran out of address
 space and died in LLVM ("Cannot allocate memory", then a segfault) after any
-eight of the arms had passed on their own (2026-09-13). One process per arm,
+eight of the arms had passed on their own. One process per arm,
 then this merge, is the same split the divergence pass already uses for the
 MJX bodies (`behavioural_divergence.py --merge`).
 

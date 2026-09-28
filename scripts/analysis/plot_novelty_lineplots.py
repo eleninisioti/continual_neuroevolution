@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """The novelty comparison as curves: elite and centroid return over the run.
 
-`fig:novelty` in the paper (2026-09-19) and `fig:novelty_all` in the appendix
-(`--figure all --diversity`, the four rows of the main figure with PBT-PPO,
-since 2026-09-21). One column per cell and two rows per block,
+`fig:novelty` in the paper and `fig:novelty_all` in the appendix
+(`--figure all --diversity`, the four rows of the main figure with PBT-PPO).
+One column per cell and two rows per block,
 the reported ELITE (best individual, fresh episodes) over the CENTROID (mean of
 the population weights). ES, GA and GA + Novelty, mean and 95% bootstrap CI
 over seeds, smoothed with the paper lineplots' rolling median (1% of the
@@ -77,8 +77,8 @@ COLUMN_SOURCES = {'behaviour': ('bd_behavioural_diversity', 'bd_probe_disagreeme
                   'genomic': ('bd_genomic_diversity',)}
 LOG_ROWS = {'genomic'}
 ARM_DIR = {'es': 'es', 'ga': 'ga', 'dns_gaussian': 'dns_gaussian', 'pbt': 'pbt'}
-# The paper's one method order (make_lineplot.METHOD_ORDER, as Figure 2) since
-# 2026-09-21: GA, GA + Novelty, ES, PBT-PPO. It used to put ES first.
+# The paper's one method order (make_lineplot.METHOD_ORDER, as Figure 2):
+# GA, GA + Novelty, ES, PBT-PPO.
 METHODS = [m for m in lp.METHOD_ORDER if m in ARM_DIR]
 # Drawn with GA + Novelty on top so it stays visible; the legend keeps METHODS.
 DRAW_ORDER = [m for m in METHODS if m != 'dns_gaussian'] + ['dns_gaussian']

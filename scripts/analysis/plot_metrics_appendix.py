@@ -30,7 +30,7 @@ docstring has the long form):
                    (make_lineplot.metric_table, the lineplot's own number)
     Cum. elite     the same for the best-performing agent (the RL arms' only
                    agent is both)
-    FT             (extracted, not drawn since 2026-09-21: the paper never
+    FT             (extracted, not drawn: the paper never
                    defines it) forward transfer against the method's OWN stationary run
                    (<suite>/data/noncontinual). Where the sub-tasks are
                    different cells (MiniGrid's two rooms, Kinetix's twenty
@@ -44,7 +44,7 @@ docstring has the long form):
                    `centroid_task<next>` at the last generation of each phase,
                    for every arm, so the panel has one source
     F              forgetting, lower is better
-    BD             (extracted, not drawn since 2026-09-22) behavioural divergence
+    BD             (extracted, not drawn) behavioural divergence
                    at the switch, lower is better, in [0, 1]
                    F and BD are read from data/stability_plasticity.json,
                    so they are the numbers that figure draws (run its
@@ -86,7 +86,7 @@ METRICS = [('cum_centroid', 'Cum. centroid', True),
            ('cum_elite', 'Cum. elite', True),
            ('zt', 'ZT', True),
            ('F', 'F', False)]
-# BD is still extracted but not drawn since 2026-09-22: it ranks the methods as F
+# BD is extracted but not drawn: it ranks the methods as F
 # does (median Spearman 0.82 over the nine settings that have it) and is n/a on Kinetix.
 # Trees whose ZT comes from the training records (module docstring).
 ZT_FROM_RECORDS = {'paper/mjx/cheetah/data/noise_10task',
@@ -312,7 +312,7 @@ GROUP_CHANGE = {'ten': 'noise', 'noise': 'noise', 'physics': 'physics',
 GROUP_RULE = '0.3'
 
 
-# Rows of Figure 2 that Figure 3 leaves out (two tasks under noise, 2026-09-24).
+# Rows of Figure 2 that Figure 3 leaves out (two tasks under noise).
 MAIN_SKIP_ROWS = ('noise',)
 
 

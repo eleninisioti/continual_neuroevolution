@@ -40,10 +40,10 @@ the churn column then needs rethinking rather than relabelling.
 
 `sigma` (gaussian) and `iso_sigma` (isoline) are both the width of an isotropic
 term, but the isoline operator adds a second, much larger displacement along
-`x2 - x1` whose scale is set by the population's own spread. The reference
+`x2 - x1` whose scale is set by the population's own spread. The published
 values differ by two orders of magnitude for exactly that reason (GA 0.1-0.5
 against iso 0.005 / line 0.05). Swapping the operator and keeping the number is
-therefore not a controlled ablation: hold the operator's own reference widths,
+therefore not a controlled ablation: hold the operator's own published widths,
 or tune both, and say which was done.
 """
 
@@ -58,10 +58,9 @@ GAUSSIAN = 'gaussian'
 ISOLINE = 'isoline'
 VARIATIONS = (GAUSSIAN, ISOLINE)
 
-# The reference defaults for each operator, per its own paper.
-#   gaussian  Such et al. (2017); the widths every GA trainer here already used
-#   isoline   QDax `mutation_operators.py` / the DNS configs
-#             (inspiration/DNS/Dominated-Novelty-Search/configs/algo/{me,aurora}.yaml)
+# The published defaults for each operator, per its own paper.
+#   gaussian  Such et al. (2017)
+#   isoline   the DNS paper's configs (Bahlous-Boldi et al.)
 DEFAULTS = {
     GAUSSIAN: {'sigma': 0.1, 'cross_over_rate': 0.0},
     ISOLINE: {'iso_sigma': 0.005, 'line_sigma': 0.05},
@@ -114,7 +113,7 @@ def gaussian_variation(genotypes, key, num_offspring, sigma=0.1,
 
     With `cross_over_rate = 0` (the default everywhere in this repo) the
     crossover step is a no-op and an offspring is exactly one archive member
-    plus `N(0, sigma^2 I)`. The path exists because the reference has it.
+    plus `N(0, sigma^2 I)`.
     """
     num_offspring = int(num_offspring)
     pop_size, num_params = genotypes.shape
@@ -138,20 +137,18 @@ def gaussian_variation(genotypes, key, num_offspring, sigma=0.1,
 
 def isoline_variation(genotypes, key, num_offspring, iso_sigma=0.005,
                       line_sigma=0.05, return_parents=False):
-    """Iso+LineDD (Vassiliades & Mouret, GECCO 2018), as QDax implements it.
+    """Iso+LineDD (Vassiliades & Mouret, GECCO 2018).
 
     `line_noise` is ONE scalar per individual drawn from a normal, not a
     per-parameter uniform: the offspring is displaced along the whole line
     joining its two parents, which is what makes this a recombination operator
-    rather than an anisotropic mutation. Getting that wrong was a real bug in
-    this repo's history.
+    rather than an anisotropic mutation.
 
     The operator multiplies population variance by `1 + 2 * line_sigma^2` per
     generation. Fitness selection contracts that; dominated novelty in an
-    UNBOUNDED descriptor space rewards the outliers instead, so at the old
-    `line_sigma = 0.5` the genotypes diverged -- see
-    docs/dns_cheetah_diagnosis.md. The defaults here are the reference's
-    corrected 0.005 / 0.05.
+    UNBOUNDED descriptor space rewards the outliers instead, so at
+    `line_sigma = 0.5` the genotypes diverge. The defaults here are
+    0.005 / 0.05.
     """
     num_offspring = int(num_offspring)
     pop_size, num_params = genotypes.shape

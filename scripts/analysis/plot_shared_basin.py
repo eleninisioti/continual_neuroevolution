@@ -20,9 +20,9 @@ through `child_survival.overlap_points` and writes
   shared_basin_main       the definition against Figure 2's LA - F, one point per setting and
          method, frozen specialists left out; Spearman over all points.
 
-Until 2026-09-25 the definition was OWN_STEP at 0.8. A method that moves less
-scores higher on it and also forgets less, whatever its landscape, so the
-radius is now method-independent; own-step stays as the right-hand panel.
+The radius is method-independent: under an own-step radius a method that
+moves less scores higher and also forgets less, whatever its landscape.
+Own-step is the right-hand panel.
 
 HalfCheetah and Kinetix are not probed (see child_survival's overlap section).
 """

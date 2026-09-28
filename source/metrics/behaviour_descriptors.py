@@ -605,14 +605,12 @@ def collect_probe_states(observations, num_probe=512, key=None, batch_dims=None)
     scored at every generation, which is also its weakness -- it says nothing
     about states this batch happens to miss.
 
-    `batch_dims` is for structured observations. The default (None) keeps the
-    original behaviour: `observations` is one array whose last axis is the
-    observation and every leading axis is batch. The scheduling suite, dropped
-    2026-09-08, had an observation that was a NamedTuple of arrays with
-    different trailing shapes, so it
-    passes `batch_dims=2` to say "the first two axes are (step, env), whatever
-    each leaf looks like after that". Both paths draw the same indices from the
-    same key, so this is a strictly wider signature, not a change.
+    `batch_dims` is for structured observations. With the default (None),
+    `observations` is one array whose last axis is the observation and every
+    leading axis is batch. An observation that is a NamedTuple of arrays with
+    different trailing shapes passes `batch_dims=2` to say "the first two axes
+    are (step, env), whatever each leaf looks like after that". Both paths draw
+    the same indices from the same key.
     """
     if batch_dims is None:
         obs = jnp.asarray(observations)

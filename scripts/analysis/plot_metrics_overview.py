@@ -116,11 +116,11 @@ SETS = {
 # caption.
 PLAIN = {'metrics_overview_main'}
 # The paper reports no novelty arm (finish_iclr.sh THE ARMS). Dropped here too,
-# so a paper directory drawn before that decision cannot put one back.
+# so an older paper directory cannot put one back.
 NOT_REPORTED = {'dns_gaussian', 'dns', 'ga_isoline'}
 # (set, agent) -> the rows that figure draws when `--rows` is not given; any
 # other figure draws every row some column has. The main-text centroid figure
-# is performance and transfer only (2026-09-16): the F and BD it would add are
+# is performance and transfer only: the F and BD it would add are
 # in stability_plasticity, which draws the same ten tasks.
 SET_ROWS = {('main', 'centroid'): ['cum', 'ZT']}
 PAIRS = (es_arm.PBT_ARMS,)                      # ('pbt', 'pbt2')

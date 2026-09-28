@@ -151,12 +151,11 @@ DESCRIPTOR_DIM = NUM_MOTOR_BINDINGS + NUM_THRUSTER_BINDINGS         # 6
 # schedule and in nothing else.
 
 _BASE = {
-    # 128 steps of frame-skip 2. The working GA configuration ran 256, and
-    # nothing happens after 128: every solving incumbent scores the same at
-    # 96/128/160/192/256 and the GA trained at 128 solves the same 20 of 20
-    # levels (source/configs/kinetix.yaml, 2026-09-13). Not a cap the
-    # reward depends on (unlike MiniGrid's), just the scan length; a solved
-    # level ends in 19-150 steps. `build_env` sets the levels' `max_timesteps` to
+    # 128 steps of frame-skip 2. Nothing happens after 128: every solving
+    # incumbent scores the same at 96/128/160/192/256 and the GA trained at
+    # 128 solves the same 20 of 20 levels. Not a cap the reward depends on
+    # (unlike MiniGrid's), just the scan length; a solved level ends in
+    # 19-150 steps. `build_env` sets the levels' `max_timesteps` to
     # it, so PPO's episodes end here too; `Kinetix.matched_steps` in
     # source/utils/config.py asserts it equals configs/kinetix.yaml.
     'episode_length': 128,

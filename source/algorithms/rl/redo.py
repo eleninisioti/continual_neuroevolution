@@ -14,12 +14,11 @@ The one ReDo every suite uses.
    bias, and zero their outgoing weights, so the network's function is
    essentially unchanged at the moment of the reset (`_reinit_params`).
 4. Zero the Adam moments of every weight touched, and restart bias correction
-   (`_reset_adam_state`). The reference's own comment on this is "Step count
-   resets are key to the algorithm's performance".
+   (`_reset_adam_state`).
 
 ## The criterion, and why it depends on the activation
 
-The reference is a ReLU network throughout, and scores a neuron by its mean
+ReDo was defined on ReLU networks, and scores a neuron by its mean
 absolute activation: a dead ReLU outputs exactly 0. That test does not transfer
 to tanh. Under tanh the useless unit is the *constant* one, and the usual way a
 tanh unit goes constant is saturation at +/-1 -- which has the LARGEST possible
@@ -29,7 +28,7 @@ dead as a dead ReLU.
 
 So the score is the spread rather than the level when the network is tanh:
 
-  "magnitude"    mean|act| / layer mean. The reference's test, and the right
+  "magnitude"    mean|act| / layer mean. The paper's test, and the right
                  one for ReLU.
   "variability"  std(act) / layer mean std. Catches both saturated units and
                  stuck-at-zero units. For a ReLU network the two nearly
@@ -40,7 +39,7 @@ So the score is the spread rather than the level when the network is tanh:
 this is not a knob anyone has to remember to set: it follows `POLICY_ARCH` in
 `source/algorithms/networks.py`, and gymnax (relu) gets magnitude while mujoco, brax
 and kinetix (tanh) get variability. Stated plainly because it matters for
-reading the numbers: `tau` is the reference's 0.025, calibrated on the
+reading the numbers: `tau` is the paper's 0.025, calibrated on the
 magnitude score. It is reused for variability because both scores are
 layer-mean-normalised and therefore dimensionless, but it was not separately
 calibrated there.
@@ -51,9 +50,8 @@ import jax.numpy as jnp
 import optax
 
 
-# The threshold and the check interval below are the reference defaults
-# (inspiration/redo/src/config.py: redo_tau=0.025, redo_check_interval=1000
-# gradient steps). One PPO "update" in the gymnax trainers is
+# The threshold and the check interval below are the defaults from Sokar et
+# al., 2023 (tau=0.025, check interval 1000 gradient steps). One PPO "update" in the gymnax trainers is
 # num_epochs * num_minibatches gradient steps, so their default of every 50
 # updates lands in the same ballpark.
 DEFAULT_TAU = 0.025
@@ -109,8 +107,8 @@ def neuron_dormancy_score(act, criterion):
     """Per-neuron score along the last axis of `act`, normalised by the layer mean.
 
     `act` is (..., width); every leading axis is batch. The normalisation is
-    what makes `tau` independent of the layer width, and it is the reference's:
-    divide by the mean of the per-neuron scores.
+    what makes `tau` independent of the layer width: divide by the mean of the
+    per-neuron scores.
     """
     if act.ndim > 1:
         batch_dims = tuple(range(act.ndim - 1))
@@ -204,12 +202,11 @@ def dormant_stats(params, obs, num_hidden, tau=DEFAULT_TAU,
     """Dormant-neuron diagnostics; pure measurement, nothing is modified.
 
     Reports both the tau-threshold count (the neurons ReDo would recycle) and
-    the tau=0 count (neurons that are strictly dead), as the reference logs.
+    the tau=0 count (neurons that are strictly dead).
 
     `activations_fn(params, obs) -> [act_0, ..., act_k]` overrides the replayed
-    MLP forward pass for architectures `hidden_activations` cannot walk -- the
-    scheduling policy, dropped 2026-09-08, had attention and per-entity
-    encoders rather than a Dense chain, and the hook is kept for the next such.
+    MLP forward pass for architectures `hidden_activations` cannot walk (e.g.
+    attention or per-entity encoders rather than a Dense chain).
     When it is given, `num_hidden`, `activation_fn` and `prefix` are unused: the
     network is reporting its own hidden layers rather than having them inferred
     from the parameter names.
@@ -226,7 +223,7 @@ def _layer_names(num_hidden, prefix, layers):
 
     ``layers`` names them outright for a network that is not a Dense chain
     (the conv policy's ``Conv_0, Dense_0, Dense_1``); otherwise they are
-    ``prefix0 .. prefix{num_hidden}``, which is every caller before 2026-09-06.
+    ``prefix0 .. prefix{num_hidden}``.
     """
     if layers is not None:
         return list(layers)
@@ -291,8 +288,7 @@ def _reinit_params(params, masks, key, prefix='Dense_', layers=None,
         #
         # Note the layers are visited in order, so if a neuron in layer i+1 is
         # itself dormant, resampling its incoming row overwrites the zeros just
-        # written here. That is also what the reference implementation does, and
-        # it is harmless: that neuron's own outgoing weights get zeroed in turn,
+        # written here. This is harmless: that neuron's own outgoing weights get zeroed in turn,
         # so there is still no path from a recycled unit to the output.
         nxt = dict(p[names[i + 1]])
         out_mask = _expand_mask(mask, nxt['kernel'],
@@ -327,10 +323,9 @@ def _reset_adam_state(opt_state, masks, reset_count=True, prefix='Dense_',
                       layers=None, extra_fan_in=None):
     """Rewrite every ScaleByAdamState in an optax state tree.
 
-    The reference zeroes the per-parameter Adam step count as well. optax keeps
-    a single count for the whole tree, so `reset_count` restarts bias correction
-    globally rather than per-tensor -- the closest available equivalent, and the
-    reference resets the step of nearly every tensor anyway.
+    ReDo zeroes the per-parameter Adam step count as well. optax keeps a single
+    count for the whole tree, so `reset_count` restarts bias correction
+    globally rather than per-tensor -- the closest available equivalent.
     """
     found = []
 
@@ -368,14 +363,13 @@ def apply_redo(state, obs, num_hidden, key, tau=DEFAULT_TAU,
     `state.tx` is assumed to contain optax.adam; any other transformation in the
     chain is left untouched.
 
-    `layers` and `activations_fn` are for a network that is not a Dense chain,
-    since 2026-09-06 (the grid conv policy): `layers` names the hidden
+    `layers` and `activations_fn` are for a network that is not a Dense chain
+    (the grid conv policy): `layers` names the hidden
     layers and then the output layer in forward order, and `activations_fn`
     is the network's own `hidden_activations`, as for `dormant_stats`. A
     hidden unit of a convolution is a channel: its incoming kernel slice is
     resampled and its outgoing rows in the flattened next layer are zeroed
-    (`_expand_mask`), which is the reference's treatment of conv layers.
-    Both None is every caller before that date, bit-unchanged.
+    (`_expand_mask`). Both None is a plain Dense chain.
 
     `extra_fan_in` maps a layer name to how many of its inputs are NOT a
     hidden unit's output (the Kinetix policy's `Dense_0` takes the flattened

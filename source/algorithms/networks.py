@@ -35,25 +35,16 @@ from jax import flatten_util
 POLICY_ARCH = {
     'gymnax':  {'hidden_dims': (16, 16),   'activation': 'relu'},
     'mujoco':  {'hidden_dims': (128, 128), 'activation': 'tanh'},
-    # brax is 'swish' as of 2026-08-11, and the reason is measured rather than
-    # aesthetic: at the small-batch shape (512/16/32/10/5 rollout) PPO on tanh
-    # collapsed within a task where swish learned. It is fine at brax's
-    # big-batch shape, so what fails is the interaction of tanh with 10 update
-    # epochs over 80-transition minibatches.
-    #
-    # This entry was 'tanh' from the day `--activation` became a flag, chosen so
-    # PPO would search the same network as GA/ES/DNS. Every run in
-    # the earlier run trees predates that flag and therefore
-    # ran make_ppo_networks' swish default on the RL side while NE ran tanh --
-    # so the reported trees are internally MISMATCHED, and no single value here
-    # reproduces both halves of them. Choosing swish keeps the fairness property
-    # this table exists for and reproduces the RL half; the NE arms are re-run
-    # under it and are new numbers, not a reproduction.
+    # brax is 'swish', and the reason is measured rather than aesthetic: at
+    # the small-batch shape (512/16/32/10/5 rollout) PPO on tanh collapsed
+    # within a task where swish learned. It is fine at brax's big-batch shape,
+    # so what fails is the interaction of tanh with 10 update epochs over
+    # 80-transition minibatches.
     'brax':    {'hidden_dims': (128, 128), 'activation': 'swish'},
     # kinetix is fc_layer_depth x fc_layer_width from configs/model/model-base.yaml,
     # shared by the NE and PPO trainers; see check_architectures.py.
     'kinetix': {'hidden_dims': (128,) * 5, 'activation': 'tanh'},
-    # MiniGrid, since 2026-09-07 (`source/envs/minigrid.py`): the
+    # MiniGrid (`source/envs/minigrid.py`): the
     # `GridConvPolicy` of Young & Tian 2019 -- one 3x3 valid convolution,
     # relu, one Dense, relu, then the head -- on the one-hot planes of
     # xminigrid's 7x7 view, at conv 4 / Dense 64 (7,758 parameters).

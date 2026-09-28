@@ -41,20 +41,19 @@ The `joint` schedule collects a rollout on *each* sub-task each update and
 trains on the concatenation, which is the direct analogue of NES scoring one
 population on both.
 
-Since 2026-09-05 the trainer runs on the mjx suite as well, through the same
+The trainer runs on the mjx suite as well, through the same
 suite interface ``train_nes`` uses (``source/envs/registry.py``): the
 environment, the sub-task vectors, the vectorised reset/step and the scoring
 function all come from the suite, and the action head from
-``source/algorithms/rl/action_heads.py``. A gymnax run is bit-identical
-to one made before that change (checked on ppo, trac, redo and cchain).
+``source/algorithms/rl/action_heads.py``.
 
 Per-update plasticity diagnostics
-    Since 2026-08-27 each record can also carry churn and dormancy, measured
+    Each record can also carry churn and dormancy, measured
     across ONE PPO update on a frozen probe batch -- the C-CHAIN estimator and
     the ReDo criterion, both imported from `source/metrics/plasticity.py`
     and `source/algorithms/rl/redo.py` rather than reimplemented, so an
     RL row here is the same measurement as an RL row in the benchmarking paper.
-    Runs finished before that date do not have these columns; the keys are
+    The keys are
     written only on the updates where they were measured, so a reader must not
     assume every record has them. See `--churn_interval`. On a continuous
     body the observer is `action_disagreement_continuous` and the method's own
@@ -91,8 +90,8 @@ def _select_gpu_early(argv):
     """``--gpus N`` must take effect BEFORE jax initialises, which happens
     at import below (action_heads.py evaluates a jnp constant). scripts/train/run.sh
     launches four of these per node, one per card; without this every one of
-    them opened card 0 and three of four died of CUDA_ERROR_OUT_OF_MEMORY at
-    import (CLUSTER, 2026-09-13). The suite CLIs do the same in select_gpus()."""
+    them would open card 0 and run out of memory at import. The suite CLIs do
+    the same in select_gpus()."""
     for i, a in enumerate(argv):
         if a in ('--gpu', '--gpus') and i + 1 < len(argv):
             os.environ['CUDA_VISIBLE_DEVICES'] = argv[i + 1]
@@ -147,8 +146,8 @@ RL_METHODS = ('ppo', 'trac', 'redo', 'cchain', 'pbt')
 #
 # The C-CHAIN controller's settings are per environment because the two action
 # spaces put the churn term on scales five orders of magnitude apart: the
-# categorical reference's 10000 / warmup 10 / window 50 / start 1 / floor 1,
-# and the continuous reference's 0.05 / 50 / 100 / start 100 / no floor. See
+# categorical C-CHAIN defaults' 10000 / warmup 10 / window 50 / start 1 /
+# floor 1, and the continuous ones' 0.05 / 50 / 100 / start 100 / no floor. See
 # `source/algorithms/rl/cchain.py:ChainCoefController` for why.
 _GYMNAX_CHAIN = dict(chain_target_rel_scale=10000.0, chain_warmup_updates=10,
                      chain_coef_window=50, chain_initial_coef=1.0,
@@ -183,7 +182,7 @@ _GYMNAX_PPO = {
 # 24,576,000 steps a phase, twenty phases. The paper's brax loop takes 5-step
 # unrolls and 320 gradient steps per 2,560 transitions; a 20-step window with
 # 32 minibatches x 10 epochs is one gradient step per 32 transitions, the
-# Python-loop shape this trainer has always had. The critic is the shared
+# Python-loop shape of this trainer. The critic is the shared
 # relu ValueNetwork at the paper's width. `eval_interval` 150 gives a phase
 # the 16 records an NE phase has generations.
 _MJX_PPO = {
@@ -211,16 +210,14 @@ _MJX_PPO = {
 # PPO on a gridded, binary-plane observation behind the conv policy
 # (`GridConvPolicy`). The update's shape is the gymnax one (2048 x 50) rather
 # than the 64 x 128 of PureJaxRL / gymnax-blines, because at this budget the
-# small shape is 750,000 updates a run; the per-sample settings are those
-# references' -- lr 5e-4, 4 epochs, gamma 0.99, GAE 0.95, clip 0.2, entropy
+# small shape is 750,000 updates a run; the per-sample settings are
+# theirs -- lr 5e-4, 4 epochs, gamma 0.99, GAE 0.95, clip 0.2, entropy
 # 0.01, value 0.5, grad norm 0.5 -- with 16 minibatches of 6400 (theirs: 8 of
 # 1024). Observations are binary planes, so no normalisation. A held-out
 # evaluation is 16 episodes of up to 1000 sequential steps, about an update's
-# worth of time, so a record every 10 updates. The C-CHAIN controller is the
-# categorical reference's, as on gymnax.
-#
-# These values were set for a MinAtar suite that was dropped on 2026-09-08;
-# MiniGrid inherits them below and is the only body that uses them.
+# worth of time, so a record every 10 updates. The C-CHAIN controller uses
+# the categorical settings, as on gymnax. MiniGrid inherits these values below
+# and is the only body that uses them.
 _CONV_PPO = {
     "num_updates": 60000,
     "task_interval": 3000,
@@ -242,7 +239,7 @@ _CONV_PPO = {
     **_GYMNAX_CHAIN,
 }
 
-# MiniGrid, since 2026-09-07 (`source/envs/minigrid.py`). The per-sample
+# MiniGrid (`source/envs/minigrid.py`). The per-sample
 # settings and batch shape above, on the same CNN; the budget matches the NE arms'
 # 4000 generations x 512 x 3 x 1024 (the scan length) = 6.29e9 steps:
 # 61,440 updates x 2048 envs x 50 steps, 3072 updates a phase against 200
@@ -256,7 +253,7 @@ _MINIGRID_PPO = {
     "task_interval": 3072,
 }
 
-# Kinetix, since 2026-09-09 (`source/envs/kinetix.py`). Everything PPO learns
+# Kinetix (`source/envs/kinetix.py`). Everything PPO learns
 # FROM is the vendored `third_party/kinetix/kinetix_config_pixels.yaml`, i.e.
 # what Kinetix itself tuned on this body: lr 5e-5, gamma 0.995, gae_lambda 0.9,
 # 8 epochs, 32 minibatches, clip 0.2, ent_coef 0.01, vf_coef 0.5, grad norm
@@ -267,19 +264,15 @@ _MINIGRID_PPO = {
 # what costs on this body and 16 parallel environments leave the card idle.
 # 1600 updates x 128 x 64 = 1.311e7 steps a level, which is the NE arms'
 # 200 generations x 512 x 1 x 128 exactly -- `Kinetix.matched_steps` in
-# source/utils/config.py asserts it, against a 24x gap in the previous
-# codebase's kinetix table. (9600 until 2026-09-13, matched to a nominal NE
-# budget of 3 rollouts x 256 steps that the deterministic level never used.)
+# source/utils/config.py asserts it.
 #
 # `value_hidden_dims` is the same MLP every other body's critic is, over the
 # flat 46,876-value observation, where Kinetix's own PPO shares a convolutional
-# trunk between actor and critic. That difference was the suspect when PPO here
-# was training on NaN; it was not the cause, and with the cause fixed (the
-# multi-discrete head's -inf padding, see action_heads.py) this critic solves
-# h0_unicycle from scratch in 819k environment steps -- half of what the old
-# trainer's shared-trunk runs took. It is left as it is on that evidence.
+# trunk between actor and critic. This critic solves h0_unicycle from scratch
+# in 819k environment steps -- half of what a shared-trunk critic took -- so it
+# is left as it is.
 #
-# The C-CHAIN controller is the categorical reference's, as on gymnax: this
+# The C-CHAIN controller uses the categorical settings, as on gymnax: this
 # body's head is multi-discrete, whose churn is that same cross-entropy summed
 # over six independent categoricals, so it sits on the gymnax scale.
 _KINETIX_PPO = {
@@ -326,7 +319,7 @@ PPO_CONFIGS.update({name: dict(_KINETIX_PPO) for name in _KINETIX_CELLS})
 # DeepSea<N>-bsuite (gymnax_classic.DeepSeaEnv, the action-map family): the
 # gymnax RL trainer's entry, CartPole's settings at gamma 0.99,
 # so the PBT arm's
-# members are the PPO already reported on it (probe_deepsea, 2026-09-19). The
+# members are the PPO already reported on it. The
 # episode is N steps; the launcher passes the compute-matched budget.
 PPO_CONFIGS.update({f"DeepSea{n}-bsuite": {**_GYMNAX_PPO, "gamma": 0.99,
                                            "learning_rate": 3e-4}
@@ -407,8 +400,8 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
     # decided by the optimizer's MOMENTUM TAIL and not by its per-coordinate
     # normalisation (the `beta1 = 0` arms there); `--adam_b1 0` is the same
     # ablation on the RL arm, so the question "is RL's retention failure the
-    # optimizer too?" is one flag rather than a second trainer. `.get` so a
-    # config written before the key existed reads as 0.9, which is what it ran.
+    # optimizer too?" is one flag rather than a second trainer. Older configs
+    # lack the key; default to 0.9.
     adam_b1 = float(hp.get('adam_b1', 0.9))
     # `max_grad_norm` 0 (or None) means no clipping at all -- the gymnax PPO
     # the paper reports is plain Adam. `clip_by_global_norm(0)` would instead
@@ -463,9 +456,7 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
 
     # C-CHAIN replaces the SGD-epoch loop rather than wrapping it: the policy
     # is pulled towards the policy from one gradient step ago, evaluated on an
-    # independently drawn minibatch of the same rollout. Imported from the
-    # paper's port of the reference implementation so the two studies run one
-    # C-CHAIN, not two. The head supplies the churn it regularises -- the
+    # independently drawn minibatch of the same rollout. The head supplies the churn it regularises -- the
     # cross-entropy on gymnax, the action-mean MSE on a continuous body -- and
     # the controller's scale, start and floor come from the env's config.
     chain_epochs = chain_state = chain_ctrl = None
@@ -642,8 +633,7 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
         # distinct object per member would be a distinct TrainState treedef
         # and `step_one` would recompile per member and per perturbation.
         # The clip follows `tx` above: `max_grad_norm` 0 is plain Adam, where
-        # `clip_by_global_norm(0)` would zero every gradient (every gymnax
-        # PBT run before 2026-09-28 trained on zero gradients). `identity`
+        # `clip_by_global_norm(0)` would zero every gradient. `identity`
         # keeps the (clip_state, injected) pair `_with_lr` unpacks.
         pbt_tx = optax.chain(
             (optax.clip_by_global_norm(hp['max_grad_norm'])
@@ -653,11 +643,9 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
         # Weights from each member's own init key, one split off the run's
         # key stream. Hyperparameters: in a mode that explores them (`full`,
         # `hp_only`) each member starts at x U(0.5, 1.5) of the config's lr
-        # and ent_coef, the old gymnax trainer's convention. In
+        # and ent_coef. In
         # `weights_only` there is ONE set, the config's, on every member and
-        # for the whole run -- until 2026-09-28 weights_only drew the spread
-        # too and a loser took the winner's values, so every `pbt_weights`
-        # run before then selected hyperparameters within x[0.5, 1.5].
+        # for the whole run.
         key, pop_key = random.split(key)
         member_keys = random.split(pop_key, N)
         spread = np.random.default_rng(seed * 31 + N)
@@ -756,9 +744,8 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
         observer every method in this repo reports (argmax disagreement, or
         the bounded action change on a continuous body) and the method's own
         (C-CHAIN's cross-entropy H(pi_before, pi_after), or its action-mean
-        MSE). Value churn is the reference's too -- it logs `value_churn`
-        beside `policy_churn` -- and is the MSE between the critic's
-        predictions before and after the update.
+        MSE). Value churn is the MSE between the critic's predictions before
+        and after the update.
         """
         before, after = actor.apply(prev_p, probe), actor.apply(cur_p, probe)
         return {
@@ -772,9 +759,7 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
     # The deployed policy at the end of each sub-task PHASE, written to
     # `checkpoints.npz` for the plasticity figures. A gradient method carries
     # ONE network, so there is no finalgen/incumbent/centroid distinction to
-    # make and `final` is the only key -- exactly what
-    # the old per-method gymnax RL trainer wrote, so an RL row of a plasticity
-    # table is the same object for runs from either.
+    # make and `final` is the only key.
     phase_agents, phase_tasks = [], []
     phase_centroids = []            # PBT: the weight mean at each phase end
     start = time.time()
@@ -1058,7 +1043,7 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
             record_centroid_scores(record, per_task)
         else:
             record_scores(record, per_task, prefix='incumbent')
-            # ELITE = the best-performing agent (2026-09-13): for a PBT
+            # ELITE = the best-performing agent: for a PBT
             # population that IS the incumbent above.
             record_scores(record, per_task, prefix='elite')
             record_centroid_scores(record, centroid_per_task)
@@ -1107,21 +1092,18 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
             # to special-case a PPO tag. PPO has no search distribution.
             'churn_interval': churn_interval,
             'num_probe_states': num_probe_states,
-            # Recorded so a cchain tag says which coefficient it ran at; runs
-            # made before 2026-08-29 have no entry and were at 0.1. The
-            # correct value is per action space -- see PPO_CONFIGS.
+            # Recorded so a cchain tag says which coefficient it ran at; older
+            # runs have no entry and were at 0.1. The correct value is per
+            # action space -- see PPO_CONFIGS.
             **({k: hp[k] for k in ('chain_target_rel_scale',
                                    'chain_warmup_updates', 'chain_coef_window',
                                    'chain_initial_coef', 'chain_floor')}
                if method == 'cchain' else {}),
             # Whether C-CHAIN was told where the sub-task boundaries are.
-            # False since 2026-09-08 and for every run made after it; runs
-            # with no entry were made when the reset was unconditional.
             **({'cchain_reset_on_switch': bool(cchain_reset_on_switch)}
                if method == 'cchain' else {}),
-            # True since 2026-09-17: C-CHAIN normalises each minibatch's
-            # advantages as PPO does here. Runs with no entry trained on raw
-            # advantages (make_chain_sgd_epochs).
+            # C-CHAIN normalises each minibatch's advantages as PPO does here
+            # (make_chain_sgd_epochs).
             **({'chain_minibatch_adv_norm': True} if method == 'cchain' else {}),
             'pop_size': hp['num_envs'], 'sigma': float('nan'),
             # The budget in steps, the field `scripts/verify_runs.py` and
@@ -1139,15 +1121,12 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
                 'elite_convention': 'best_member'}
                if pbt is not None else {}),
             'learning_rate': hp['learning_rate'], 'optimizer': 'adam',
-            # Adam's momentum coefficient. Since 2026-09-05; a run without
-            # the key ran at optax's 0.9.
+            # Adam's momentum coefficient.
             'adam_b1': adam_b1,
             'shaping': 'n/a', 'sigma_lr': 0.0, 'num_evals': 1,
             **{k: hp[k] for k in ('num_envs', 'num_steps', 'num_epochs',
                                   'num_minibatches', 'gamma', 'ent_coef',
                                   'clip_eps')},
-            # Since 2026-09-05. Absent on a gymnax run made before, where all
-            # of these were the values written here for gymnax.
             'head': head.name, 'normalize_obs': normalize_obs,
             'reward_scale': float(hp.get('reward_scale', 1.0)),
             'eval_interval': eval_interval,
@@ -1271,26 +1250,19 @@ def build_parser():
                         'would hand C-CHAIN alone a signal about where the '
                         'switches are, and because the C-CHAIN paper itself '
                         'says the method "does not need to be aware of task '
-                        'switches" and its Algorithm 1 has no reset. The '
-                        'released reference code does reset anyway, in three '
-                        'of its four suites, so this is kept as an option to '
-                        'reproduce that. Matches --cchain_reset_on_switch in '
+                        'switches" and its Algorithm 1 has no reset. Kept '
+                        'as an option because the C-CHAIN code release resets '
+                        'in three of its four suites. Matches --cchain_reset_on_switch in '
                         'the paper\'s trainers.')
     p.add_argument('--chain_target_rel_scale', type=float, default=None,
                    help="C-CHAIN's churn coefficient target: coef is "
                         'max(scale * |policy loss| / churn loss, floor). None '
-                        "is the environment's own -- the reference's 10000 "
+                        "is the environment's own -- C-CHAIN's 10000 "
                         'for a categorical policy (source/algorithms/rl/cchain.py) and '
-                        'its 0.05 for a continuous one '
-                        '(crl_dmc), five orders of '
+                        '0.05 for a continuous one, five orders of '
                         'magnitude apart because the churn term is a '
                         'cross-entropy in one and an action-mean MSE in the '
-                        'other. The gymnax runs made before 2026-08-29 used '
-                        '0.1, which pins coef at its floor of 1.0 on every '
-                        'update (measured: 400/400) where the controller would '
-                        'otherwise choose ~3500 -- so those runs are PPO plus a '
-                        'unit-weight self-distillation term and not this '
-                        'method. They are kept under the `cchain_coef1` tags.')
+                        'other.')
     p.add_argument('--chain_warmup_updates', type=int, default=None,
                    help='updates into a sub-task before the coefficient '
                         "controller is allowed to move off its start; None is "

@@ -8,9 +8,8 @@ environment shares a SYMBOLIC 7x7 egocentric view and the six MiniGrid actions
 one network plays any pair of them as it stands.
 
 Why this body: a 512-sample search gradient on a pixel CNN is mostly noise, so
-the NE arms could not learn the specialists on a pixel body at all -- which is
-what a dropped MinAtar suite established before it was removed on 2026-09-08.
-A MiniGrid view is 98 categorical values, the network below has ~8k
+the NE arms could not learn the specialists on a pixel body at all. A MiniGrid
+view is 98 categorical values, the network below has ~8k
 parameters, and a random policy already reaches the goal in a quarter of
 Empty-8x8 episodes, so the question "does switching leave one agent good at
 both?" can be asked where the NE arms plausibly learn the specialists first.
@@ -46,17 +45,14 @@ the active environment under ``lax.switch`` INSIDE the per-step scan, this
 suite's NE rollout switches once per EPISODE: ``lax.switch`` on the index selects a whole single-
 environment episode (its own reset and scan), so a generation costs one
 environment's steps and the conditional runs once per generation rather
-than once per step. That placement was forced on 2026-09-07: with XLA's
-CUDA-graph command buffers on, a per-step conditional inside a 1024-step
-scan crashed every switch-schedule run within minutes (segfaults and cuDNN
-illegal-address faults); with them off (``XLA_FLAGS=
---xla_gpu_enable_command_buffer=``) the same runs sat at generation 0,
-because a conditional executed outside a graph reads its predicate on the
-host at every scan step. The RL step (``rl_env_fns``) still carries both
-environments' timesteps and switches per step, as PPO's rollout is 50 steps
-and ran at speed either way. A check script in the earlier codebase asserted
-on the CPU that a switched rollout on environment i returns exactly
-what xminigrid's own environment i returns under the same keys.
+than once per step. That placement is forced: with XLA's CUDA-graph command
+buffers on, a per-step conditional inside a 1024-step scan crashes a
+switch-schedule run within minutes (segfaults and cuDNN illegal-address
+faults); with them off (``XLA_FLAGS=--xla_gpu_enable_command_buffer=``) the
+same runs sit at generation 0, because a conditional executed outside a graph
+reads its predicate on the host at every scan step. The RL step
+(``rl_env_fns``) still carries both environments' timesteps and switches per
+step, as PPO's rollout is 50 steps and runs at speed either way.
 
 ## No solved threshold
 
@@ -114,7 +110,7 @@ NUM_COLORS = 12          # xminigrid.core.constants.Colors, ids 0..11
 NUM_PLANES = NUM_TILES + NUM_COLORS
 NUM_ACTIONS = 6          # forward, right, left, pick up, drop, toggle
 
-# The default pair, settled 2026-09-07 from the probes below: the 8x8 room
+# The default pair, chosen from the probes below: the 8x8 room
 # with a random start and the 16x16 one, both with the goal in the corner.
 # A nested pair -- the 16x16 specialist solves both (0.95 / 0.97 at 32
 # fixed seeds) and the 8x8 specialist reaches 0.73 on the 16x16 room -- so
@@ -125,7 +121,7 @@ NUM_ACTIONS = 6          # forward, right, left, pick up, drop, toggle
 #
 #     EmptyRandom-8x8    0.9-1.0 by generation 200, every NES and GA cell
 #     EmptyRandom-16x16  1.0 by generation 200 (NES 0.1/0.05 and 0.3/0.15)
-#     FourRooms          0.1-0.2 at 300 (1000-generation run pending)
+#     FourRooms          0.1-0.2 at 300
 #     DoorKey-5x5/6x6/8x8, Unlock, UnlockPickUp, LockedRoom
 #                        0, and provably stuck: of 1024 fresh argmax
 #                        policies (sigma 0.1 or 0.5 around the init) NONE
@@ -152,8 +148,7 @@ _MINIGRID = {
 
 ENV_CONFIGS = {
     'MiniGrid': dict(_MINIGRID),
-    # The name the 2026-09-07 probes on the 16x16 room ran under, before the
-    # pair became the default; the same configuration.
+    # An alias of the same configuration, kept so older runs load.
     'MiniGrid-L1024': dict(_MINIGRID),
 }
 

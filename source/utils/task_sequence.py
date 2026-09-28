@@ -1,12 +1,7 @@
 """The continual protocol's task sequence, shared by every suite.
 
-`cycle_task_sequence` lived in the old gymnax trainers' `continual_common.py` and so was
-available to gymnax alone. brax grew its own partial version --
-`effective_task_idx` in source/envs/brax_common.py -- which was wired into the
-observation-noise offsets and NOTHING else, so `--task_period` silently did
-nothing to the friction or speed sequences. A flag that appears
-to work and does not is worse than a missing one, which is why this is now one
-definition that every axis folds through.
+One definition that every axis folds through, so `--task_period` acts on the
+observation offsets, the friction and the speed sequences alike.
 """
 
 
@@ -35,7 +30,7 @@ def cycle_task_sequence(sequence, period):
     and needs a schedule built for that.
 
     `period` of 0, None, or anything at least as long as the sequence leaves it
-    untouched, so the default reproduces every run already on disk.
+    untouched.
     """
     if not period or period >= len(sequence):
         return sequence
@@ -51,32 +46,22 @@ def cycle_task_sequence(sequence, period):
 # physics parameters is rescaled instead -- the pole length on CartPole, the
 # link masses on Acrobot, gravity on MountainCar.
 #
-# ONE TABLE FOR EVERY TRAINER, WHICH IT WAS NOT BEFORE. Until 2026-09-08 each
-# of GA, DNS and RL carried its own `PARAM_CONFIGS` literal, and they DID NOT
-# AGREE: CartPole's gravity range was [0.98, 98.0] in the two NE trainers and
-# [0.098, 198.0] in the RL one, MountainCar's [0.000833, 0.0075] against
-# [0.00125, 0.005]. Both halves of the comparison drew from that range with the
-# same trial-seeded key, so the sub-task sequences silently diverged between
-# the NE and RL arms of what is meant to be one compute-matched experiment
-# (matched steps, same task boundaries). ES/NES had no param branch at all and would have run the
-# observation-noise experiment into the same tree.
+# ONE TABLE FOR EVERY TRAINER, so the NE and RL arms of what is meant to be
+# one compute-matched experiment (matched steps, same task boundaries) draw
+# the same sub-task sequences.
 #
-# A SUB-TASK IS A MULTIPLIER, NOT AN ABSOLUTE VALUE. The old sequence drew the
-# parameter uniformly over an absolute range, which put sub-task 0's default
-# (9.8 for CartPole gravity, in [0.98, 98.0]) at an arbitrary point of the
-# distribution and made the family asymmetric in a way nothing chose. Here
-# sub-task 0 is multiplier 1.0 -- the stock body, identical to the
-# noncontinual block, exactly as sub-task 0 of the noise family is the
-# unperturbed environment -- and every later sub-task draws a multiplier
-# LOG-uniformly over `mult_range`, so a factor of two up and a factor of two
+# A SUB-TASK IS A MULTIPLIER, NOT AN ABSOLUTE VALUE. Sub-task 0 is multiplier
+# 1.0 -- the stock body, identical to the noncontinual block, exactly as
+# sub-task 0 of the noise family is the unperturbed environment -- and every
+# later sub-task draws a multiplier LOG-uniformly over `mult_range`, so a factor of two up and a factor of two
 # down are equally likely. That is the counterpart of the noise family's
 # zero-mean Gaussian offset: symmetric about the stock body, with no direction
 # built in.
 #
 # WHICH KNOB, AND HOW FAR, ARE MEASURED NUMBERS. They come from
-# `source/envs/gymnax_classic.py`'s `ENV_CONFIGS[env]['physics']`, chosen on
-# 2026-09-05 by scoring specialists trained on the stock body under every
-# available knob at 0.25x-4x. Two constraints fix each entry: the stock
+# `source/envs/gymnax_classic.py`'s `ENV_CONFIGS[env]['physics']`, chosen by
+# scoring specialists trained on the stock body under every available knob at
+# 0.25x-4x. Two constraints fix each entry: the stock
 # specialist must NOT already solve the rescaled body (or the sub-task is not
 # a sub-task), and a specialist trained on it must be able to (or the sub-task
 # is unlearnable and every method floors together).
@@ -119,11 +104,8 @@ def physics_mult_sequence(trial, num_tasks, mult_range, period=0):
     Seeded from `trial` alone with the same `trial * 7919` key the noise family
     uses, and deliberately NOT from the training RNG, so every method at a
     given trial faces the same bodies in the same order. `period` folds through
-    `cycle_task_sequence`, which the param branch used to skip entirely: a
-    20-sub-task run at period 10 was giving the noise arms each sub-task twice
-    and the param arms twenty distinct ones, so the two were not measuring
-    forgetting on the same schedule -- and the param arms were not measuring it
-    at all, since nothing was ever revisited.
+    `cycle_task_sequence`, so the param arms revisit sub-tasks on the same
+    schedule as the noise arms.
     """
     import math
 

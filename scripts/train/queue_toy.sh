@@ -71,7 +71,7 @@ for pop in 16 64 1024; do
         --methods ga dns_gaussian --sigmas 0.05 --levels 0 0.01
 done
 
-# ripdim: the paper's appendix grid of the ripple stage (2026-09-17) -- a
+# ripdim: the paper's appendix grid of the ripple stage -- a
 # finer k, the paper's 24 seeds, GA and ES only.
 for k in 2 4 8 16 32 64 128; do
     sweep "ripdim_k${k}" --landscape rugged --rugged_dims "$k" \
@@ -79,9 +79,9 @@ for k in 2 4 8 16 32 64 128; do
         --sigmas 0.1 0.2 0.4 --levels 0.4 0.8 1.6
 done
 # rippop: does a larger population move the k at which the GA stops finding
-# the generalist (2026-09-18)? The GA needs its BEST child: best-of-N gains
-# ~sqrt(2 ln N) standard deviations while the cost grows ~k, so the k at which it
-# fails should move only logarithmically with N. Pop 64 is ripdim itself. A
+# the generalist? The GA needs its BEST child: best-of-N gains ~sqrt(2 ln N)
+# standard deviations while the cost grows ~k, so the k at which it fails
+# should move only logarithmically with N. Pop 64 is ripdim itself. A
 # larger pop is also a larger budget per generation: not compute-matched.
 for k in 4 8 16 32 64; do
     for pop in 16 256 1024; do
@@ -97,15 +97,15 @@ sweep rippop_matched_k16_n256 --landscape rugged --rugged_dims 16 \
     --num_seeds 24 --methods ga es --sigmas 0.2 0.4 --levels 0.4 1.6
 # stiff_smooth: the smooth toy in d = 128 with c of the 126 extra coordinates
 # stiff (the solutions of both sub-tasks lie within a tube of width 0.3 there),
-# the rest null (2026-09-22): does holding the shared region get harder with
-# the number of directions the solutions are narrow in, rather than with d?
+# the rest null: does holding the shared region get harder with the
+# number of directions the solutions are narrow in, rather than with d?
 for c in 0 4 16 64 126; do
     sweep "stiff_smooth_c${c}" --landscape manifold --manifold_base smooth \
         --stiff_dims "$c" --tube_width 0.3 --num_params 128 --pop_size 64 \
         --num_seeds 24 --methods ga es --sigmas 0.02 0.05 0.1 0.2 \
         --levels 0.1 0.3 1.0
 done
-# d128: toy_local_optima in d = 128 (2026-09-18). smooth: 126 coordinates that
+# d128: toy_local_optima in d = 128. smooth: 126 coordinates that
 # change nothing (the landscape has no ripple to extend); rugged: the ripple on
 # all 128. <name>_d128 sweeps the 2-D figure's sigma grid, so the sweep's own
 # best sigma (and the path it saves) is chosen the way the 2-D figure's was;
@@ -116,9 +116,8 @@ sweep smooth_d128 --landscape smooth $D128
 sweep rugged_d128 --landscape rugged --rugged_dims 128 $D128
 sweep smooth_d128_wide --landscape smooth $D128 --sigmas 0.3 0.4
 sweep rugged_d128_wide --landscape rugged --rugged_dims 128 $D128 --sigmas 0.3 0.4
-# sigma: does the width of the basin ES settles in depend on its sigma
-# (2026-09-18)? ES and the GA at seven widths on the smooth toy (no local
-# optima), the rugged toy (local optima of one width) and the spikes toy (a
+# sigma: does the width of the basin ES settles in depend on its sigma?
+# ES and the GA at seven widths on the smooth toy (no local optima), the rugged toy (local optima of one width) and the spikes toy (a
 # narrow tall specialist on each shoulder of the wide shared hill), with the
 # full centroid saved at every record. plot_toy_sigma_basin.py measures the
 # landscape around the end-of-phase centroid and reads all three.

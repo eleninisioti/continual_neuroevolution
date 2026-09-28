@@ -60,7 +60,7 @@ a statement about |w|. Every quantity here is invariant to the logit scale.
                     sub-task and ~125 on the clean one (sub-tasks 1 and 11),
                     while the RL `final` checkpoints, whose folded normaliser
                     (`actors.fold_normalizer`) already carries the offset in
-                    the bias, read ~120 throughout (2026-09-20). Without the
+                    the bias, read ~120 throughout. Without the
                     fold the two families were measured in different
                     parametrisations. Under the fold an RL checkpoint is
                     re-expressed in the NE whitening (W' = std * W,
@@ -332,7 +332,7 @@ def reference_whitening(root, cell, ctx, cache):
     checkpoint in the same coordinates under `--fold-offset`.
 
     A whitened run's own spec first; otherwise the statistics an NE run of the
-    cell recorded (`obs_mean`/`obs_std` in its config, since 2026-09-13); as a
+    cell recorded (`obs_mean`/`obs_std` in its config); as a
     last resort the fixed-seed measurement `source/envs/mjx._measure_obs_stats`
     (which does not reproduce bit for bit on MJX; see there).
     """

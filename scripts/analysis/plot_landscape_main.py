@@ -112,8 +112,7 @@ def wrap(change, width=11):
     return f'{change[:cut]}\n{change[cut + 1:]}'
 
 
-# Bodies left out of both landscape figures (2026-09-16: HalfCheetah, whose
-# slices and PBT/GA runs are still coming); `--include` puts one back.
+# Bodies left out of both landscape figures; `--include` puts one back.
 EXCLUDED = {'HalfCheetah'}
 
 

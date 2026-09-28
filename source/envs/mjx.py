@@ -39,9 +39,7 @@ restored after. That is brax's own idiom -- its
 ``DomainRandomizationVmapWrapper`` does exactly this to vmap a rollout over
 batched Systems -- and it is what makes the multiplier a traced *argument*, so
 the whole switching run compiles once and the joint schedule can ``vmap`` a
-population's rollout over the two sub-tasks' frictions. ``check_friction`` in
-the earlier codebase asserted that a rollout under a
-traced multiplier returns exactly what a statically rescaled env returns.
+population's rollout over the two sub-tasks' frictions.
 
 ## The reward is speed tracking
 
@@ -58,10 +56,9 @@ a found/held count. Nothing downstream invents a constant.
 
 ## Sigma is relative to the observation spread
 
-Measured on 2026-09-09 over 200 random-action steps, brax's halfcheetah has a
-median per-dim observation std of 0.803, so sigma 2.0 is ~2.5x it. That is why
-``CheetahRun`` keeps `noise_range` 2.0, which is also the value
-``runs_repro2/mujoco/continual`` was made at.
+Over 200 random-action steps, brax's halfcheetah has a median per-dim
+observation std of 0.803, so sigma 2.0 is ~2.5x it. That is why
+``CheetahRun`` keeps `noise_range` 2.0.
 
 ``noise_range`` per environment records the value that environment's own runs
 were made at, and is what ``--noise_range`` overrides. It only applies under
@@ -96,8 +93,7 @@ __all__ = [
 
 # Per-environment settings, pinned to what the paper's own runs used so the two
 # sets of numbers stay comparable. `hidden_dims` is POLICY_ARCH's for the body;
-# `noise_range` is the sigma that body's obs-noise runs were made at
-# (the earlier mujoco/continual and brax/continual_obsnoise run configs).
+# `noise_range` is the sigma that body's obs-noise runs were made at.
 #
 # `task_mod` says what a sub-task vector means -- see the module docstring.
 # `friction` is the friction grid (`source/envs/brax_common.py`): the cycle is
@@ -111,22 +107,14 @@ __all__ = [
 # side's and what the dormancy criterion is chosen from.)
 ENV_CONFIGS = {
     "CheetahRun": {
-        # brax's `halfcheetah` since 2026-09-08, on the same MJX physics. It ran
-        # on mujoco_playground's dm_control CheetahRun until then; moving it
-        # deleted the per-method mujoco trainers and `source/envs/mjx_cheetah.py` and
-        # dropped the `mujoco_playground` dependency, which nothing else used.
-        # Both are 17-dim observation, 6 actuators, so the policy, the
-        # searchers and the analysis are unchanged -- but the REWARD is not, so
-        # no cheetah number from before that date is comparable and the block
-        # is being re-run.
+        # brax's `halfcheetah`, on MJX physics.
         "backend": "brax",
         "body": "halfcheetah",
         "hidden_dims": (128, 128),
         "episode_length": 1000,
         "task_mod": "obs_noise",
         "noise_range": 2.0,
-        # dm_control's own `_RUN_SPEED` for CheetahRun, so the objective still
-        # asks for the speed the replaced task asked for. Their credit is
+        # dm_control's own `_RUN_SPEED` for CheetahRun. Their credit is
         # ONE-sided (full marks at or above 10, linear ramp from 0); ours is
         # a two-sided Gaussian peaking AT the target -- see
         # `source/envs/brax_common.py`.
@@ -363,12 +351,12 @@ def build_env(env_name, episode_length, task_options=None):
     # because there one process may build the env for an RL arm that must
     # not whiten. Either route measures the same fixed-seed statistics.
     obs_norm = bool(options.pop('obs_norm', False))
-    # The whitening statistics a finished run RECORDED (since 2026-09-13).
-    # Rebuilding from them is exact; re-measuring them is not: the fixed-seed
-    # random-policy rollout in `_measure_obs_stats` does not reproduce on MJX,
-    # not even on one machine (std range 0.118-4.729 recorded vs 0.124-4.783
-    # re-measured in the next process, home server, 2026-09-13). A whitened
-    # NE agent rebuilt on re-measured statistics re-scored ~8% low.
+    # The whitening statistics a finished run RECORDED. Rebuilding from them
+    # is exact; re-measuring them is not: the fixed-seed random-policy rollout
+    # in `_measure_obs_stats` does not reproduce on MJX, not even on one
+    # machine (std range 0.118-4.729 recorded vs 0.124-4.783 re-measured in
+    # the next process). A whitened NE agent rebuilt on re-measured
+    # statistics re-scores ~8% low.
     recorded_mean = options.pop('obs_mean', None)
     recorded_std = options.pop('obs_std', None)
     if options:
@@ -384,9 +372,8 @@ def build_env(env_name, episode_length, task_options=None):
         print('  obs whitening  : ON  (statistics recorded by the run)', flush=True)
     elif obs_norm or os.environ.get('NE_OBS_NORM', '0') == '1':
         mean, std = _measure_obs_stats(env)
-        # Host arrays: a device read of `mean` at finalise hung every long
-        # NE run on the home server (futex_wait, 2026-09-18/19); a jit closes
-        # over them as constants either way.
+        # Host arrays: a device read of `mean` at finalise hangs long NE runs
+        # (futex_wait); a jit closes over them as constants either way.
         spec.obs_mean, spec.obs_std = np.asarray(mean), np.asarray(std)
         print(f'  obs whitening  : ON  (per-dim std {float(std.min()):.3f}'
               f'-{float(std.max()):.3f} before, 1.0 after)', flush=True)
@@ -554,8 +541,7 @@ def obs_offset(spec, task):
 def build_policy(key, obs_dim, action_dim, hidden_dims):
     """Return ``(policy, param_template, num_params)``.
 
-    Same signature and same contract as ``continual_common.build_policy`` on
-    the gymnax side, so ``train_nes`` calls one thing. The network is the
+    Same signature and same contract as ``build_policy`` on the gymnax side, so ``train_nes`` calls one thing. The network is the
     shared ``ContinuousMLPPolicy``, i.e. the paper's cheetah NE policy.
     """
     policy, param_template = create_continuous_policy_network(
@@ -606,14 +592,13 @@ def _rollout(env, spec, policy, param_template, episode_length, collect=False,
                 # `whiten` is a Python bool closed over at trace time, so the
                 # off branch compiles to exactly the pre-whitening rollout.
                 #
-                # A PARAMETER, NOT A PROPERTY OF `spec`. It used to be the
-                # latter, and that broke every whitened RL row (ppo 4919
-                # -> 220): run_ppo scores its policy through this same
-                # function, on purpose, so both families share one ruler --
-                # and its normaliser is already FOLDED into Dense_0 by
-                # actors.fold_normalizer, so the folded network expects RAW
-                # observations. Whitening on the shared spec normalised them a
-                # second time. Only run_nes asks for it now.
+                # A PARAMETER, NOT A PROPERTY OF `spec`: run_ppo scores its
+                # policy through this same function, on purpose, so both
+                # families share one ruler -- and its normaliser is already
+                # FOLDED into Dense_0 by actors.fold_normalizer, so the folded
+                # network expects RAW observations. Whitening on the shared
+                # spec would normalise them a second time. Only run_nes asks
+                # for it.
                 x = obs + offset
                 x = spec.whiten(x) if whiten else x
                 action = policy.apply(params, spec.augment(x, task))
@@ -942,13 +927,12 @@ def make_trajectory_scoring_fn(env, env_params, policy, param_template,
     """``score(genomes, key, task) -> (fitness, observations)``.
 
     The AURORA path, sub-sampled with ``episode_relative_indices`` -- the same
-    reference function the gymnax side and the paper's cheetah DNS both use, so
-    samples land inside the episode that happened rather than being spread over
-    the episode CAP.
+    function the gymnax side uses, so samples land inside the episode that
+    happened rather than being spread over the episode CAP.
 
-    Only the first evaluation's trajectory is kept when ``num_evals > 1``,
-    matching the reference: averaging trajectories from different resets would
-    describe no episode that happened.
+    Only the first evaluation's trajectory is kept when ``num_evals > 1``:
+    averaging trajectories from different resets would describe no episode
+    that happened.
     """
     num_traj_steps = min(traj_steps, episode_length)
     episode = _rollout(env, env_params, policy, param_template, episode_length,

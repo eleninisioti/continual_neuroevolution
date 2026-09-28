@@ -12,8 +12,7 @@ single one.
     -> paper/visuals/final/appendix/basin_width_evolution.{pdf,png,md}
        paper/visuals/final/data/basin_width_evolution.json
 
-Last row (since 2026-09-22, when the separate basin_width_lines figure was folded
-in here, since it drew the same data): one panel per environment, one line per
+Last row: one panel per environment, one line per
 method, the median over that environment's settings of the method's width
 relative to PPO at every task (log scale, 3-checkpoint running mean; MiniGrid has
 one setting, so it has no relative panel). Relative width per setting and
@@ -22,7 +21,7 @@ checkpoints only, and undefined where either mean is below RATIO_FLOOR (0.5% of
 probe states: a near-constant policy makes the ratio explode). Grouped by
 environment, not by the axis of change, because environment explains most of the
 spread between settings and the axis of change almost none (adjusted eta^2 over
-the 12 classic-control settings, 2026-09-21: ~0.7 vs <= 0 for the late ratio of
+the 12 classic-control settings: ~0.7 vs <= 0 for the late ratio of
 ES, GA and TRAC-PPO). The legend carries basin_width_main's pooled statistic
 over all 13 settings: the median late ratio and its Wilcoxon mark.
 
@@ -32,7 +31,7 @@ Panels, runs, arms, trials and the width column are exactly those of
 (0.1 times each tensor's norm) on the ReLU networks of gymnax and MiniGrid,
 absolute noise (s.d. 0.1 on every weight) on the tanh networks of HalfCheetah
 and Kinetix. The FIGURE draws the 13 ReLU panels only, as basin_width_main and
-the appendix table do (2026-09-21): on a tanh network neither kind of noise is
+the appendix table do: on a tanh network neither kind of noise is
 free of the weight scale (paper app:basin_noise_scale); the tanh panels stay in
 the data file and the markdown, marked with a dagger. Each panel draws, per method, the action
 change under weight noise of the centroid saved at the end of each sub-task

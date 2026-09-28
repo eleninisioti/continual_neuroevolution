@@ -66,12 +66,9 @@ confidence interval (`--band ci`, the default; `bootstrap_ci` in
 uses). Not the median: the per-seed outcomes on these tasks are bimodal -- a
 PPO seed on CartPole scores 500 on a sub-task or 9 -- and a median over 10
 seeds flips to the ceiling as soon as 6 solve, with the failed seeds hidden
-under its interquartile band. Between 2026-09-08 and 2026-09-10 this script
-drew that median, and the RL arms looked a full ceiling better on CartPole
-than the table beside them, which averages over trials, said they were. The
-mean is the only summary that still encodes how many seeds failed, and it is
-what every column of the table reports, so the figure and the table now
-aggregate the same way. `--band sd` and `--band iqr` remain for the appendix.
+under its interquartile band. The mean is the only summary that still
+encodes how many seeds failed, and it is what every column of the table
+reports, so the figure and the table aggregate the same way. `--band sd` and `--band iqr` remain for the appendix.
 
 ## The x axis
 
@@ -102,8 +99,7 @@ from source.metrics.continual_metrics import (            # noqa: E402
     bootstrap_ci, cumulative_reward, forward_transfer_trials,
     mann_whitney_marks)
 
-# The paper's palette and labels, from the earlier comparison script's METHOD_STYLE.
-# Deliberately kept in step with it: a method must be the same colour in every
+# The paper's palette and labels: a method must be the same colour in every
 # figure or the reader re-learns the legend on each one.
 METHOD_STYLE = {
     # `ga_refresh` is THE GA and is labelled as such: it re-evaluates its elite
@@ -149,9 +145,9 @@ METHOD_ORDER = ['ga', 'ga_refresh', 'ga_reeval', 'ga_isoline', 'dns',
 # Arms whose data does not measure what their name says.
 #
 # KEYED ON WHAT THE RUN RECORDED, not on the method name, because the same
-# name now covers both a broken and a fixed run: `ga` froze its archive until
-# 2026-09-08 and re-scores it unconditionally after, and `cchain` ran at a
-# pinned coefficient in the reported tree and at the reference's value since.
+# name covers both a broken and a fixed run: `ga` runs that froze their
+# archive and runs that re-score it unconditionally, and `cchain` runs at a
+# pinned coefficient in the reported tree and at the published value elsewhere.
 # A name-keyed list would drop the fixed runs along with the broken ones, and
 # it would do it silently. Each entry is (predicate over the run's config,
 # reason); a cell is affected only if EVERY trial in it satisfies the
@@ -167,11 +163,10 @@ def _ga_archive_frozen(cfg):
     # GA would be dropped as superseded for a bug it cannot have.
     #
     # The shared runners (MiniGrid, mjx, kinetix) record the same fact under
-    # `searcher_resolved.refresh` -- their GA has re-scored its archive since
-    # 2026-08-27 and `ga_stale` is the frozen one -- so a run carrying that
-    # block is judged by it. Reading `refresh_archive` alone dropped every
-    # shared-runner GA from the continual figures (found on cheetah,
-    # 2026-09-11; MiniGrid had been drawn without its GA too).
+    # `searcher_resolved.refresh` -- their GA re-scores its archive and
+    # `ga_stale` is the frozen one -- so a run carrying that block is judged
+    # by it. Reading `refresh_archive` alone would drop every shared-runner GA
+    # from the continual figures.
     resolved = cfg.get('searcher_resolved') or {}
     if 'refresh' in resolved:
         return not bool(resolved['refresh'])
@@ -181,7 +176,7 @@ def _ga_archive_frozen(cfg):
 def _cchain_coef_pinned(cfg):
     # The categorical controller floors the coefficient at 1, so a target
     # scale below 1 pins it there. The brax (continuous-action) controller has
-    # no floor (`chain_floor` 0) and 0.05 is the reference's DMC value.
+    # no floor (`chain_floor` 0) and 0.05 is the published DMC value.
     scale = cfg.get('chain_target_rel_scale')
     return (scale is not None and float(scale) < 1.0
             and float(cfg.get('chain_floor', 1.0)) > 0)
@@ -287,8 +282,8 @@ METRIC_COLUMNS = {
     # that differs per method and does not cancel in a comparison. The RL arms
     # have no population, and `mean_reward` is ALREADY this protocol at the
     # same episode count, so they fall back to it and the two families are one
-    # estimator. Runs made before 2026-09-08 do not have the column; they fall
-    # back to `best_fitness` and the figure says so.
+    # estimator. Runs without the column fall back to `best_fitness` and the
+    # figure says so.
     'elite_eval':    ['elite_eval_fitness', 'mean_reward'],
     # What the search HANDS BACK, held out across every sub-task. Generalists
     # trainers only, and NOT the same thing as `centroid` on GA or DNS.
@@ -298,9 +293,9 @@ MONOTONE_OK = {'best_so_far'}
 
 
 # The table's headline column is an integral of whatever curve `--metric`
-# selected, so its NAME has to follow that metric. It used to be the literal
-# string "Cum. max" for every metric, which under `--metric centroid` labelled
-# the score of the population's mean WEIGHTS as a maximum -- of nothing. The
+# selected, so its NAME has to follow that metric: "Cum. max" under
+# `--metric centroid` would label the score of the population's mean WEIGHTS
+# as a maximum -- of nothing. The
 # two reported directories are meant to be read side by side, so a reader who
 # takes both tables' first column for the same quantity is exactly the error
 # the elite/centroid split exists to prevent.
@@ -404,7 +399,7 @@ def agent_sources_for(cell_dir, metric):
         for trial_dir in sorted(cell_dir.glob('trial_*')):
             cfg, _ = load_config(trial_dir)
             if cfg:
-                # The elite is the best-performing agent (2026-09-13). On a
+                # The elite is the best-performing agent. On a
                 # shared-runner tree that is the incumbent for GA/DNS (the
                 # best archive member) and PBT, but on ES (any recorded ES
                 # method string: `es`, or the older `openes`/`nes`) the
@@ -590,7 +585,7 @@ def load_divergence(results_dir):
             #    alone: on MiniGrid that is the 8x8 room after the 16x16, ~0
             #    for every arm, while the 16x16 after the 8x8 loses up to 0.73.
             #    With two sub-tasks this IS the standard definition, taken at
-            #    every switch and in both directions. Since 2026-09-11.
+            #    every switch and in both directions.
             'F': summary.get(
                 'switch_forgetting'
                 if distinct_subtasks(run_dir, rec.get('num_tasks')) == 2
@@ -735,13 +730,11 @@ def collect(root, phase, cell_filter, metric, aggregate, assume_ep,
                     continue
                 total, per_gen = budget(cfg, res, assume_ep)
                 if total is None:
-                    # A trial whose budget cannot be computed used to be
-                    # dropped HERE, silently, and a method all of whose trials
-                    # hit this vanished from the figure with nothing said. It
-                    # is how the stationary NE arms went missing: the
-                    # noncontinual NE trainers recorded no `episode_length`,
-                    # so `generations x pop x evals x episode_length` had a
-                    # None in it. Reported now.
+                    # A trial whose budget cannot be computed is reported, not
+                    # dropped silently: otherwise a method all of whose trials
+                    # hit this (e.g. a trainer that records no
+                    # `episode_length`) would vanish from the figure with
+                    # nothing said.
                     missing_field = next(
                         (k for k in ('pop_size', 'num_evals', 'episode_length',
                                      'num_generations')
@@ -1021,8 +1014,8 @@ def write_table(path, data, pop_data, ref_data, posthoc, used_columns, per_gen,
         'WEAKEST comparison survived. \\* p<0.05, \\*\\* p<0.01, '
         '\\*\\*\\* p<0.001.', '']
     notes = []
-    # ES on a shared-runner tree logged no best-member elite before
-    # 2026-09-13: the curve under `elite_eval` there is the distribution MEAN
+    # ES runs on a shared-runner tree that predate the best-member elite: the
+    # curve under `elite_eval` there is the distribution MEAN
     # (the incumbent), while Final / ZT read the saved best member. Said in
     # the table, per method, rather than left to be discovered.
     if args.metric == 'elite_eval':
@@ -1040,8 +1033,8 @@ def write_table(path, data, pop_data, ref_data, posthoc, used_columns, per_gen,
                     break
         if mean_curve:
             notes += [f"> **{', '.join(sorted(mean_curve))}: the elite CURVE is the "
-                      'distribution mean.** These runs predate the best-member elite '
-                      '(2026-09-13), so for them the curve equals the centroid; the '
+                      'distribution mean.** These runs predate the best-member elite, '
+                      'so for them the curve equals the centroid; the '
                       'post-hoc columns (Final, ZT) read the saved best member of each '
                       "phase's last generation.", '']
     if missing_ref:

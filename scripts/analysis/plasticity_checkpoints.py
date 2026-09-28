@@ -67,8 +67,8 @@ CPU-only, and it is safe to run beside training.
   * `step_norm` is the distance moved over a whole sub-task, so it may be
     compared across methods (they spend the same steps per sub-task) but NOT read as a per-update step size.
 
-Finer resolution needs runs saved with a checkpoint interval, which the
-earlier generalists study did (at 5 generations) and this tree does not.
+Finer resolution needs runs saved with a checkpoint interval, which this
+tree does not have.
 
 ## The probe batch
 
@@ -84,23 +84,23 @@ Under `param` the body is rescaled instead, and the same argument applies more
 weakly through the dynamics.
 
     matched   (default) sub-task t's own distribution at checkpoint t, which is
-              the agent saved at the end of sub-task t. This is the ReDo
-              reference's convention: it draws a fresh replay-buffer batch at
-              every check (inspiration/redo/redo_dqn.py:170), so dormancy there
-              is always relative to the data the agent is training on.
+              the agent saved at the end of sub-task t. This is ReDo's
+              convention: it draws a fresh replay-buffer batch at every
+              check, so dormancy there is always relative to the data the
+              agent is training on.
     pooled    an equal share of states from every sub-task, one fixed batch for
               every checkpoint. On-distribution in aggregate AND constant in
               time, which is what a persistence measure wants -- see below.
-    subtask0  the historical batch: a random policy on the unperturbed body,
-              reused at every checkpoint. Reproduces earlier outputs, and is
-              kept as the control that shows how much the choice matters.
+    subtask0  a random policy on the unperturbed body, reused at every
+              checkpoint. Kept as the control that shows how much the choice
+              matters.
 
 The sub-task sequence itself is read out of `checkpoints.npz`
 (`noise_vectors`, `param_mults`), which the trainers write beside the agents,
 so nothing about it is reconstructed or assumed.
 
 In every mode the states come from a UNIFORM RANDOM policy, not from each
-method's own visited states. The reference uses the agent's replay buffer,
+method's own visited states. ReDo uses the agent's replay buffer,
 which here would fold policy quality into the metric and make the arms
 incomparable; a random-policy batch under the correct sub-task fixes the large
 error without introducing that one.
@@ -160,9 +160,8 @@ from source.metrics.ntk import rank_stats                    # noqa: E402
 # Which saved agent the columns are read off, in preference order, keyed by
 # `--agent`. The NE trainers write `finalgen` (best member of the sub-task's
 # final generation) and `incumbent`; the single-policy RL trainers write
-# `final`. `elite` is the historical behaviour and the order
-# `make_lineplot.ZT_SOURCES` uses, so every post-hoc column in the paper
-# describes the same agent as the elite lineplot.
+# `final`. `elite` is the order `make_lineplot.ZT_SOURCES` uses, so every
+# post-hoc column in the paper describes the same agent as the elite lineplot.
 #
 # `centroid` reads `centroid` instead, so the plasticity table describes the
 # NETWORK THE CENTROID LINEPLOT SCORES -- `centroid_fitness` is the score of
@@ -372,12 +371,11 @@ def subtask_probes(env_name, offsets, mults, num_obs, seed, mode, cache):
     the two fixed modes. `cache` is a dict keyed by the rollout actually needed,
     so the random-policy rollouts are shared across methods and trials.
 
-      subtask0   the historical batch: sub-task 0, the UNPERTURBED body, one
+      subtask0   sub-task 0, the UNPERTURBED body, one
                  batch for every checkpoint. Kept as a control.
       matched    sub-task `t`'s own observation distribution at checkpoint `t`
-                 -- the ReDo reference's convention, which resamples from the
-                 current replay buffer at every check
-                 (inspiration/redo/redo_dqn.py). The default.
+                 -- ReDo's convention, which resamples from the current
+                 replay buffer at every check. The default.
       pooled     an equal share of states from EVERY sub-task, fixed across
                  time. On-distribution in aggregate and constant, which is
                  what a persistence measure wants: see the note below.

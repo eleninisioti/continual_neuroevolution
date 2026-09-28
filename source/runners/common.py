@@ -56,8 +56,7 @@ def make_phase_grid(num_steps, task_interval, warmup=0):
 
     The uniform grid -- phase ``step // task_interval`` -- unless ``warmup``,
     which makes the FIRST phase ``warmup`` steps long and every later one
-    ``task_interval``. ``warmup=0`` reproduces the uniform grid exactly, so
-    every run made before this existed is unchanged.
+    ``task_interval``. ``warmup=0`` reproduces the uniform grid exactly.
 
     A warmup exists because a phase has to be read against how long the SEARCH
     takes on that body, and the two can differ by an order of magnitude. A
@@ -175,8 +174,7 @@ def record_scores(record, per_task, prefix='centroid'):
     was actually optimising -- it is the run's result, and it has to be the
     same reduction for both methods.
 
-    The two prefixes the runners write (since 2026-09-09; the older runs are
-    renamed in place by scripts/analysis/migrate_shared_runner_columns.py):
+    The two prefixes the runners write:
 
         centroid   the coordinate-wise MEAN OF THE POPULATION'S WEIGHTS, always.
                    On ES that is the distribution mean; on GA and DNS
@@ -187,10 +185,6 @@ def record_scores(record, per_task, prefix='centroid'):
                    and DNS (the elite), the distribution mean on ES,
                    the best PBT member by training return. The figures read it
                    as `elite_eval`.
-
-    Until 2026-09-09 this docstring described the opposite convention
-    (`centroid` = what the search hands back, `popmean` = the weight mean),
-    which is what the kinetix_repo runs on CLUSTER still record.
     """
     per_task = np.asarray(per_task)
     for t in range(per_task.shape[0]):
@@ -264,9 +258,6 @@ def add_figure_columns(records, is_rl):
              policy_churn_action = rl_churn     (argmax disagreement)
              policy_churn        = rl_churn_ce  (the cross-entropy C-CHAIN
                                                  regularises)
-
-    This used to be a separate pass over finished runs
-    (`scripts/analysis/migrate_shared_runner_columns.py`).
     """
     if not records:
         return records

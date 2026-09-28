@@ -49,10 +49,10 @@ Where the runs come from. GA on MountainCar is the plain gymnax GA
 is the plain GA plus novelty selection, so that is the comparison that
 isolates novelty, and the focus runs log no behavioural diversity. GA +
 Novelty is read from the
-2026-09-16 re-runs that re-score the repertoire every generation
+re-runs that re-score the repertoire every generation
 (`runs_*_dnsrefresh`, scripts/train/cluster/submit_gymnax_dns.sh) when all
 their trials are there; `--dns boundary` -- or their absence -- falls back to
-the earlier runs, which re-scored the population AT each switch (so the method was
+the runs that re-scored the population AT each switch (so the method was
 told where the boundaries were) and are stamped PRELIMINARY on the figure.
 """
 

@@ -147,7 +147,7 @@ FAMILIES = {
 # `reported` is the noise family's link tree; a multiplier axis's x is the
 # multiplier of the reported value.
 # ES columns first: the paper's one method order (make_lineplot.METHOD_ORDER,
-# NE before RL, as Figure 2) since 2026-09-21.
+# NE before RL, as Figure 2).
 AXES = [
     ('es', 'pop', 'population $P$',
      [('es_pop128', 128), ('reported', 512), ('es_pop2048', 2048)], 'int'),

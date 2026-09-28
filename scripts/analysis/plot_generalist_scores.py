@@ -66,8 +66,8 @@ one. MiniGrid has one direction, so it cannot be frozen.
 
 MiniGrid is drawn in its own row (Physics), and a separate column right of
 the grid holds a threshold-free summary, performance profiles as in rliable.
-Since 2026-09-24 the grid is the appendix figure (`_grid` stem: the two-task
-points moved into the trade-off figure) and the main-text figure is the two
+The grid is the appendix figure (`_grid` stem: the two-task points are in
+the trade-off figure) and the main-text figure is the two
 profiles alone, side by side. Per trial and panel, a score is
 rescaled to (score - untrained) / (best - untrained), `best` the highest mean
 shown return of any method and direction in the panel, and taken in the
@@ -359,7 +359,7 @@ def main() -> int:
     ap.add_argument('--profile-layout', choices=('row', 'column'), default='row',
                     help='the standalone profiles side by side with a legend, or stacked '
                          'without one (the paper draws them in Figure 2 from '
-                         'data/generalist_profiles.json since 2026-09-24)')
+                         'data/generalist_profiles.json)')
     ap.add_argument('--profile-width', type=float, default=None,
                     help='width in inches of the profiles-only figure (default 1.55 '
                          'stacked, 3.4 in a row)')
@@ -541,7 +541,7 @@ def main() -> int:
     plt.close(fig)
     print(f'wrote {STEM_GRID}.pdf/.png ({width:.2f} x {height:.2f} in)')
     # The main-text figure: the profiles alone, side by side (the grid's
-    # two-task points are in the trade-off figure since 2026-09-24).
+    # two-task points are in the trade-off figure).
     stacked = args.profile_layout == 'column'
     pw = args.profile_width or (1.55 if stacked else 3.4)
     if stacked:

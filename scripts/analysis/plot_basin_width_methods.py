@@ -33,7 +33,7 @@ five sub-task checkpoints, on the centroid (the policy for PPO, TRAC, ReDo and C
 average of the population for PBT). A method's width relative to PPO is PPO's
 action change over the method's: above 1 = a wider basin than PPO.
 
-Solved checkpoints only (ReLU panels, since 2026-09-21). A basin is the region
+Solved checkpoints only (ReLU panels). A basin is the region
 of high return around a SOLUTION, and the action change stands in for it only
 while the policy solves its sub-task. A failed policy can read as very wide --
 TRAC-PPO's MountainCar checkpoints that push right in every state change no
@@ -87,8 +87,8 @@ TABLE = plm.OUT / 'basin_width_table'
 MAIN = pgs.FINAL / 'basin_width_main'
 DATA = pgs.FINAL / 'data' / 'basin_width_main.json'
 METHODS = pgo.ARMS                  # ga es ppo trac redo cchain pbt
-# The paper's one method order (make_lineplot.METHOD_ORDER, as Figure 2) since
-# 2026-09-21; the table used to put ES first. PPO is the reference, not a column.
+# The paper's one method order (make_lineplot.METHOD_ORDER, as Figure 2).
+# PPO is the reference, not a column.
 from make_lineplot import METHOD_ORDER                     # noqa: E402
 TABLE_ORDER = [m for m in METHOD_ORDER if m in ('es', 'ga', 'trac', 'redo', 'cchain', 'pbt')]
 REFERENCE = 'ppo'

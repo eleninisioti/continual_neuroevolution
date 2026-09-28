@@ -18,8 +18,7 @@ Two methods of one class, differing only in the variation operator
 The descriptor space is either hand-designed (per suite, see `source/envs`)
 or learned online by AURORA (`source/metrics/aurora.py`).
 
-The dominated-novelty computation is an exact port of QDax
-`dns_repertoire.py`.
+The dominated-novelty computation is adapted from QDax (MIT licence).
 """
 
 from __future__ import annotations
@@ -36,7 +35,7 @@ from source.algorithms.ne.variation import (
 
 
 def dominated_novelty(fitness, descriptor, k, normalize=False):
-    """Compute dominated novelty — exact port of QDax dns_repertoire.py.
+    """Compute dominated novelty.
 
     For each individual, dominated novelty is the mean distance in descriptor
     space to the k nearest neighbors that have fitness >= its own.
@@ -45,8 +44,8 @@ def dominated_novelty(fitness, descriptor, k, normalize=False):
 
     `normalize` z-scores the descriptors per dimension across the pool before
     the distances are taken, which makes the ranking invariant to how the
-    descriptor space happens to be scaled. Off by default (the reference does
-    not do it, and its descriptor spaces are bounded and commensurate anyway);
+    descriptor space happens to be scaled. Off by default (hand-designed
+    descriptor spaces are bounded and commensurate anyway);
     worth having for AURORA, whose six latent dimensions are on arbitrary and
     unequal scales, so an unnormalised Euclidean distance is dominated by
     whichever dimension the encoder happened to give the largest range.
@@ -123,8 +122,7 @@ class DNSSearcher:
     ``repertoire_ratio`` splits it: at 512 / 0.5 the repertoire is 256 and 256
     offspring are bred from it, matching the other methods' 512 evaluations.
 
-    The iso/line sigmas default to the reference's corrected values
-    (0.005 / 0.05).
+    The iso/line sigmas default to 0.005 / 0.05 (the DNS paper's values).
     """
 
     needs_descriptors = True
@@ -153,7 +151,7 @@ class DNSSearcher:
         self.init_scale = float(init_scale)
         self.normalize_descriptors = bool(normalize_descriptors)
         # Where the repertoire starts: jittered copies of the seed policy, or
-        # the reference's `N(0, init_scale)` -- as `GASearcher.init_around_mean`.
+        # `N(0, init_scale)` -- as `GASearcher.init_around_mean`.
         self.init_around_mean = bool(init_around_mean)
         self.repertoire_size = max(
             1, int(self.population_size * float(repertoire_ratio)))

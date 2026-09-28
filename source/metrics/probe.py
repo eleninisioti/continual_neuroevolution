@@ -2,15 +2,12 @@
 
 Every plasticity diagnostic scores policies on the same held-out batch of
 visited states. For gymnax/brax/kinetix that batch is a single `(n, obs_dim)`
-array and plain slicing is enough. The scheduling suite, dropped
-2026-09-08, had an observation that was a NamedTuple of arrays with different
-trailing shapes (`ops_durations` is
-(n, J, O), `machines_remaining_times` is (n, M)), so `probe_obs[:k]` and
-`probe_obs.shape[0]` stop working.
+array and plain slicing is enough. An observation that is a NamedTuple of
+arrays with different trailing shapes breaks `probe_obs[:k]` and
+`probe_obs.shape[0]`.
 
 These four helpers are the whole difference. They are `jax.tree` operations, so
-a bare array -- a pytree with one leaf -- goes through them unchanged and every
-existing caller keeps its numbers bit-exactly. Use them instead of indexing a
+a bare array -- a pytree with one leaf -- goes through them unchanged. Use them instead of indexing a
 probe batch directly.
 """
 

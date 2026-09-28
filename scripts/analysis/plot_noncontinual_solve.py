@@ -27,7 +27,7 @@ these draw the CENTROID, the curve `make_lineplot.py --phase noncontinual
 rolling median and bootstrap band). The two differ most for a GA whose archive
 never consolidates: the plain GA's best individual on MountainCar read ~-95 and
 the mean of its weights -500 in half the seeds, which is why the MountainCar GA
-is `ga_focus_explore` since 2026-09-15
+is `ga_focus_explore`
 (projects/iclr_2027/runs_ga_focus_mountaincar/README.md).
 
 MiniGrid is drawn over its first 250 of 4000 generations: every arm has

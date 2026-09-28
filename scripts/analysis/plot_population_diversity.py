@@ -42,9 +42,7 @@ A column a run does not log is n/a: Kinetix GA/ES log no behavioural column
 (the Kinetix NE trace keeps step features, not frames, so there is no probe
 batch to disagree on). An ES population is the centroid plus sigma-noise, so
 its genomic diversity is sigma by construction. The weight RMS of the saved
-agent is the plasticity figure's weight row; it used to be a column here, with
-the per-weight s.d. over it (dropped 2026-09-19: both are the genomic column
-against a quantity the figure is not about).
+agent is the plasticity figure's weight row, not a column here.
 """
 
 from __future__ import annotations
@@ -84,8 +82,8 @@ PANELS = [
     ('actions_2task', 'Acrobot_v1_sigma1.0', 'Acrobot, action reversal'),
     ('actions_2task', 'MountainCar_v0_sigma1.0', 'MountainCar, action reversal'),
     # DeepSea 12, the action-map family (fig:novelty's collapse cell, not one
-    # of continual_main's): probe_deepsea GA/ES and the PBT-PPO run of
-    # 2026-09-20 (scripts/train/queue_iclr_deepsea_pbt.sh).
+    # of continual_main's): probe_deepsea GA/ES and the PBT-PPO run
+    # (scripts/train/queue_iclr_deepsea_pbt.sh).
     ('deepsea', 'DeepSea12_bsuite_sigma1.0', 'DeepSea 12, action map'),
     ('cheetah_noise_10task', 'cheetah_noise', 'HalfCheetah, noise'),
     ('cheetah_actions_2task', 'cheetah_action', 'HalfCheetah, action reversal'),
@@ -95,7 +93,7 @@ PANELS = [
 # The row the main text shows (--main); the appendix figure has them all.
 # CartPole under action reversal: the GA is the most plastic and the most
 # diverse, ES the least diverse with the least forgetting, PBT-PPO between
-# them on both counts (2026-09-19).
+# them on both counts.
 MAIN_ROW = ('actions_2task', 'CartPole_v1_sigma1.0', 'CartPole, action reversal')
 # Link name -> the method it is drawn as: one ES and one PBT-PPO entry.
 ARM_METHOD = {'ga': 'ga', 'es': 'es', 'pbt': 'pbt', 'pbt2': 'pbt'}

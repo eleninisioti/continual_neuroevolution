@@ -59,7 +59,7 @@ some RL method's interval on both axes (lower LA than its lower bound, more F
 than its upper bound); an NE point outside it is not clearly beaten on both
 axes by any RL method. The `Dominated by` column tests the same claim: RL
 methods better on LA and on F, each by a one-sided Mann-Whitney U test over
-seeds (p < 0.05). Before 2026-09-24 the region and the column used the means. The mean, not rliable's IQM, as in every other
+seeds (p < 0.05). The mean, not rliable's IQM, as in every other
 figure of the paper (make_lineplot.bootstrap_ci says why). The tables add
 rliable's probability of improvement on LA - F.
 
@@ -71,11 +71,11 @@ gymnax and MiniGrid read the reward matrix from the home forgetting pass
 (PASS). Kinetix and HalfCheetah read it from the training records instead
 (`load_records`), which log the centroid on every sub-task: Kinetix's pass runs
 on the GH200 only, and the records gave its LA and F exactly on
-all 45 runs it scored (2026-09-15); the cheetah's RL arms (and its noise GA)
+all 45 runs it scored; the cheetah's RL arms (and its noise GA)
 are the CLUSTER brax-PPO-shape runs, which the home pass never scored, so every
 cheetah arm is read the same way. On the cheetah ES runs both sources score,
 mean LA agrees to 0.1% and a run's F to within 0.07 of the rescaled axis (MJX
-evaluation noise, 2026-09-17). Their BD, where present, is a CLUSTER centroid
+evaluation noise). Their BD, where present, is a CLUSTER centroid
 pass over three trials an arm (BD_PASS).
 
 `--stability BD` puts behavioural divergence at the switch on the y axis
@@ -336,8 +336,8 @@ def points_for(scaled, envs, stability):
 def dominators(points, alpha=0.05):
     """`{method: [RL methods SIGNIFICANTLY better on both axes]}`: higher LA and
     lower F, each by a one-sided Mann-Whitney U test over seeds at `alpha`.
-    Better means alone did not count as dominance since 2026-09-24: on Kinetix
-    ES trailed ReDo-PPO by 0.02 LA (p 0.84) and sat in the region."""
+    Better means alone do not count as dominance: on Kinetix ES trails
+    ReDo-PPO by only 0.02 LA (p 0.84)."""
     def seeds(p, k):
         return np.concatenate(p['per_env'][k])
     out = {}
