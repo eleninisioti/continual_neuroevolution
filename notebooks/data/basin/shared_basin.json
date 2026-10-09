@@ -1,0 +1,446 @@
+{
+ "description": "Shared basin per setting and method: share of random moves of radius 0.1 (x each tensor norm) around an end-of-task checkpoint that solve both the task just trained and the next (rescaled return >= 0.5), mean over checkpoints of the second half of each run that solve their own task. shared_basin_own_step: the same with moves as large, per tensor, as the step the method took over the next task. la_minus_f: rescaled LA - F of Figure 2. frozen: the method only ever learnt one of two alternating tasks.",
+ "points": [
+  {
+   "setting": "CartPole, 10 noise tasks",
+   "method": "cchain",
+   "shared_basin": 0.01,
+   "shared_basin_own_step": 0.0124,
+   "la_minus_f": 0.1517,
+   "frozen": false,
+   "checkpoints": 83
+  },
+  {
+   "setting": "CartPole, 10 noise tasks",
+   "method": "es",
+   "shared_basin": 0.1531,
+   "shared_basin_own_step": 0.1542,
+   "la_minus_f": 0.3064,
+   "frozen": false,
+   "checkpoints": 70
+  },
+  {
+   "setting": "CartPole, 10 noise tasks",
+   "method": "ga",
+   "shared_basin": 0.0756,
+   "shared_basin_own_step": 0.0311,
+   "la_minus_f": 0.2267,
+   "frozen": false,
+   "checkpoints": 86
+  },
+  {
+   "setting": "CartPole, 10 noise tasks",
+   "method": "pbt",
+   "shared_basin": 0.0299,
+   "shared_basin_own_step": 0.0333,
+   "la_minus_f": 0.1314,
+   "frozen": false,
+   "checkpoints": 90
+  },
+  {
+   "setting": "CartPole, 10 noise tasks",
+   "method": "ppo",
+   "shared_basin": 0.0043,
+   "shared_basin_own_step": 0.0009,
+   "la_minus_f": 0.0976,
+   "frozen": false,
+   "checkpoints": 69
+  },
+  {
+   "setting": "CartPole, 10 noise tasks",
+   "method": "redo",
+   "shared_basin": 0.01,
+   "shared_basin_own_step": 0.0011,
+   "la_minus_f": 0.0863,
+   "frozen": false,
+   "checkpoints": 89
+  },
+  {
+   "setting": "CartPole, 10 noise tasks",
+   "method": "trac",
+   "shared_basin": 0.0194,
+   "shared_basin_own_step": 0.0094,
+   "la_minus_f": 0.1018,
+   "frozen": false,
+   "checkpoints": 70
+  },
+  {
+   "setting": "Acrobot, 10 noise tasks",
+   "method": "cchain",
+   "shared_basin": 0.3116,
+   "shared_basin_own_step": 0.2001,
+   "la_minus_f": 0.4551,
+   "frozen": false,
+   "checkpoints": 73
+  },
+  {
+   "setting": "Acrobot, 10 noise tasks",
+   "method": "es",
+   "shared_basin": 0.5453,
+   "shared_basin_own_step": 0.5088,
+   "la_minus_f": 0.5878,
+   "frozen": false,
+   "checkpoints": 87
+  },
+  {
+   "setting": "Acrobot, 10 noise tasks",
+   "method": "ga",
+   "shared_basin": 0.4066,
+   "shared_basin_own_step": 0.2887,
+   "la_minus_f": 0.5986,
+   "frozen": false,
+   "checkpoints": 96
+  },
+  {
+   "setting": "Acrobot, 10 noise tasks",
+   "method": "pbt",
+   "shared_basin": 0.2824,
+   "shared_basin_own_step": 0.2294,
+   "la_minus_f": 0.3394,
+   "frozen": false,
+   "checkpoints": 66
+  },
+  {
+   "setting": "Acrobot, 10 noise tasks",
+   "method": "ppo",
+   "shared_basin": 0.1744,
+   "shared_basin_own_step": 0.0776,
+   "la_minus_f": 0.2082,
+   "frozen": false,
+   "checkpoints": 31
+  },
+  {
+   "setting": "Acrobot, 10 noise tasks",
+   "method": "redo",
+   "shared_basin": 0.1808,
+   "shared_basin_own_step": 0.0435,
+   "la_minus_f": 0.0536,
+   "frozen": false,
+   "checkpoints": 28
+  },
+  {
+   "setting": "Acrobot, 10 noise tasks",
+   "method": "trac",
+   "shared_basin": 0.2121,
+   "shared_basin_own_step": 0.0681,
+   "la_minus_f": 0.3278,
+   "frozen": false,
+   "checkpoints": 87
+  },
+  {
+   "setting": "MountainCar, 10 noise tasks",
+   "method": "cchain",
+   "shared_basin": 0.1345,
+   "shared_basin_own_step": 0.1542,
+   "la_minus_f": 0.2711,
+   "frozen": false,
+   "checkpoints": 38
+  },
+  {
+   "setting": "MountainCar, 10 noise tasks",
+   "method": "es",
+   "shared_basin": 0.2053,
+   "shared_basin_own_step": 0.1373,
+   "la_minus_f": 0.2523,
+   "frozen": false,
+   "checkpoints": 51
+  },
+  {
+   "setting": "MountainCar, 10 noise tasks",
+   "method": "ga",
+   "shared_basin": 0.0376,
+   "shared_basin_own_step": 0.0243,
+   "la_minus_f": 0.2152,
+   "frozen": false,
+   "checkpoints": 188
+  },
+  {
+   "setting": "MountainCar, 10 noise tasks",
+   "method": "pbt",
+   "shared_basin": 0.1903,
+   "shared_basin_own_step": 0.1599,
+   "la_minus_f": 0.2692,
+   "frozen": false,
+   "checkpoints": 56
+  },
+  {
+   "setting": "MountainCar, 10 noise tasks",
+   "method": "ppo",
+   "shared_basin": 0.1374,
+   "shared_basin_own_step": 0.0909,
+   "la_minus_f": 0.2348,
+   "frozen": false,
+   "checkpoints": 39
+  },
+  {
+   "setting": "MountainCar, 10 noise tasks",
+   "method": "redo",
+   "shared_basin": 0.1086,
+   "shared_basin_own_step": 0.0227,
+   "la_minus_f": 0.0971,
+   "frozen": false,
+   "checkpoints": 20
+  },
+  {
+   "setting": "MountainCar, 10 noise tasks",
+   "method": "trac",
+   "shared_basin": 0.1455,
+   "shared_basin_own_step": 0.1013,
+   "la_minus_f": 0.1751,
+   "frozen": false,
+   "checkpoints": 58
+  },
+  {
+   "setting": "MiniGrid, 16x16 / 8x8",
+   "method": "cchain",
+   "shared_basin": 0.497,
+   "shared_basin_own_step": 0.4361,
+   "la_minus_f": 0.6178,
+   "frozen": false,
+   "checkpoints": 100
+  },
+  {
+   "setting": "MiniGrid, 16x16 / 8x8",
+   "method": "es",
+   "shared_basin": 0.9434,
+   "shared_basin_own_step": 0.7561,
+   "la_minus_f": 0.9172,
+   "frozen": false,
+   "checkpoints": 100
+  },
+  {
+   "setting": "MiniGrid, 16x16 / 8x8",
+   "method": "ga",
+   "shared_basin": 0.7003,
+   "shared_basin_own_step": 0.2742,
+   "la_minus_f": 0.8713,
+   "frozen": false,
+   "checkpoints": 100
+  },
+  {
+   "setting": "MiniGrid, 16x16 / 8x8",
+   "method": "pbt",
+   "shared_basin": 0.6109,
+   "shared_basin_own_step": 0.545,
+   "la_minus_f": 0.7784,
+   "frozen": false,
+   "checkpoints": 100
+  },
+  {
+   "setting": "MiniGrid, 16x16 / 8x8",
+   "method": "ppo",
+   "shared_basin": 0.2247,
+   "shared_basin_own_step": 0.1932,
+   "la_minus_f": 0.6477,
+   "frozen": false,
+   "checkpoints": 87
+  },
+  {
+   "setting": "MiniGrid, 16x16 / 8x8",
+   "method": "redo",
+   "shared_basin": 0.4416,
+   "shared_basin_own_step": 0.0317,
+   "la_minus_f": 0.685,
+   "frozen": false,
+   "checkpoints": 100
+  },
+  {
+   "setting": "MiniGrid, 16x16 / 8x8",
+   "method": "trac",
+   "shared_basin": 0.4145,
+   "shared_basin_own_step": 0.1862,
+   "la_minus_f": 0.6809,
+   "frozen": false,
+   "checkpoints": 98
+  },
+  {
+   "setting": "CartPole, order reversed",
+   "method": "cchain",
+   "shared_basin": 0.0002,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.0026,
+   "frozen": false,
+   "checkpoints": 100
+  },
+  {
+   "setting": "CartPole, order reversed",
+   "method": "es",
+   "shared_basin": 0.7898,
+   "shared_basin_own_step": 0.7461,
+   "la_minus_f": 0.5748,
+   "frozen": false,
+   "checkpoints": 91
+  },
+  {
+   "setting": "CartPole, order reversed",
+   "method": "ga",
+   "shared_basin": 0.1047,
+   "shared_basin_own_step": 0.0319,
+   "la_minus_f": 0.0906,
+   "frozen": false,
+   "checkpoints": 100
+  },
+  {
+   "setting": "CartPole, order reversed",
+   "method": "pbt",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.0035,
+   "frozen": false,
+   "checkpoints": 100
+  },
+  {
+   "setting": "CartPole, order reversed",
+   "method": "ppo",
+   "shared_basin": 0.0002,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.0194,
+   "frozen": false,
+   "checkpoints": 95
+  },
+  {
+   "setting": "CartPole, order reversed",
+   "method": "redo",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.0228,
+   "frozen": false,
+   "checkpoints": 94
+  },
+  {
+   "setting": "CartPole, order reversed",
+   "method": "trac",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.0102,
+   "frozen": false,
+   "checkpoints": 70
+  },
+  {
+   "setting": "Acrobot, order reversed",
+   "method": "cchain",
+   "shared_basin": 0.0291,
+   "shared_basin_own_step": 0.0119,
+   "la_minus_f": 0.3796,
+   "frozen": false,
+   "checkpoints": 58
+  },
+  {
+   "setting": "Acrobot, order reversed",
+   "method": "es",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.5748,
+   "frozen": true,
+   "checkpoints": 50
+  },
+  {
+   "setting": "Acrobot, order reversed",
+   "method": "ga",
+   "shared_basin": 0.0046,
+   "shared_basin_own_step": 0.0046,
+   "la_minus_f": 0.0995,
+   "frozen": false,
+   "checkpoints": 85
+  },
+  {
+   "setting": "Acrobot, order reversed",
+   "method": "pbt",
+   "shared_basin": 0.0695,
+   "shared_basin_own_step": 0.0583,
+   "la_minus_f": 0.3127,
+   "frozen": false,
+   "checkpoints": 71
+  },
+  {
+   "setting": "Acrobot, order reversed",
+   "method": "ppo",
+   "shared_basin": 0.011,
+   "shared_basin_own_step": 0.0051,
+   "la_minus_f": 0.3527,
+   "frozen": false,
+   "checkpoints": 58
+  },
+  {
+   "setting": "Acrobot, order reversed",
+   "method": "redo",
+   "shared_basin": 0.015,
+   "shared_basin_own_step": 0.0059,
+   "la_minus_f": 0.3382,
+   "frozen": false,
+   "checkpoints": 71
+  },
+  {
+   "setting": "Acrobot, order reversed",
+   "method": "trac",
+   "shared_basin": 0.0112,
+   "shared_basin_own_step": 0.0076,
+   "la_minus_f": 0.2208,
+   "frozen": false,
+   "checkpoints": 70
+  },
+  {
+   "setting": "MountainCar, order reversed",
+   "method": "cchain",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.4986,
+   "frozen": true,
+   "checkpoints": 50
+  },
+  {
+   "setting": "MountainCar, order reversed",
+   "method": "es",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.4687,
+   "frozen": true,
+   "checkpoints": 50
+  },
+  {
+   "setting": "MountainCar, order reversed",
+   "method": "ga",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": -0.0022,
+   "frozen": false,
+   "checkpoints": 176
+  },
+  {
+   "setting": "MountainCar, order reversed",
+   "method": "pbt",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.5862,
+   "frozen": true,
+   "checkpoints": 50
+  },
+  {
+   "setting": "MountainCar, order reversed",
+   "method": "ppo",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.5212,
+   "frozen": true,
+   "checkpoints": 50
+  },
+  {
+   "setting": "MountainCar, order reversed",
+   "method": "redo",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.3833,
+   "frozen": false,
+   "checkpoints": 38
+  },
+  {
+   "setting": "MountainCar, order reversed",
+   "method": "trac",
+   "shared_basin": 0.0,
+   "shared_basin_own_step": 0.0,
+   "la_minus_f": 0.1135,
+   "frozen": false,
+   "checkpoints": 50
+  }
+ ]
+}

@@ -1,47 +1,49 @@
 #!/bin/bash
 # ============================================================================
-# Run experiments: one or more settings, over as many GPUs as you give it.
+# Run experiments, over as many GPUs as you give it.
 #
-#   bash scripts/train/run.sh [options] SETTING[:METHODS] [SETTING[:METHODS] ...]
+#   bash scripts/train/run.sh [options]
+#
+# With no options, runs every experiment in the paper.
 #
 # Examples
-#   bash scripts/train/run.sh --gpus 4 gymnax_continual
-#   bash scripts/train/run.sh --gpus 2 gymnax_noncontinual gymnax_continual:ga,ppo
-#   bash scripts/train/run.sh --gpus 8 all
-#   bash scripts/train/run.sh --dry-run --trials 1 minigrid_continual:es
+#   bash scripts/train/run.sh
+#   bash scripts/train/run.sh --envs CartPole-v1 --methods ga --settings noncontinual --trials 1
+#   bash scripts/train/run.sh --benchmarks gymnax --methods ga,ppo --settings continual
+#   bash scripts/train/run.sh --dry-run --trials 1 --benchmarks minigrid --methods es
 #
-# SETTINGS
-#   gymnax_noncontinual   gymnax_continual   gymnax_popsize
-#   minigrid_noncontinual minigrid_continual
-#   kinetix_noncontinual  kinetix_continual
-#   cheetah_noncontinual  cheetah_continual
-#   all                   every setting above except gymnax_popsize, in that
-#                         order
-#
-# METHODS (after the colon, comma-separated)
-#   Default: the methods the paper reports for that benchmark, read from
-#   reported_arms in source/configs/<benchmark>.yaml. `all` is every method the
-#   setting defines. Anything a config knows is accepted, including the
-#   hyperparameter arms (`es_sigma0.3`, `ppo_lr0.001`, ...; see the gymnax
-#   blocks below) and `<method>_pop<N>` under gymnax_popsize.
+# WHAT TO RUN (each a comma-separated list)
+#   --benchmarks B    gymnax, minigrid, kinetix, mjx. Default: all four, or the
+#                     ones the --envs belong to.
+#   --envs E          environments, replacing each benchmark's defaults. The
+#                     benchmark follows from the name: MiniGrid_* is minigrid,
+#                     Kinetix* kinetix, cheetah* mjx, anything else gymnax
+#                     (CartPole-v1, Acrobot-v1, MountainCar-v0).
+#   --methods M       Default: the methods the paper reports for each benchmark,
+#                     read from reported_arms in source/configs/<benchmark>.yaml.
+#                     `all` is every method a benchmark defines. Anything a
+#                     config knows is accepted, including the hyperparameter
+#                     arms (`es_sigma0.3`, `ppo_lr0.001`, ...; see the gymnax
+#                     blocks below) and `<method>_pop<N>` under popsize.
+#   --settings S      noncontinual, continual, popsize (gymnax only: the
+#                     population-size sweep). Default: noncontinual,continual.
 #
 # OPTIONS
 #   --gpus N          use N GPUs (the first N visible). Default: all visible.
 #   --gpu-ids 0,2,5   use exactly these GPUs.
 #   --jobs-per-gpu K  run K jobs on each GPU at once (default 1; see below).
-#   --trials N        trials per (method, cell), seeds BASE_SEED..+N-1 (default 10)
+#   --trials N        trials per (method, env), seeds BASE_SEED..+N-1 (default 10)
 #   --root DIR        where runs are written (default $PROJECT_ROOT)
 #   --dry-run         print the job list and exit
 #
-# Runs land in <root>/<benchmark>/<setting>/<method>/<cell>/trial_<n>/, and
+# Runs land in <root>/<benchmark>/<setting>/<method>/<env>/trial_<n>/, and
 # each job's log in $LOG_DIR (default logs/run). A trial whose
 # training_metrics.json exists is skipped, so re-running the same command
-# runs exactly what is missing or failed. Every setting's jobs are queued in
-# the order the settings are given; one job runs per GPU at a time.
+# runs exactly what is missing or failed. Jobs are queued benchmark by
+# benchmark, setting by setting; one job runs per GPU at a time.
 #
 # More knobs, as environment variables: BASE_SEED (42), TRIALS ("3 4": only
-# these trials), ENVS (a setting's cells), PYTHON, and each block's own
-# (documented at the block).
+# these trials), PYTHON, and each block's own (documented at the block).
 #
 # ============================================================================
 
@@ -67,11 +69,18 @@ NUM_GPUS=""
 GPU_IDS=""
 JOBS_PER_GPU=1
 
-usage() { sed -n '2,50p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
+usage() { sed -n '2,47p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
-SPECS=()
+BENCHMARKS=""
+SETTINGS="noncontinual continual"
+METHODS_ARG=""
+ENVS_ARG=""
 while [ $# -gt 0 ]; do
     case "$1" in
+        --benchmarks)    BENCHMARKS="${2//,/ }"; shift 2 ;;
+        --envs)          ENVS_ARG="${2//,/ }"; shift 2 ;;
+        --methods)       METHODS_ARG="${2//,/ }"; shift 2 ;;
+        --settings)      SETTINGS="${2//,/ }"; shift 2 ;;
         --gpus)          NUM_GPUS="$2"; shift 2 ;;
         --gpu-ids)       GPU_IDS="${2//,/ }"; shift 2 ;;
         --jobs-per-gpu)  JOBS_PER_GPU="$2"; shift 2 ;;
@@ -79,11 +88,9 @@ while [ $# -gt 0 ]; do
         --root)          PROJECT_ROOT="$2"; shift 2 ;;
         --dry-run)       DRY_RUN=1; shift ;;
         -h|--help)       usage 0 ;;
-        -*)              echo "unknown option $1" >&2; usage 1 ;;
-        *)               SPECS+=("$1"); shift ;;
+        *)               echo "unknown argument $1" >&2; usage 1 ;;
     esac
 done
-[ "${#SPECS[@]}" -gt 0 ] || usage 1
 
 # The repo virtualenv if there is one, so the script works without activating it.
 if [ -z "${PYTHON:-}" ]; then
@@ -174,7 +181,7 @@ wants_pbt() {
 #     <root>/gymnax/<noncontinual|continual>/<method>/CartPole_v1_sigma1.0/trial_<n>
 #
 # Environment knobs:
-#   ENVS          environments (default CartPole-v1 Acrobot-v1 MountainCar-v0)
+#   --envs        environments (default CartPole-v1 Acrobot-v1 MountainCar-v0)
 #   SIGMAS        continual noise widths (default 0.02 1.0 2.0; NOISE_RANGE
 #                 forces one). Each must be in the config's SIGMAS.
 #   NUM_TASKS     continual phases (default 10, 200 generations each)
@@ -326,10 +333,10 @@ block_gymnax_popsize() {
 #                            controls, same budget, same twenty checkpoints,
 #                            nothing changing at them.
 #
-# Env: ENVS (the cells), TRIALS/NUM_TRIALS, PROJECT_ROOT, GPU, and
+# Env: --envs (the cells), TRIALS/NUM_TRIALS, PROJECT_ROOT, GPU, and
 # MINIGRID_EXTRA for anything to pass straight through to the CLI.
 # ----------------------------------------------------------------------------
-# Blocks: cheetah_*   (the ICLR mjx study)
+# Blocks: mjx_*   (the ICLR mjx study)
 # ----------------------------------------------------------------------------
 #
 # The MiniGrid arrangement on the MJX body: `source/run.py --suite mjx`
@@ -359,11 +366,11 @@ block_mjx() {
     done
 }
 
-block_cheetah_continual() {
+block_mjx_continual() {
     block_mjx continual "${ENVS:-cheetah_noise cheetah_friction}"
 }
 
-block_cheetah_noncontinual() {
+block_mjx_noncontinual() {
     # One stationary cell serves both families: sub-task 0 is the unperturbed
     # body under either task_mod, so the two would be the same run twice. See
     # source/configs/mjx.yaml.
@@ -453,17 +460,34 @@ block_kinetix_continual() {
 # Which settings, which methods
 # ----------------------------------------------------------------------------
 
-ALL_SETTINGS="gymnax_noncontinual gymnax_continual minigrid_noncontinual
-minigrid_continual kinetix_noncontinual kinetix_continual
-cheetah_noncontinual cheetah_continual"
+ALL_BENCHMARKS="gymnax minigrid kinetix mjx"
 
-suite_of() {
+# The benchmark an --envs name belongs to.
+benchmark_of_env() {
     case "$1" in
-        gymnax_*)            echo gymnax ;;
-        minigrid_*)          echo minigrid ;;
-        kinetix_*)           echo kinetix ;;
-        cheetah_*)           echo mjx ;;
-        *)                   return 1 ;;
+        MiniGrid*)  echo minigrid ;;
+        Kinetix*)   echo kinetix ;;
+        cheetah*)   echo mjx ;;
+        *)          echo gymnax ;;
+    esac
+}
+
+# Whether an --envs name is a cell of <benchmark>_<setting>. A gymnax
+# environment is a cell of every setting (continual adds the noise widths);
+# elsewhere the name says which: a pair of rooms, the twenty-level chain or a
+# cheetah with a kind of change is continual, a single one is not.
+env_fits() {
+    local suite="$1" setting="$2" env="$3" continual
+    case "$suite:$env" in
+        gymnax:*)                return 0 ;;
+        minigrid:MiniGrid_*x*_*) continual=1 ;;
+        kinetix:Kinetix[0-9]*)   continual=1 ;;
+        mjx:cheetah_*)           continual=1 ;;
+        *)                       continual=0 ;;
+    esac
+    case "$setting" in
+        continual) [ "$continual" = 1 ] ;;
+        *)         [ "$continual" = 0 ] ;;
     esac
 }
 
@@ -473,30 +497,63 @@ reported_methods() {
 from source.utils.config import load; print(' '.join(load('$1').reported_arms))"
 }
 
-EXPANDED=()
-for spec in "${SPECS[@]}"; do
-    if [ "${spec%%:*}" = all ]; then
-        for s in $ALL_SETTINGS; do EXPANDED+=("$s${spec#all}"); done
+# No --benchmarks: every benchmark, or only those the --envs belong to.
+if [ -z "$BENCHMARKS" ]; then
+    if [ -n "$ENVS_ARG" ]; then
+        for env in $ENVS_ARG; do
+            b="$(benchmark_of_env "$env")"
+            case " $BENCHMARKS " in *" $b "*) ;; *) BENCHMARKS="$BENCHMARKS $b" ;; esac
+        done
     else
-        EXPANDED+=("$spec")
+        BENCHMARKS="$ALL_BENCHMARKS"
     fi
+fi
+for b in $BENCHMARKS; do
+    case " $ALL_BENCHMARKS " in
+        *" $b "*) ;;
+        *) echo "unknown benchmark '$b' (one of: $ALL_BENCHMARKS)" >&2; exit 1 ;;
+    esac
+done
+for setting in $SETTINGS; do
+    case "$setting" in
+        noncontinual|continual|popsize) ;;
+        *) echo "unknown setting '$setting' (noncontinual, continual, popsize)" >&2; exit 1 ;;
+    esac
 done
 
 echo "=========================================="
-for spec in "${EXPANDED[@]}"; do
-    setting="${spec%%:*}"
-    suite="$(suite_of "$setting")" && declare -F "block_$setting" >/dev/null \
-        || { echo "unknown setting '$setting'; see --help" >&2; exit 1; }
-    if [ "$spec" != "$setting" ]; then
-        METHODS="${spec#*:}"; METHODS="${METHODS//,/ }"
+for suite in $BENCHMARKS; do
+    # This benchmark's share of --envs; empty means the blocks' defaults.
+    ENVS=""
+    for env in $ENVS_ARG; do
+        [ "$(benchmark_of_env "$env")" = "$suite" ] && ENVS="$ENVS $env"
+    done
+    if [ -n "$ENVS_ARG" ] && [ -z "$ENVS" ]; then
+        echo "none of --envs ($ENVS_ARG) belongs to benchmark '$suite'" >&2; exit 1
+    fi
+    if [ -n "$METHODS_ARG" ]; then
+        METHODS="$METHODS_ARG"
     else
         METHODS="$(reported_methods "$suite")" \
-            || { echo "could not read REPORTED_ARMS for $suite" >&2; exit 1; }
+            || { echo "could not read reported_arms for $suite" >&2; exit 1; }
     fi
-    before=$(wc -l < "$JOBFILE")
-    "block_$setting" >> "$LOG_DIR/collect.$$.log" 2>&1 \
-        || { echo "setting '$setting' failed to build its jobs; see $LOG_DIR/collect.$$.log" >&2; exit 1; }
-    printf '%-22s %4d jobs  (%s)\n' "$setting" $(( $(wc -l < "$JOBFILE") - before )) "$METHODS"
+    suite_envs="$ENVS"
+    for setting in $SETTINGS; do
+        declare -F "block_${suite}_$setting" >/dev/null \
+            || { echo "$suite has no $setting setting; skipped"; continue; }
+        ENVS=""
+        for env in $suite_envs; do
+            env_fits "$suite" "$setting" "$env" && ENVS="$ENVS $env"
+        done
+        if [ -n "$suite_envs" ] && [ -z "$ENVS" ]; then
+            echo "${suite}_$setting: none of --envs is one of its environments; skipped"
+            continue
+        fi
+        before=$(wc -l < "$JOBFILE")
+        "block_${suite}_$setting" >> "$LOG_DIR/collect.$$.log" 2>&1 \
+            || { echo "${suite}_$setting failed to build its jobs; see $LOG_DIR/collect.$$.log" >&2; exit 1; }
+        printf '%-22s %4d jobs  (%s)\n' "${suite}_$setting" $(( $(wc -l < "$JOBFILE") - before )) "$METHODS"
+    done
 done
 NJOBS=$(wc -l < "$JOBFILE")
 

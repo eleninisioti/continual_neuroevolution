@@ -364,7 +364,7 @@ def zero_shot_transfer(
 
     Args:
         run: The run to score. Its tasks must carry ``zero_shot_returns``,
-            which ``scripts/analysis/evaluate_continual.py`` produces.
+            which a post-hoc evaluation of the saved checkpoints produces.
         reducer: Statistic mapping a sub-task's zero-shot episode returns to
             ZT_tau.
 
@@ -377,8 +377,8 @@ def zero_shot_transfer(
     if not per_task:
         raise ValueError(
             f"run {run.method}/{run.env}/pop={run.pop_size}/trial={run.trial} has "
-            "no zero-shot evaluations; re-run scripts/analysis/evaluate_continual.py "
-            "so that each sub-task's agent is also scored on the next sub-task"
+            "no zero-shot evaluations: score each sub-task's agent on the next "
+            "sub-task first"
         )
     return float(np.mean(per_task))
 

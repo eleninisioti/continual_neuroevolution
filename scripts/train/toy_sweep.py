@@ -8,7 +8,7 @@
         --num_params 400 --out_dir projects/iclr_2027/runs_toy/wells_d400 \\
         --project ga 0.05 0      # full-dimensional snapshots of one cell
 
-then `python scripts/plotting/make_toy_figures.py <out_dir>`. A sweep is 2-D
+A sweep is 2-D
 (or d-D) arithmetic vmapped over levels and seeds, so it is CPU work
 (`JAX_PLATFORMS=cpu`) and minutes. `scripts/train/queue_toy.sh` runs every
 stage the paper uses.
@@ -35,8 +35,7 @@ generation; GA and DNS re-score their archive out of that budget. NO ARM IS
 TOLD WHERE A SWITCH IS: the sub-task only enters through the
 scores.
 
-`--record_centroid` adds the full centroid at every record, for every sigma
-(`scripts/analysis/plot_toy_sigma_basin.py` measures the basin around it).
+`--record_centroid` adds the full centroid at every record, for every sigma.
 
 WHAT IS RECORDED, beyond the old harness's found / held / retention:
 the CENTROID -- the coordinate-wise mean of the population's weights

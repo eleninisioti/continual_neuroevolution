@@ -15,7 +15,7 @@
 #
 # Arithmetic, not rollouts: CPU (JAX_PLATFORMS=cpu), so it never competes with
 # a training queue for a card. Output under $ROOT/<stage>/, one log per stage
-# under $ROOT/logs/, figures and table.md written into each stage directory.
+# under $ROOT/logs/.
 # =============================================================================
 set -uo pipefail
 
@@ -140,13 +140,4 @@ project wells_d400 ga 0.05 0.05 --landscape wells --num_params 400
 project wells_d400 dns_gaussian 0.05 0 --landscape wells --num_params 400
 project wells_d50 ga 0.05 0 --landscape wells --num_params 50
 
-for dir in "$ROOT"/*/; do
-    name=$(basename "$dir")
-    [ "$name" = logs ] && continue
-    wanted "$name" || continue
-    [ -f "$dir/results.json" ] || continue
-    echo "=== figures $name"
-    $PY scripts/plotting/make_toy_figures.py "$dir" >> "$ROOT/logs/$name.log" 2>&1 \
-        || echo "FAILED figures $name"
-done
 echo "=== done $(date '+%F %T')"

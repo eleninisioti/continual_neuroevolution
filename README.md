@@ -1,43 +1,61 @@
 # Continual Neuroevolution
 
-Neuroevolution vs. deep RL on non-stationary tasks, in JAX.
+This codebase contains code for benchmarking neuro-evolution in continual reinforcement learning tasks.
 
-**Methods:** GA · GA + Novelty · ES · PBT · PPO · TRAC-PPO · ReDo-PPO · C-CHAIN-PPO
+We consider two neuroevolution algorithms: [Evolution Strategies](https://arxiv.org/abs/1703.03864) and [Genetic Algorithms](https://arxiv.org/abs/1712.06567). For Genetic Algorithms, we also consider a variant that jointly maximises fitness and novelty ([Dominated Novelty Search](https://arxiv.org/abs/2502.00593)).
 
-**Benchmarks:** gymnax · MiniGrid · Kinetix · MJX HalfCheetah
 
-## Install
+We consider a wide diversity of environments (gymnax, MiniGrid, mujoco, Kinetix) and types of environmental changes (observation noise and differnet types of change in transition dynamics, action reversal).
 
-Needs Linux, Python 3.11–3.13, CUDA 12 (optional, since it also runs on CPU) and [uv](https://docs.astral.sh/uv/).
+
+## Set up
+
+Install all package dependencies with [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv sync && source .venv/bin/activate
-python -c "import jax; print(jax.devices())"
 ```
 
-## Run
+All experiments were run on a single NVIDIA RTX 6000 GPU.
+
+## How to run experiments
+
+To run all experiments:
 
 ```bash
-bash scripts/train/run.sh [--gpus N] SETTING[:METHODS] ...
+bash scripts/train/run.sh
 ```
+
+To choose a subset of environments, methods or settings:
 
 ```bash
-# quick check
-ENVS=CartPole-v1 bash scripts/train/run.sh --gpus 1 --trials 1 --root runs gymnax_noncontinual:ga
-
-# GA and PPO on continual gymnax
-bash scripts/train/run.sh --gpus 2 gymnax_continual:ga,ppo
-
-# everything
-bash scripts/train/run.sh --gpus 8 all
+bash scripts/train/run.sh [--envs ENVS] [--methods METHODS] [--settings continual,noncontinual]
 ```
 
-| Settings | Methods |
+For example:
+
+```bash
+# quick check: GA on stationary CartPole, one trial
+bash scripts/train/run.sh --envs CartPole-v1 --methods ga --settings noncontinual --trials 1
+
+# GA and PPO on all continual gymnax environments
+bash scripts/train/run.sh --benchmarks gymnax --methods ga,ppo --settings continual
+```
+
+Any option left out defaults to everything in the paper. Jobs are spread over all visible GPUs; use `--gpus N` to use only the first N.
+
+| Option | Values |
 |---|---|
-| `{gymnax,minigrid,kinetix,cheetah}_{continual,noncontinual}`, `all` | `ga` `dns` `dns_gaussian` `es` `pbt` `pbt2` `ppo` `trac` `redo` `cchain` |
+| `--benchmarks` | `gymnax` `minigrid` `kinetix` `mjx` |
+| `--envs` | gymnax: `CartPole-v1` `Acrobot-v1` `MountainCar-v0`; minigrid: `MiniGrid_8x8` `MiniGrid_16x16` `MiniGrid_8x8_16x16`; kinetix: `Kinetix-<level>` `Kinetix20`; mjx: `cheetah` `cheetah_noise` `cheetah_friction` |
+| `--methods` | `ga` `dns` `dns_gaussian` `es` `pbt` `pbt2` `ppo` `trac` `redo` `cchain` |
+| `--settings` | `noncontinual` `continual` |
 
-Runs go to `<root>/<benchmark>/<setting>/<method>/<cell>/trial_<n>/`. Finished trials are skipped on rerun. See `--help` for more options, and [scripts/README.md](scripts/README.md) for evaluation and figures.
+Runs go to `runs/<benchmark>/<setting>/<method>/<env>/trial_<n>/`. Finished trials are skipped on rerun. See `--help` for more options.
 
----
+## Notebooks
 
-`third_party/kinetix/` is a modified copy of [Kinetix](https://github.com/FLAIROx/Kinetix) and keeps its original license.
+The [notebooks](notebooks/) analyse saved runs and redraw figures of the paper from the data in `notebooks/data/`. They need only numpy, scipy and matplotlib, and run on Colab.
+
+- [basin_width.ipynb](notebooks/basin_width.ipynb): how the basin width and the shared basin are measured, step by step on an ES and a PPO run, ending with the paper's basin figure.
+- [compare_methods.ipynb](notebooks/compare_methods.ipynb): every method on CartPole with observation offsets: training curves, the stability-plasticity trade-off (LA, F, Cum., ZT), dormant units and weight growth, and population diversity.
