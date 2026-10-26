@@ -10,7 +10,7 @@
 
 A sweep is 2-D
 (or d-D) arithmetic vmapped over levels and seeds, so it is CPU work
-(`JAX_PLATFORMS=cpu`) and minutes. `scripts/train/queue_toy.sh` runs every
+(`JAX_PLATFORMS=cpu`) and minutes. `scripts/train/run_toy.sh` runs every
 stage the paper uses.
 
 Not a benchmark, so not `source/run.py`: a toy is a score function over a

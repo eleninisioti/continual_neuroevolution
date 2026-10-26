@@ -21,10 +21,9 @@ bodies and across families:
                               (`source/metrics/plasticity.py`), here between
                               every pair of members.
 
-The column names are the ones `scripts/plotting/make_plasticity_figure.py` already
-resolves for its `genomic_diversity` and `fitness_std` rows (the gymnax
-trainers' behaviour tracker wrote them), so the diversity figure needs no
-new vocabulary.
+The column names, `genomic_diversity` and `fitness_std`, are the ones the
+gymnax trainers' behaviour tracker writes, so every runner's records share
+one vocabulary.
 
 Host-side numpy for the first two (a population is at most a few hundred
 short vectors here); the behavioural statistic is one jitted call per record.

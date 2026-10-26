@@ -551,7 +551,7 @@ def build_policy(key, obs_dim, action_dim, hidden_dims):
 
 
 def _rollout(env, spec, policy, param_template, episode_length, collect=False,
-             whiten=False, trace=False):
+             whiten=False):
     """``episode(flat_params, key, task) -> return``, or with the trace.
 
     One undiscounted episode return. Reward accrues only until the first
@@ -573,11 +573,6 @@ def _rollout(env, spec, policy, param_template, episode_length, collect=False,
     ``nan_to_num`` on the reward is the mjx guard the paper's trainers carry: a
     diverging sim returns NaN on the terminating step, and one NaN in a
     population poisons every reduction over it.
-
-    ``trace`` is the post-hoc passes' variant of ``collect``: it emits the
-    POLICY INPUT (offset and, when the spec carries whitening statistics,
-    whitened) rather than the raw observation, plus the torso's xy after each
-    step as an occupancy feature. See ``make_trace_fn``.
     """
 
     def episode(flat_params, key, task):
@@ -614,11 +609,7 @@ def _rollout(env, spec, policy, param_template, episode_length, collect=False,
                 valid = 1.0 - done_flag
                 done_flag = jnp.maximum(done_flag,
                                         jnp.maximum(next_state.done, blown))
-                if trace:
-                    # Body 0 is the torso on every brax body; its xy is where
-                    # the agent went.
-                    emitted = (x, next_state.pipeline_state.x.pos[0, :2], valid)
-                elif collect:
+                if collect:
                     emitted = (obs, valid)
                 else:
                     emitted = None
@@ -626,9 +617,6 @@ def _rollout(env, spec, policy, param_template, episode_length, collect=False,
 
             (_, total, _), out = jax.lax.scan(
                 step_fn, (state, 0.0, 0.0), None, length=episode_length)
-        if trace:
-            inputs, torso_xy, valid = out
-            return total, inputs, torso_xy, valid
         if not collect:
             return total
         all_obs, valid = out
@@ -762,53 +750,6 @@ def _reset_blown_up(state):
     reward = jnp.where(bad, jnp.zeros_like(state.reward), state.reward)
     return state.replace(pipeline_state=pipeline_state, obs=obs, done=done,
                          reward=reward)
-
-
-# ============================================================================
-# The post-hoc passes (`source/envs/run_context.RunContext`)
-# ============================================================================
-#
-# What `evaluate_continual`, `behavioural_divergence` and
-# `plasticity_checkpoints` need beyond the training interface, as on MiniGrid
-# and Kinetix. Two things are particular to this suite:
-#
-# WHITENING. An NE run trained with `--obs_norm` saved RAW policy weights that
-# expect the whitened observation, while an RL run's `final` checkpoint has
-# its normaliser folded into `Dense_0` and expects the raw one. The spec
-# decides: `registry.make_env_for_run` builds the env with `obs_norm` when the
-# run recorded it, so `spec.obs_mean` is set exactly for the runs that
-# whitened, and every rollout below whitens iff it is set. That is also why
-# `RunContext.cache_key` carries `obs_norm`: the two kinds of run must not
-# share a jitted trace.
-#
-# STATES ARE POLICY INPUTS. The trace keeps what the policy consumed (offset
-# added, whitening applied) rather than the raw observation, and `policy_input`
-# is the identity. `behavioural_divergence` measures row i of its matrix on
-# the states agent i visited on sub-task i, under sub-task i's shift -- which
-# is exactly this input -- and `SuiteContext.logits_of` takes no task.
-
-def make_trace_fn(env, env_params, policy, param_template, episode_length):
-    """``trace(flat_params, key, task) -> (states, occupancy, alive, ret)``.
-
-    ``states`` are the ``(T, obs_dim)`` policy inputs (see above),
-    ``occupancy`` the torso's xy after each step, ``alive`` the mask of steps
-    before the first termination, ``ret`` the undiscounted return -- the same
-    return the training rollout scores.
-    """
-    spec = env_params
-    episode = _rollout(env, spec, policy, param_template, episode_length,
-                       whiten=spec.obs_mean is not None, trace=True)
-
-    def trace(flat_params, key, task):
-        total, inputs, torso_xy, valid = episode(flat_params, key, task)
-        return inputs, torso_xy, valid, total
-
-    return trace
-
-
-def policy_input(states):
-    """The trace already keeps the policy's input; nothing to encode."""
-    return jnp.asarray(states)
 
 
 _PROBE_FNS = {}

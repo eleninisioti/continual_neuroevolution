@@ -231,7 +231,7 @@ def summarise_records(records, num_tasks, threshold):
 
 
 #: Recorded in a run's config once its records carry the figure-facing names
-#: below. `scripts/plotting/make_lineplot.py` branches on it.
+#: below, so a reader can tell them from runs that predate the names.
 COLUMN_NAMING = 'gymnax_aliases_v1'
 
 

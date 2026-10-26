@@ -37,7 +37,6 @@ from __future__ import annotations
 import os
 
 import jax
-import jax.numpy as jnp
 import numpy as np
 
 from source.metrics.behaviour_descriptors import (
@@ -227,63 +226,3 @@ class PopulationDiversityTracker:
         )
         return path
 
-
-def continual_snapshot_gens(num_generations, task_interval, per_task):
-    """Snapshot generations, pinned relative to each sub-task.
-
-    The tracker's own schedule spreads snapshots evenly over the whole run,
-    which in the continual setting scatters them across sub-task boundaries and
-    leaves some sub-tasks unsampled. Diversity *at the switch* is the quantity
-    of interest, so each sub-task gets the same schedule: `per_task`
-    generations spread over its own range, which always includes its first
-    generation and the one immediately before the next switch.
-
-    Set `tracker.snapshot_gens` to the result; build the tracker with
-    `snapshots=0` so it does not also install its own.
-    """
-    if per_task <= 0 or num_generations <= 0:
-        return set()
-    gens = set()
-    for start in range(0, num_generations, task_interval):
-        stop = min(start + task_interval, num_generations) - 1
-        if stop < start:
-            continue
-        gens.update(np.linspace(start, stop,
-                                min(per_task, stop - start + 1)).astype(int).tolist())
-    return gens
-
-
-def add_diversity_args(parser, default_interval=10):
-    """The flags every gymnax NE trainer exposes for this."""
-    group = parser.add_argument_group("behavioural diversity tracking")
-    group.add_argument('--track_diversity', type=int, default=1,
-                       help='Log behavioural diversity of the population '
-                            '(0 disables it and the extra rollout bookkeeping)')
-    group.add_argument('--diversity_interval', type=int, default=default_interval,
-                       help='Measure diversity every N generations')
-    group.add_argument('--occupancy_bins', type=int, default=12,
-                       help='Bins per dimension of the state-occupancy histogram')
-    group.add_argument('--diversity_max_pairwise', type=int, default=128,
-                       help='Individuals compared pairwise per diversity number')
-    group.add_argument('--num_probe_states', type=int, default=512,
-                       help='Size of the frozen probe batch for the '
-                            'action-distribution measure')
-    group.add_argument('--behaviour_snapshots', type=int, default=8,
-                       help='Generations whose trajectories are saved to '
-                            'behaviour_snapshots.npz for the offline shared-'
-                            'encoder analysis (0 disables)')
-    return parser
-
-
-def summarise(metrics):
-    """Short one-line form of a diversity dict, for the training log."""
-    parts = []
-    for key, label in (("bd_handcrafted_diversity", "hand"),
-                       ("bd_occupancy_diversity", "occ"),
-                       ("bd_action_usage_diversity", "act"),
-                       ("bd_aurora_diversity", "aur"),
-                       ("bd_probe_js", "probe"),
-                       ("bd_probe_action_dist", "probe")):
-        if key in metrics:
-            parts.append(f"{label} {metrics[key]:.3f}")
-    return " | ".join(parts)

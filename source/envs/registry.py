@@ -286,19 +286,3 @@ def suite_for(env_name):
                        f"{sorted(ENV_SUITE)}")
     return ENV_SUITE[env_name]
 
-
-def threshold_for(env_name, threshold_set='generalists'):
-    """The solved threshold for ``env_name``, or None where there is not one.
-
-    One place decides, so a table, a figure and a trainer cannot disagree about
-    whether an environment has a threshold at all. gymnax has three named sets
-    and this picks one of them; the mjx body has none --
-    ``source/metrics/evaluation_metrics.py`` says outright that
-    CheetahRun has no threshold to compare against -- so this returns None and everything downstream reports the generalist
-    SCORE instead of a found/held count. Nothing invents a constant.
-    """
-    # The mjx bodies and MiniGrid have none -- see their modules.
-    if suite_for(env_name) != 'gymnax':
-        return None
-    from source.envs.gymnax_classic import get_threshold
-    return get_threshold(env_name, threshold_set)

@@ -119,7 +119,6 @@ from source.metrics.population_diversity import (diversity_columns,
                                                  make_pairwise_behaviour_fn)
 from source.algorithms.rl import ppo as ppo_lib
 from source.algorithms.rl.ppo import make_rollout_fn, make_update_fn
-from source.algorithms.rl.pbt import pbt_arm, pbt_kwargs  # noqa: F401  (re-exported)
 from source.algorithms.rl import redo as redo_lib
 from source.algorithms.rl.redo import criterion_for_activation
 from source.utils.run_artifacts import save_checkpoints
@@ -1149,8 +1148,7 @@ def run_ppo(env_name='CartPole-v1', method='ppo', schedule='switch',
                   centroids=np.stack(checkpoints),
                   generations=np.asarray(checkpoint_updates),
                   noise_vectors=np.asarray(noise_vectors))
-        # Beside it, never through `save_eval_artifacts`: that writes a
-        # `results.json` of its own and would clobber the one above.
+        # `checkpoints.npz`, beside it.
         if pbt is None:
             save_checkpoints(
                 output_dir,

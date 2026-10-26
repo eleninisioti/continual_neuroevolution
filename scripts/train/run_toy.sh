@@ -2,15 +2,21 @@
 # =============================================================================
 # The toy-landscape block, on the toy runner (scripts/train/toy_sweep.py).
 #
-#   bash scripts/train/queue_toy.sh                  # every stage, in order
-#   ONLY="wells_d400 wells_pop" bash scripts/train/queue_toy.sh
+#   bash scripts/train/run_toy.sh                  # every stage, in order
+#   ONLY="wells_d400 wells_pop" bash scripts/train/run_toy.sh
 #
 # smooth, rugged    every arm the paper has, plus the dns_corrected control.
 # rugged_d386       section B with 384 null coordinates: the policy's size.
 # wells_d{2,50,400} the centroid question: two equal wells per relevant
 #                   coordinate, d - 2 coordinates that change nothing.
-# wells_pop         GA and dns_gaussian at archive sizes 8 .. 512 on the tied
+# wells_pop         GA and dns_gaussian at pop 16, 64, 1024 on the tied
 #                   wells: how long drift takes to pick a well.
+# ripdim            the appendix grid: GA and ES as the rugged k grows.
+# rippop            does a larger population move the k where the GA fails?
+# stiff_smooth      hardness with the number of stiff directions, not with d.
+# smooth/rugged_d128  the local-optima toy in d = 128.
+# sigma             does the width of the basin ES settles in depend on sigma?
+# wells_k           many equal peaks: does the centroid gap grow with k?
 # projections       full-dimensional snapshots for the PCA / plane figures.
 #
 # Arithmetic, not rollouts: CPU (JAX_PLATFORMS=cpu), so it never competes with
@@ -110,7 +116,6 @@ done
 # all 128. <name>_d128 sweeps the 2-D figure's sigma grid, so the sweep's own
 # best sigma (and the path it saves) is chosen the way the 2-D figure's was;
 # <name>_d128_wide adds sigma 0.3 / 0.4 for the table.
-# plot_toy_local_optima.py --dims 128 reads both.
 D128="--num_params 128 --num_seeds 24 --methods ga es"
 sweep smooth_d128 --landscape smooth $D128
 sweep rugged_d128 --landscape rugged --rugged_dims 128 $D128
@@ -119,8 +124,8 @@ sweep rugged_d128_wide --landscape rugged --rugged_dims 128 $D128 --sigmas 0.3 0
 # sigma: does the width of the basin ES settles in depend on its sigma?
 # ES and the GA at seven widths on the smooth toy (no local optima), the rugged toy (local optima of one width) and the spikes toy (a
 # narrow tall specialist on each shoulder of the wide shared hill), with the
-# full centroid saved at every record. plot_toy_sigma_basin.py measures the
-# landscape around the end-of-phase centroid and reads all three.
+# full centroid saved at every record, so the landscape around the
+# end-of-phase centroid can be measured afterwards.
 SIGMA="--num_seeds 24 --methods ga es --record_centroid --sigmas 0.01 0.02 0.05 0.1 0.2 0.4 0.8"
 sweep sigma_smooth --landscape smooth $SIGMA
 sweep sigma_rugged --landscape rugged $SIGMA --levels 0 0.4 0.8 1.6

@@ -50,9 +50,8 @@ from flax import struct
 from jax import random, flatten_util
 
 from source.algorithms.networks import MLPPolicy  # noqa: F401  (re-exported)
-from source.utils.task_sequence import (  # noqa: F401  (cycle re-exported)
-    GYMNAX_PHYSICS_TASKS, action_flip_sequence, cycle_task_sequence,
-    physics_mult_sequence)
+from source.utils.task_sequence import (
+    GYMNAX_PHYSICS_TASKS, action_flip_sequence, physics_mult_sequence)
 from source.metrics.aurora import (  # noqa: F401  (re-exported)
     episode_relative_indices,
 )
@@ -532,102 +531,6 @@ def wrap_actions(env):
     action order; ``DeepSeaEnv`` carries its own action sub-task (the map)
     and reads the same flag, so it is returned as is."""
     return env if isinstance(env, DeepSeaEnv) else FlipEnv(env)
-
-
-def gymnax_task_type(cfg):
-    """The gymnax trainers' family name for a run from EITHER trainer family.
-
-    The gymnax trainers record ``task_type`` (noise | param | actions); the
-    shared runners record ``task`` (the suite's ``describe()``) under physics
-    and actions and nothing under obs_noise. One name, so the post-hoc passes
-    key their jitted rollouts -- and wrap FlipEnv -- the same way for both.
-    """
-    if 'task_type' in cfg:
-        return cfg['task_type']
-    mod = (cfg.get('task') or {}).get('task_mod')
-    return {'physics': 'param', 'actions': 'actions'}.get(mod, 'noise')
-
-
-def saved_task_rows(cfg, ckpt_files, stock_params, env_name=None):
-    """``(offsets, bodies, mults)`` per SAVED PHASE, for either trainer family.
-
-    ``offsets`` is what is added to the observation, ``(T, obs_dim)``;
-    ``bodies`` one env params pytree per phase (the body and action order the
-    phase was trained under); ``mults`` the physics multiplier per phase (1.0
-    where the family has none). ``T`` is the number of rows in the
-    checkpoint's ``noise_vectors``, i.e. the phases that were saved.
-
-    The gymnax trainers' runs (``task_type`` in the config) keep the offset in
-    ``noise_vectors`` and the body in ``param_mults`` / ``action_flips``; the
-    shared runners' runs keep ONE row per phase whose meaning the run's
-    ``task`` block gives -- the multiplier itself under physics, the flip flag
-    plus its cue under actions, the offset under obs_noise -- and their
-    ``num_tasks`` is the number of DISTINCT sub-tasks, not the phase count.
-    """
-    env_name = env_name or cfg['env']
-    rows = np.asarray(ckpt_files['noise_vectors'], dtype=np.float32)
-    if 'task_type' in cfg:
-        bodies = _legacy_task_params(cfg, ckpt_files, stock_params, env_name)
-        mults = (np.asarray(ckpt_files['param_mults'], dtype=np.float64)
-                 if 'param_mults' in ckpt_files else np.ones(len(rows)))
-        return rows, bodies, mults[:len(rows)]
-    if not cfg.get('task'):
-        # obs_noise on the shared runner: the row is the offset, the body the stock one.
-        return rows, [stock_params] * len(rows), np.ones(len(rows))
-    from source.envs.registry import make_env_for_run
-    _env, spec, obs_dim, _action_dim = make_env_for_run(cfg)
-    offsets, bodies, mults = [], [], []
-    for row in rows:
-        off = spec.obs_offset(row)
-        offsets.append(np.zeros(obs_dim, dtype=np.float32) if np.ndim(off) == 0
-                       else np.asarray(off, dtype=np.float32))
-        bodies.append(spec.env_params(row))
-        mults.append(float(row[0]) if spec.task_mod == 'physics' else 1.0)
-    return np.stack(offsets), bodies, np.asarray(mults, dtype=np.float64)
-
-
-def saved_task_params(cfg, ckpt_files, stock_params, env_name=None):
-    """The env params each saved phase of a run was trained under; see
-    ``saved_task_rows``, which also gives the offsets."""
-    if 'task_type' not in cfg:
-        return saved_task_rows(cfg, ckpt_files, stock_params, env_name)[1]
-    return _legacy_task_params(cfg, ckpt_files, stock_params, env_name)
-
-
-def _legacy_task_params(cfg, ckpt_files, stock_params, env_name=None):
-    """The env params each sub-task of a SAVED run was trained under.
-
-    ``cfg`` is the run's results.json and ``ckpt_files`` the dict-like
-    checkpoints.npz beside it. Returns one params pytree per sub-task, in
-    order, so a post-hoc pass can roll a saved agent under exactly the body
-    and action order its sub-task had. The observation offset is NOT in here:
-    it lives in ``noise_vectors`` and is added to the observation by the
-    caller, as in training.
-
-    One function for the three families (one shared code path).
-    """
-    env_name = env_name or cfg['env']
-    # Absent in older runs: defaults to the offset family.
-    task_type = cfg.get('task_type', 'noise')
-    num_tasks = int(cfg['num_tasks'])
-    if task_type == 'param':
-        if 'param_mults' not in ckpt_files:
-            raise ValueError(f"{cfg.get('method')}/{env_name}: task_type=param "
-                             f"but no param_mults saved")
-        mults = np.asarray(ckpt_files['param_mults'], dtype=float)
-        return [apply_physics(env_name, stock_params, cfg['param_name'],
-                              float(mults[t]))
-                for t in range(min(num_tasks, len(mults)))]
-    if task_type == 'actions':
-        # `action_flips` is the only record of the sequence, so a run
-        # without it cannot be scored at all.
-        if 'action_flips' not in ckpt_files:
-            raise ValueError(f"{cfg.get('method')}/{env_name}: "
-                             f"task_type=actions but no action_flips saved")
-        flips = np.asarray(ckpt_files['action_flips'])
-        return [FlippedParams(stock_params, jnp.float32(flips[t]))
-                for t in range(min(num_tasks, len(flips)))]
-    return [stock_params] * num_tasks
 
 
 class TaskSpec:

@@ -109,7 +109,7 @@ __all__ = [
     'make_scoring_fn', 'make_fixed_seed_scoring_fn',
     'make_descriptor_scoring_fn', 'make_trajectory_scoring_fn',
     'descriptor_dim', 'traj_feature_dim', 'rl_env_fns',
-    'make_trace_fn', 'policy_input', 'random_policy_observations',
+    'random_policy_observations',
 ]
 
 
@@ -505,53 +505,6 @@ def make_fixed_seed_scoring_fn(env, env_params, policy, param_template,
         return _chunked(one_chunk, genomes, min(chunk, genomes.shape[0]))
 
     return score
-
-
-# ============================================================================
-# The post-hoc passes (`source/envs/run_context.RunContext`)
-# ============================================================================
-#
-# What `evaluate_continual`, `behavioural_divergence` and
-# `plasticity_checkpoints` need beyond the training interface. The pixel frame
-# is what makes this body different from the other suites here: 46,876 floats
-# a step, so a trace cannot keep what the policy saw. It keeps the 13-value
-# `step_features` instead -- enough for the return, the state-visitation
-# feature and the episode mask, which is all the ZT pass reads.
-
-def make_trace_fn(env, env_params, policy, param_template, episode_length):
-    """``trace(flat_params, key, task) -> (states, occupancy, alive, ret)``.
-
-    ``states`` are the per-step ``step_features`` (``(T, 13)``: green xy and
-    velocity, blue xy, their distance, the six action channels) -- NOT the
-    frames, see above. ``occupancy`` is the green body's xy, the natural
-    state-visitation feature on a physics level. ``alive`` masks the steps
-    before the first termination.
-    """
-    del env_params
-    episode = _rollout(env, policy, param_template, episode_length,
-                       collect=True)
-
-    def trace(flat_params, key, task):
-        total, feats, _actions, valid = episode(flat_params, key, task)
-        return feats, feats[:, :2], valid, total
-
-    return trace
-
-
-def policy_input(states):
-    """Compact states -> the batch the policy consumes.
-
-    Not available on this body: a compact state here is `step_features`, and
-    the policy consumes the rendered frame, which the trace does not keep (one
-    behavioural-divergence sweep's worth of frames is tens of GB). Behavioural
-    divergence on Kinetix needs a trace that keeps the physics `EnvState` and
-    re-renders it here; until then the BD column is `--` for this body and the
-    F column, which is returns only, is not affected.
-    """
-    raise NotImplementedError(
-        'kinetix.policy_input: the trace keeps step_features, not frames; '
-        'behavioural divergence needs an EnvState-keeping trace (see the '
-        'docstring)')
 
 
 def random_policy_observations(env, env_params, task, num_obs, seed=0,

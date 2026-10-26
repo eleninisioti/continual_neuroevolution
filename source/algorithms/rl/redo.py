@@ -85,24 +85,6 @@ def criterion_for_activation(activation):
         ) from None
 
 
-def criterion_for_activation_fn(activation_fn):
-    """Same, for callers that hold the activation callable rather than its name.
-
-    brax builds its networks from an `ActivationFn`, not from a string. The
-    callables in `core.networks.ACTIVATIONS` are the flax/jax ones, so identity
-    against them resolves the name.
-    """
-    from source.algorithms.networks import ACTIVATIONS
-
-    for name, fn in ACTIVATIONS.items():
-        if fn is activation_fn:
-            return criterion_for_activation(name)
-    raise ValueError(
-        f"Cannot map activation {activation_fn!r} to a ReDo dormancy criterion. "
-        f"Add it to core.networks.ACTIVATIONS and _CRITERION_FOR_ACTIVATION."
-    )
-
-
 def neuron_dormancy_score(act, criterion):
     """Per-neuron score along the last axis of `act`, normalised by the layer mean.
 

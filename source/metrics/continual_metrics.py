@@ -23,8 +23,8 @@ define the same column differently.
 
 Forgetting, behavioural divergence and zero-shot transfer are not functions of
 a training curve. They are measured post hoc, by re-rolling every sub-task's
-saved agent against every sub-task (`evaluate_continual.py`), and live in the
-`evaluation.json` / divergence records that pass writes. A tree without that
+saved agent against every sub-task, and live in the records that pass
+writes. A tree without that
 pass has no F, BD or ZT, and the honest report is a blank rather than a number
 derived from something else.
 

@@ -15,7 +15,6 @@ The left-hand name is what lands in `training_metrics.json`; the tuple is the
 candidate keys a given brax version may have used, tried in order.
 """
 
-import numpy as np
 
 from source.metrics import weight_stats
 
@@ -81,73 +80,3 @@ NTK_KEYS = {
 
 DIAGNOSTIC_KEYS = {**CORE_KEYS, **WEIGHT_KEYS, **NTK_KEYS}
 
-
-def extract(metrics, keys=DIAGNOSTIC_KEYS):
-    """The gymnax-named diagnostics present in `metrics`, else None.
-
-    None rather than omitted: `training_metrics.json` then has one schema for
-    every method and every record, which is what lets a reader tell "this method
-    does not have churn" from "this record predates churn logging".
-    """
-    out = {}
-    for name, candidates in keys.items():
-        value = None
-        for key in candidates:
-            raw = metrics.get(key)
-            if raw is None:
-                continue
-            # np.asarray().mean() rather than float(): the loss metrics come
-            # straight off training_epoch_pmap and are still per-device arrays,
-            # and float() on those raises -- which an earlier version swallowed
-            # into None, so every loss column was silently empty while the
-            # dormant ones (already host floats) worked.
-            try:
-                value = float(np.asarray(raw, dtype=float).mean())
-            except (TypeError, ValueError):
-                value = None
-            break
-        out[name] = value
-    return out
-
-
-def make_missing_reporter(keys=DIAGNOSTIC_KEYS, min_records=4, printer=print):
-    """A callable that reports, once, which tracked keys never showed up.
-
-    The mapping above is against key names a brax version bump can rename, and a
-    diagnostic that silently logs None for a whole sweep is the failure this
-    guards against.
-
-    It deliberately does not fire on the first record: each sub-task's *initial*
-    evaluation runs with `training_metrics={}`, so it carries no losses and no
-    dormant stats by construction. Reporting there listed every key as missing
-    on a run where they all in fact arrive one record later -- and a warning
-    that fires on every healthy run is one nobody reads. So: wait for a record
-    that has at least one diagnostic and report what is still absent there; if
-    several records pass with nothing at all, say that instead.
-    """
-    state = {'done': False, 'seen': 0}
-
-    def report(metrics):
-        if state['done']:
-            return
-        got = extract(metrics, keys)
-        present = {k for k, v in got.items() if v is not None}
-        state['seen'] += 1
-        if not present:
-            # C-CHAIN's churn keys are absent for every other method, so "no
-            # diagnostics at all" is only alarming once a few records have gone
-            # by with nothing.
-            if state['seen'] >= min_records:
-                state['done'] = True
-                printer("  [diagnostics] WARNING: no tracked key appeared in "
-                        f"the first {state['seen']} records.")
-                printer(f"  [diagnostics] metrics keys were: {sorted(metrics)}")
-            return
-        state['done'] = True
-        missing = sorted(k for k, v in got.items() if v is None)
-        if missing:
-            printer(f"  [diagnostics] present: {len(present)}; absent: {missing}")
-        else:
-            printer("  [diagnostics] all tracked keys present")
-
-    return report

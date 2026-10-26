@@ -156,13 +156,6 @@ def unflatten_params(flat_params, param_template):
     return unravel_fn(flat_params)
 
 
-def create_policy_network(key, obs_dim, action_dim, hidden_dims=(16, 16)):
-    policy = MLPPolicy(hidden_dims=hidden_dims, action_dim=action_dim)
-    dummy_obs = jnp.zeros((obs_dim,))
-    params = policy.init(key, dummy_obs)
-    return policy, params
-
-
 def create_grid_conv_policy_network(key, obs_shape, action_dim,
                                   hidden_dims=(128,), conv_features=16):
     policy = GridConvPolicy(obs_shape=tuple(obs_shape),

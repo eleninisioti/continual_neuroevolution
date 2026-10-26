@@ -78,7 +78,7 @@ __all__ = [
     'build_policy', 'descriptor_dim', 'make_scoring_fn',
     'make_fixed_seed_scoring_fn', 'make_descriptor_scoring_fn',
     'make_trajectory_scoring_fn', 'task_vectors', 'obs_offset', 'rl_env_fns',
-    'make_trace_fn', 'policy_input', 'random_policy_observations',
+    'random_policy_observations',
 ]
 
 # Short name -> xminigrid id. Every registered MiniGrid environment shares the
@@ -501,43 +501,6 @@ def make_trajectory_scoring_fn(env, env_params, policy, param_template,
                 trajectories[:, 0])
 
     return score
-
-
-# ============================================================================
-# Post-hoc measurement, for the passes that re-score SAVED agents
-# ============================================================================
-#
-# `source/envs/run_context.py` builds a finished run's environment and policy
-# back from its config and needs three things a training rollout does not
-# expose: the states an agent visited (compactly), a cheap occupancy feature
-# per step, and a probe batch under a policy that belongs to no arm. Each
-# suite that the shared runners drive supplies them here; the gymnax passes
-# have their own, older path and are untouched.
-
-def make_trace_fn(env, env_params, policy, param_template, episode_length):
-    """``trace(flat_params, key, task) -> (states, occupancy, alive, ret)``.
-
-    ``states`` are the RAW ``(T, 7, 7, 2)`` uint8 views -- 98 bytes a step,
-    against 4,900 for the encoded planes -- so a 20-agent x 20-episode sweep
-    of 1024-step episodes is 40 MB rather than 2 GB; ``policy_input`` encodes
-    whichever subset a pass keeps. ``occupancy`` is the agent's scaled
-    ``(row, col)`` after each step, the natural state-visitation feature on a
-    grid. ``alive`` masks the steps before the first termination.
-    """
-    del env_params
-    episode = _rollout(env, policy, param_template, episode_length,
-                       collect=True)
-
-    def trace(flat_params, key, task):
-        total, views, valid, positions = episode(flat_params, key, task)
-        return views, positions, valid, total
-
-    return trace
-
-
-def policy_input(states):
-    """``(N, 7, 7, 2)`` raw views -> ``(N, 7 * 7 * 25)`` planes, the policy's input."""
-    return jax.vmap(encode_view)(jnp.asarray(states))
 
 
 def random_policy_observations(env, env_params, task, num_obs, seed=0,

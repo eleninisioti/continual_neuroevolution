@@ -225,14 +225,3 @@ def make_chain_sgd_epochs(
 
     return sgd_epochs_chain
 
-
-def add_chain_args(parser):
-    """CLI flags shared by both trainers."""
-    parser.add_argument('--chain_target_rel_scale', type=float, default=10000.0,
-                        help='Target relative scale of policy loss vs churn loss '
-                             '(0 disables the churn regularizer)')
-    parser.add_argument('--chain_warmup_updates', type=int, default=10,
-                        help='Updates into a task before the coefficient is auto-tuned')
-    parser.add_argument('--chain_coef_window', type=int, default=50,
-                        help='Number of recent updates averaged by the coefficient controller')
-    return parser

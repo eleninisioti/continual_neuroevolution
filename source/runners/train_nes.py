@@ -70,7 +70,7 @@ from jax import random
 from source.envs.registry import ENV_NAMES, get_suite, suite_for
 from source.utils.run_artifacts import save_checkpoints
 from source.algorithms.ne.searchers import (
-    DNS_METHODS, GA_METHODS, NE_METHODS, build_searcher,
+    DNS_METHODS, NE_METHODS, build_searcher,
 )
 from source.runners.common import (
     SCHEDULES, make_phase_grid, make_task_sequence, record_centroid_scores,
@@ -699,8 +699,7 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
     centroids = []
     centroid_gens = []
     # One saved network per sub-task PHASE, for the centroid plasticity
-    # figure. Written to `checkpoints.npz`, which is the only file
-    # `scripts/analysis/plasticity_checkpoints.py` reads; `trajectory.npz`'s
+    # figure. Written to `checkpoints.npz`; `trajectory.npz`'s
     # `centroids` is a different thing -- it is `incumbent`, sampled on
     # `checkpoint_interval`, and on the GA and DNS `incumbent` is NOT the
     # network the centroid lineplot scores. See save_checkpoints.
@@ -1107,12 +1106,9 @@ def run_nes(env_name='CartPole-v1', schedule='switch', num_generations=2000,
             arrays['champions'] = np.stack(champion_genomes)
             arrays['champion_generations'] = np.asarray(champion_gens)
         write_run(output_dir, result, records, **arrays)
-        # `checkpoints.npz`, alongside -- never through `save_eval_artifacts`,
-        # which would overwrite the `results.json` `write_run` just wrote with
-        # a schema that has no `task_sequence` and no suite `task` block.
-        # `noise_vectors` here is the PER-PHASE sequence: a schedule that
-        # revisits sub-tasks has more phases than sub-tasks, and a checkpoint
-        # belongs to the phase it closed.
+        # `checkpoints.npz`, alongside. `noise_vectors` here is the PER-PHASE
+        # sequence: a schedule that revisits sub-tasks has more phases than
+        # sub-tasks, and a checkpoint belongs to the phase it closed.
         save_checkpoints(
             output_dir,
             noise_vectors=[np.asarray(noise_vectors[t])
